@@ -406,42 +406,13 @@ func TestOperators(t *testing.T) {
 }
 
 func TestIdentifier(t *testing.T) {
-	idents := []string{
+	texts := []string{
 		"a",
 		"_x9",
 		"ThisVariableIsExported",
 		"αβ",
 	}
-	var tests []test
-	for _, text := range idents {
-		end := utf8.RuneCountInString(text) + 1
-		tests = append(tests, test{
-			text: text,
-			want: []Token{
-				{
-					Type: TokenIdentifier,
-					Text: text,
-					Span: span(1, end),
-				},
-				{
-					Type:     TokenOperator,
-					Span:     span(end, end),
-					Operator: OpSemicolon,
-				},
-				{
-					Type: TokenNewline,
-					Span: span(end, end),
-				},
-				{
-					Type: TokenEOF,
-					Span: span(end, end),
-				},
-			},
-		})
-	}
-	for i, test := range tests {
-		test.run(i, t)
-	}
+	literalThenSemicolon(t, texts, TokenIdentifier)
 }
 
 func TestIntegerLiteral(t *testing.T) {
@@ -457,7 +428,7 @@ func TestIntegerLiteral(t *testing.T) {
 		"0XF",
 		"9832",
 	}
-	numberLiterals(t, texts, TokenIntegerLiteral)
+	literalThenSemicolon(t, texts, TokenIntegerLiteral)
 }
 
 func TestFloatLiteral(t *testing.T) {
@@ -472,7 +443,7 @@ func TestFloatLiteral(t *testing.T) {
 		".25",
 		".12345E+5",
 	}
-	numberLiterals(t, texts, TokenFloatLiteral)
+	literalThenSemicolon(t, texts, TokenFloatLiteral)
 }
 
 func TestImaginaryLiteral(t *testing.T) {
@@ -487,13 +458,13 @@ func TestImaginaryLiteral(t *testing.T) {
 		".25i",
 		".12345E+5i",
 	}
-	numberLiterals(t, texts, TokenImaginaryLiteral)
+	literalThenSemicolon(t, texts, TokenImaginaryLiteral)
 }
 
-func numberLiterals(t *testing.T, texts []string, kind TokenType) {
+func literalThenSemicolon(t *testing.T, texts []string, kind TokenType) {
 	var tests []test
 	for _, text := range texts {
-		end := len(text) + 1
+		end := utf8.RuneCountInString(text) + 1
 		tests = append(tests, test{
 			text: text,
 			want: []Token{
