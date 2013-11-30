@@ -466,14 +466,16 @@ func (l *Lexer) nextLiteralToken() *Token {
 	case r == '\n':
 		return l.token(TokenNewline)
 	case isWhitespace(r):
-		return whitespaceToken(l)
+		return whitespace(l)
 	case isIdentStart(r):
-		return identifierToken(l)
+		return identifier(l)
+	case isDecimalDigit(r) || isOctalDigit(r) || isHexDigit(r):
+		return number(r, l)
 	case r == '^':
 		if l.rune() != '=' {
 			l.replace()
 		}
-		return operatorToken(l)
+		return operator(l)
 	case r == '<':
 		if r = l.rune(); r == '<' {
 			if r = l.rune(); r != '=' {
@@ -482,12 +484,12 @@ func (l *Lexer) nextLiteralToken() *Token {
 		} else if r != '=' && r != '-' {
 			l.replace()
 		}
-		return operatorToken(l)
+		return operator(l)
 	case r == '=' || r == ':' || r == '!' || r == '*' || r == '%':
 		if r = l.rune(); r != '=' {
 			l.replace()
 		}
-		return operatorToken(l)
+		return operator(l)
 	case r == '>':
 		if r = l.rune(); r == '>' {
 			if r = l.rune(); r != '=' {
@@ -496,38 +498,40 @@ func (l *Lexer) nextLiteralToken() *Token {
 		} else if r != '=' {
 			l.replace()
 		}
-		return operatorToken(l)
+		return operator(l)
 	case r == '|':
 		if r = l.rune(); r != '=' && r != '|' {
 			l.replace()
 		}
-		return operatorToken(l)
+		return operator(l)
 	case r == '-':
 		if r = l.rune(); r != '-' && r != '=' {
 			l.replace()
 		}
-		return operatorToken(l)
+		return operator(l)
 	case r == ',' || r == ';' || r == '(' || r == ')' || r == '[' || r == ']' || r == '{' || r == '}':
-		return operatorToken(l)
+		return operator(l)
 	case r == '/':
 		switch r := l.rune(); {
 		case r == '/':
-			return commentToken(l, []rune{'\n'})
+			return comment(l, []rune{'\n'})
 		case r == '*':
-			return commentToken(l, []rune{'*', '/'})
+			return comment(l, []rune{'*', '/'})
 		case r != '=':
 			l.replace()
 		}
-		return operatorToken(l)
+		return operator(l)
 	case r == '.':
 		if r = l.rune(); r == '.' {
 			if r = l.rune(); r != '.' {
 				return l.unexpected(r)
 			}
+		} else if isDecimalDigit(r) {
+			return fraction(l)
 		} else {
 			l.replace()
 		}
-		return operatorToken(l)
+		return operator(l)
 	case r == '&':
 		if r = l.rune(); r == '^' {
 			if r = l.rune(); r != '=' {
@@ -536,12 +540,12 @@ func (l *Lexer) nextLiteralToken() *Token {
 		} else if r != '=' && r != '&' {
 			l.replace()
 		}
-		return operatorToken(l)
+		return operator(l)
 	case r == '+':
 		if r = l.rune(); r != '+' && r != '=' {
 			l.replace()
 		}
-		return operatorToken(l)
+		return operator(l)
 	}
 	return l.unexpected(r)
 }
@@ -594,7 +598,7 @@ func needsSemicolon(tok *Token) bool {
 				tok.Operator == OpCloseBrace))
 }
 
-func operatorToken(l *Lexer) *Token {
+func operator(l *Lexer) *Token {
 	tok := l.token(TokenOperator)
 	oper, ok := operators[tok.Text]
 	if !ok {
@@ -604,7 +608,7 @@ func operatorToken(l *Lexer) *Token {
 	return tok
 }
 
-func identifierToken(l *Lexer) *Token {
+func identifier(l *Lexer) *Token {
 	r := l.rune()
 	for isIdent(r) {
 		r = l.rune()
@@ -626,7 +630,7 @@ func isIdent(r rune) bool {
 	return isIdentStart(r) || unicode.IsDigit(r)
 }
 
-func whitespaceToken(l *Lexer) *Token {
+func whitespace(l *Lexer) *Token {
 	r := l.rune()
 	for isWhitespace(r) {
 		r = l.rune()
@@ -639,7 +643,7 @@ func isWhitespace(r rune) bool {
 	return r == ' ' || r == '\t' || r == '\v' || r == '\r'
 }
 
-func commentToken(l *Lexer, closing []rune) *Token {
+func comment(l *Lexer, closing []rune) *Token {
 	i := 0
 	typ := TokenWhitespace
 	for i < len(closing) {
@@ -660,4 +664,77 @@ func commentToken(l *Lexer, closing []rune) *Token {
 		}
 	}
 	return l.token(typ)
+}
+
+func number(r0 rune, l *Lexer) *Token {
+	r := l.rune()
+	if r0 == '0' && (r == 'x' || r == 'X') {
+		return hex(l)
+	}
+	for {
+		switch {
+		case r == 'e' || r == 'E':
+			return mantissa(l)
+		case r == '.':
+			return fraction(l)
+		case r == 'i':
+			return l.token(TokenImaginaryLiteral)
+		case !isDecimalDigit(r):
+			l.replace()
+			return l.token(TokenIntegerLiteral)
+		}
+		r = l.rune()
+	}
+	panic("unreachable")
+}
+
+func mantissa(l *Lexer) *Token {
+	r := l.rune()
+	if r == '+' || r == '-' {
+		r = l.rune()
+	}
+	for isDecimalDigit(r) {
+		r = l.rune()
+	}
+	if r == 'i' {
+		return l.token(TokenImaginaryLiteral)
+	}
+	l.replace()
+	return l.token(TokenFloatLiteral)
+}
+
+func fraction(l *Lexer) *Token {
+	r := l.rune()
+	for isDecimalDigit(r) {
+		r = l.rune()
+	}
+	switch {
+	case r == 'i':
+		return l.token(TokenImaginaryLiteral)
+	case r == 'e' || r == 'E':
+		return mantissa(l)
+	}
+	l.replace()
+	return l.token(TokenFloatLiteral)
+}
+
+func hex(l *Lexer) *Token {
+	r := l.rune()
+	for isHexDigit(r) {
+		r = l.rune()
+	}
+	l.replace()
+	return l.token(TokenIntegerLiteral)
+}
+
+func isDecimalDigit(r rune) bool {
+	return r >= '0' && r <= '9'
+}
+
+func isOctalDigit(r rune) bool {
+	return r >= '0' && r <= '7'
+}
+
+func isHexDigit(r rune) bool {
+	return (r >= '0' && r <= '9') || (r >= 'A' && r <= 'F') || (r >= 'a' && r <= 'f')
 }

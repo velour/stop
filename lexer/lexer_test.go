@@ -3,6 +3,7 @@ package lexer
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"gogo/loc"
 )
@@ -311,6 +312,211 @@ func TestSemicolonInsertion(t *testing.T) {
 				Span: span(7, 7),
 			},
 		}},
+	}
+
+	for i, test := range tests {
+		test.run(i, t)
+	}
+}
+
+func TestKeywords(t *testing.T) {
+	var tests []test
+	for text, keyword := range keywords {
+		if keyword == KeywordNone {
+			continue
+		}
+		end := len(text) + 1
+		toks := []Token{
+			{
+				Type:    TokenKeyword,
+				Text:    text,
+				Span:    span(1, end),
+				Keyword: keyword,
+			},
+			{
+				Type: TokenNewline,
+				Span: span(end, end),
+			},
+			{
+				Type: TokenEOF,
+				Span: span(end, end),
+			},
+		}
+		switch keyword {
+		case KeywordBreak, KeywordContinue, KeywordFallthrough, KeywordReturn:
+			semi := Token{
+				Type:     TokenOperator,
+				Span:     span(end, end),
+				Operator: OpSemicolon,
+			}
+			toks = []Token{toks[0], semi, toks[1], toks[2]}
+		}
+		tests = append(tests, test{
+			text: text,
+			want: toks,
+		})
+	}
+
+	for i, test := range tests {
+		test.run(i, t)
+	}
+}
+
+func TestOperators(t *testing.T) {
+	var tests []test
+	for text, op := range operators {
+		if op == OpNone {
+			continue
+		}
+		end := len(text) + 1
+		toks := []Token{
+			{
+				Type:     TokenOperator,
+				Text:     text,
+				Span:     span(1, end),
+				Operator: op,
+			},
+			{
+				Type: TokenNewline,
+				Span: span(end, end),
+			},
+			{
+				Type: TokenEOF,
+				Span: span(end, end),
+			},
+		}
+		switch op {
+		case OpPlusPlus, OpMinusMinus, OpCloseParen, OpCloseBracket, OpCloseBrace:
+			semi := Token{
+				Type:     TokenOperator,
+				Span:     span(end, end),
+				Operator: OpSemicolon,
+			}
+			toks = []Token{toks[0], semi, toks[1], toks[2]}
+		}
+		tests = append(tests, test{
+			text: text,
+			want: toks,
+		})
+	}
+
+	for i, test := range tests {
+		test.run(i, t)
+	}
+}
+
+func TestIdentifier(t *testing.T) {
+	idents := []string{
+		"a",
+		"_x9",
+		"ThisVariableIsExported",
+		"αβ",
+	}
+	var tests []test
+	for _, text := range idents {
+		end := utf8.RuneCountInString(text) + 1
+		tests = append(tests, test{
+			text: text,
+			want: []Token{
+				{
+					Type: TokenIdentifier,
+					Text: text,
+					Span: span(1, end),
+				},
+				{
+					Type:     TokenOperator,
+					Span:     span(end, end),
+					Operator: OpSemicolon,
+				},
+				{
+					Type: TokenNewline,
+					Span: span(end, end),
+				},
+				{
+					Type: TokenEOF,
+					Span: span(end, end),
+				},
+			},
+		})
+	}
+	for i, test := range tests {
+		test.run(i, t)
+	}
+}
+
+func TestIntegerLiteral(t *testing.T) {
+	texts := []string{
+		"42",
+		"0600",
+		"0xBadFace",
+		"170141183460469231731687303715884105727",
+		"0",
+		"01",
+		"0777",
+		"0xF",
+		"0XF",
+		"9832",
+	}
+	numberLiterals(t, texts, TokenIntegerLiteral)
+}
+
+func TestFloatLiteral(t *testing.T) {
+	texts := []string{
+		"0.",
+		"72.40",
+		"072.40",
+		"2.71828",
+		"1.e+0",
+		"6.67428e-11",
+		"1E6",
+		".25",
+		".12345E+5",
+	}
+	numberLiterals(t, texts, TokenFloatLiteral)
+}
+
+func TestImaginaryLiteral(t *testing.T) {
+	texts := []string{
+		"0i",
+		"011i",
+		"0.i",
+		"2.71828i",
+		"1.e+0i",
+		"6.67428e-11i",
+		"1E6i",
+		".25i",
+		".12345E+5i",
+	}
+	numberLiterals(t, texts, TokenImaginaryLiteral)
+}
+
+func numberLiterals(t *testing.T, texts []string, kind TokenType) {
+	var tests []test
+	for _, text := range texts {
+		end := len(text) + 1
+		tests = append(tests, test{
+			text: text,
+			want: []Token{
+				{
+					Type: kind,
+					Text: text,
+					Span: span(1, end),
+				},
+				{
+					Type:     TokenOperator,
+					Span:     span(end, end),
+					Operator: OpSemicolon,
+				},
+				{
+					Type: TokenNewline,
+					Span: span(end, end),
+				},
+				{
+					Type: TokenEOF,
+					Span: span(end, end),
+				},
+			},
+		})
 	}
 
 	for i, test := range tests {
