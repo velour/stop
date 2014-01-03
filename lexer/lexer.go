@@ -2,7 +2,12 @@
 //
 // Quirks:
 //
-// Mal-formed octal literals that begin with 0 followed by any number of decmial digits are returned as valid integer literals.
+// Mal-formed octal literals that begin with 0 followed by any
+// number of decmial digits are returned as valid integer literals.
+//
+// Unicode code points are not validated, so characters with
+// invalid code points (such as '\U00110000' and '\uDFFF') are
+// returned as valid character literals.
 package lexer
 
 import (
@@ -478,6 +483,12 @@ func (l *Lexer) nextLiteralToken() *Token {
 			l.replace()
 		}
 		return operator(l)
+	case r == '\'':
+		return runeLiteral(l)
+	case r == '"':
+		return interpertedStringLiteral(l)
+	case r == '`':
+		return rawStringLiteral(l)
 	}
 	return l.unexpected(r)
 }
@@ -654,8 +665,104 @@ func hex(l *Lexer) *Token {
 	return l.token(IntegerLiteral)
 }
 
+func runeLiteral(l *Lexer) *Token {
+	if l.rune() == '\\' {
+		if err := unicodeValue(l); err != nil {
+			return err
+		}
+	}
+	if r := l.rune(); r != '\'' {
+		return l.unexpected(r)
+	}
+	return l.token(RuneLiteral)
+}
+
+func interpertedStringLiteral(l *Lexer) *Token {
+	for {
+		r := l.rune()
+		switch {
+		case r == '"':
+			return l.token(StringLiteral)
+		case r == '\\':
+			if err := unicodeValue(l); err != nil {
+				return err
+			}
+		case r < 0:
+			return l.unexpected(r)
+		}
+	}
+}
+
+func rawStringLiteral(l *Lexer) *Token {
+	for {
+		r := l.rune()
+		switch {
+		case r == '`':
+			return l.token(StringLiteral)
+		case r < 0:
+			return l.unexpected(r)
+		}
+	}
+}
+
+// Parses a unicode value (assuming that the leading '\' has
+// already been consumed), and returns nil on success or
+// an error token if the parse failed.
+func unicodeValue(l *Lexer) *Token {
+	r := l.rune()
+	switch {
+	case r == 'U':
+		if s := l.rune(); !isHexDigit(s) {
+			return l.unexpected(s)
+		}
+		if s := l.rune(); !isHexDigit(s) {
+			return l.unexpected(s)
+		}
+		if s := l.rune(); !isHexDigit(s) {
+			return l.unexpected(s)
+		}
+		if s := l.rune(); !isHexDigit(s) {
+			return l.unexpected(s)
+		}
+		fallthrough
+
+	case r == 'u':
+		if s := l.rune(); !isHexDigit(s) {
+			return l.unexpected(s)
+		}
+		if s := l.rune(); !isHexDigit(s) {
+			return l.unexpected(s)
+		}
+		fallthrough
+
+	case r == 'x':
+		if s := l.rune(); !isHexDigit(s) {
+			return l.unexpected(s)
+		}
+		if s := l.rune(); !isHexDigit(s) {
+			return l.unexpected(s)
+		}
+
+	case isOctalDigit(r):
+		if s := l.rune(); !isOctalDigit(s) {
+			return l.unexpected(s)
+		}
+		if s := l.rune(); !isOctalDigit(s) {
+			return l.unexpected(s)
+		}
+
+	case r != 'a' && r != 'b' && r != 'f' && r != 'n' && r != 'r' && r != 't' && r != 'v' && r != '\\' && r != '\'' && r != '"':
+		l.replace()
+	}
+	return nil
+}
+
 func isDecimalDigit(r rune) bool {
 	return r >= '0' && r <= '9'
+}
+
+func isOctalDigit(r rune) bool {
+	return r >= '0' && r <= '7'
 }
 
 func isHexDigit(r rune) bool {

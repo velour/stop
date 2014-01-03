@@ -19,7 +19,7 @@ func (tests multiTokenTests) run(t *testing.T) {
 			got = append(got, lex.Next().Type)
 		}
 		if !reflect.DeepEqual(got, test.want) {
-			t.Errorf("test %d: got %s, wanted %s", i, got, test.want)
+			t.Errorf("test %d: %s got %s, wanted %s", i, test.text, got, test.want)
 		}
 	}
 }
@@ -155,9 +155,9 @@ type singleTokenTests []struct {
 func (tests singleTokenTests) run(t *testing.T) {
 	for i, test := range tests {
 		lex := New(strings.NewReader(test.text))
-		got := lex.Next().Type
-		if got != test.want {
-			t.Errorf("test %d: got %s, wanted %s", i, got, test.want)
+		got := lex.Next()
+		if got.Type != test.want {
+			t.Errorf("test %d: %s got %s, wanted %s", i, test.text, got, test.want)
 		}
 	}
 }
@@ -214,6 +214,67 @@ func TestImaginaryLiteral(t *testing.T) {
 		{"1E6i", ImaginaryLiteral},
 		{".25i", ImaginaryLiteral},
 		{".12345E+5i", ImaginaryLiteral},
+	}
+	tests.run(t)
+}
+
+func TestRuneLiteral(t *testing.T) {
+	tests := singleTokenTests{
+		{"'a'", RuneLiteral},
+		{"'ä'", RuneLiteral},
+		{"'本'", RuneLiteral},
+		{"'\\t'", RuneLiteral},
+		{"'\\000'", RuneLiteral},
+		{"'\\007'", RuneLiteral},
+		{"'\\377'", RuneLiteral},
+		{"'\\x07'", RuneLiteral},
+		{"'\\xff'", RuneLiteral},
+		{"'\\u12e4'", RuneLiteral},
+		{"'\\U00101234'", RuneLiteral},
+
+		{"'aa'", Error},
+		{"'\\xa'", Error},
+		{"'\\0'", Error},
+
+		// The following two should be errors, but we don't validate the Unicode code points.
+		{"'\\uDFFF'", RuneLiteral},
+		{"'\\U00110000'", RuneLiteral},
+	}
+	tests.run(t)
+}
+
+func TestInterpretedStringLiteral(t *testing.T) {
+	tests := singleTokenTests{
+		{`"\n"`, StringLiteral},
+		{`""`, StringLiteral},
+		{`"Hello, world!\n"`, StringLiteral},
+		{`"日本語"`, StringLiteral},
+		{`"\u65e5本\U00008a9e"`, StringLiteral},
+		{`"\xff\u00FF"`, StringLiteral},
+		{`"日本語"`, StringLiteral},
+		{`"\u65e5\u672c\u8a9e"`, StringLiteral},
+		{`"\U000065e5\U0000672c\U00008a9e"`, StringLiteral},
+		{`"\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e"`, StringLiteral},
+
+		{`"not terminated`, Error},
+
+		// The following two should be errors, but we don`t validate the Unicode code points.
+		{`"\uD800"`, StringLiteral},
+		{`"\U00110000"`, StringLiteral},
+	}
+	tests.run(t)
+}
+
+func TestRawStringLiteral(t *testing.T) {
+	tests := singleTokenTests{
+		// `abc`
+		{"\x60abc\x60", StringLiteral},
+		// '\n
+		// \n'
+		{"\x60\\n\x0a\\n\x60", StringLiteral},
+		{"\x60日本語\x60", StringLiteral},
+
+		{"\x60not terminated", Error},
 	}
 	tests.run(t)
 }
