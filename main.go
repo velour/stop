@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"gogo/lexer"
+	"bitbucket.org/eaburns/stop/lexer"
 )
 
 func main() {

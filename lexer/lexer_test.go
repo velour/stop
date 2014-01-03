@@ -5,7 +5,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"gogo/loc"
+	"bitbucket.org/eaburns/stop/loc"
 )
 
 type test struct {

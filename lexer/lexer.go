@@ -6,7 +6,7 @@ import (
 	"os"
 	"unicode"
 
-	"gogo/loc"
+	"bitbucket.org/eaburns/stop/loc"
 )
 
 // Token is a the atomic unit of the vocabulary of a Go program.
