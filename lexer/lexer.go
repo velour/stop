@@ -71,7 +71,7 @@ const (
 	AndAnd
 	EqualEqual
 	BangEqual
-	enParen
+	OpenParen
 	CloseParen
 	Minus
 	Or
@@ -80,7 +80,7 @@ const (
 	OrOr
 	Less
 	LessEqual
-	enBracket
+	OpenBracket
 	CloseBracket
 	Star
 	Carrot
@@ -89,7 +89,7 @@ const (
 	LessMinus
 	Greater
 	GreaterEqual
-	enBrace
+	OpenBrace
 	CloseBrace
 	Divide
 	LessLess
@@ -156,7 +156,7 @@ var tokenTypeNames = map[TokenType]string{
 	AndAnd:              "AndAnd",
 	EqualEqual:          "EqualEqual",
 	BangEqual:           "BangEqual",
-	enParen:             "enParen",
+	OpenParen:           "OpenParen",
 	CloseParen:          "CloseParen",
 	Minus:               "Minus",
 	Or:                  "Or",
@@ -165,7 +165,7 @@ var tokenTypeNames = map[TokenType]string{
 	OrOr:                "OrOr",
 	Less:                "Less",
 	LessEqual:           "LessEqual",
-	enBracket:           "enBracket",
+	OpenBracket:         "OpenBracket",
 	CloseBracket:        "CloseBracket",
 	Star:                "Star",
 	Carrot:              "Carrot",
@@ -174,7 +174,7 @@ var tokenTypeNames = map[TokenType]string{
 	LessMinus:           "LessMinus",
 	Greater:             "Greater",
 	GreaterEqual:        "GreaterEqual",
-	enBrace:             "enBrace",
+	OpenBrace:           "OpenBrace",
 	CloseBrace:          "CloseBrace",
 	Divide:              "Divide",
 	LessLess:            "LessLess",
@@ -239,7 +239,7 @@ var operators = map[string]TokenType{
 	"&&":  AndAnd,
 	"==":  EqualEqual,
 	"!=":  BangEqual,
-	"(":   enParen,
+	"(":   OpenParen,
 	")":   CloseParen,
 	"-":   Minus,
 	"|":   Or,
@@ -248,7 +248,7 @@ var operators = map[string]TokenType{
 	"||":  OrOr,
 	"<":   Less,
 	"<=":  LessEqual,
-	"[":   enBracket,
+	"[":   OpenBracket,
 	"]":   CloseBracket,
 	"*":   Star,
 	"^":   Carrot,
@@ -257,7 +257,7 @@ var operators = map[string]TokenType{
 	"<-":  LessMinus,
 	">":   Greater,
 	">=":  GreaterEqual,
-	"{":   enBrace,
+	"{":   OpenBrace,
 	"}":   CloseBrace,
 	"/":   Divide,
 	"<<":  LessLess,
