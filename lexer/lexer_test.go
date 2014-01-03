@@ -1,475 +1,219 @@
 package lexer
 
 import (
+	"reflect"
 	"strings"
 	"testing"
-	"unicode/utf8"
-
-	"bitbucket.org/eaburns/stop/loc"
 )
 
-type test struct {
+type multiTokenTests []struct {
 	text string
-	want []Token
+	want []TokenType
 }
 
-func (test test) run(num int, t *testing.T) {
-	in := strings.NewReader(test.text)
-	lex := New(in)
-	var got []*Token
-	for len(got) == 0 || got[len(got)-1].Type != EOF {
-		got = append(got, lex.Next())
-	}
-	for i, want := range test.want {
-		if tokenEq(got[i], &want) {
-			continue
+func (tests multiTokenTests) run(t *testing.T) {
+	for i, test := range tests {
+		lex := New(strings.NewReader(test.text))
+		got := make([]TokenType, 0, len(test.want))
+		for len(got) == 0 || got[len(got)-1] != EOF {
+			got = append(got, lex.Next().Type)
 		}
-		t.Fatalf("test %d:\n%s:\ntoken %d: got %s, wanted %s",
-			num, test.text, i, got, test.want)
+		if !reflect.DeepEqual(got, test.want) {
+			t.Errorf("test %d: got %s, wanted %s", i, got, test.want)
+		}
 	}
-}
-
-func tokenEq(a, b *Token) bool {
-	return a.Type == b.Type &&
-		a.Text == b.Text &&
-		a.Span[0].Rune == b.Span[0].Rune &&
-		a.Span[1].Rune == b.Span[1].Rune
-}
-
-func span(a, b int) loc.Span {
-	return loc.Span{{Rune: a}, {Rune: b}}
 }
 
 func TestEOF(t *testing.T) {
-	tests := [...]test{
-		{"", []Token{
-			{
-				Type: Newline,
-				Span: span(1, 1),
-			},
-			{
-				Type: EOF,
-				Span: span(1, 1),
-			},
-		}},
-		{"\n", []Token{
-			{
-				Type: Newline,
-				Text: "\n",
-				Span: span(1, 2),
-			},
-			{
-				Type: EOF,
-				Span: span(2, 2),
-			},
-		}},
+	tests := multiTokenTests{
+		{"", []TokenType{Newline, EOF}},
+		{"\n", []TokenType{Newline, EOF}},
 	}
-
-	for i, test := range tests {
-		test.run(i, t)
-	}
-
+	tests.run(t)
 }
 
 func TestLineComment(t *testing.T) {
-	tests := [...]test{
-		{"//\n", []Token{
-			{
-				Type: Newline,
-				Text: "//\n",
-				Span: span(1, 4),
-			},
-			{
-				Type: EOF,
-				Span: span(4, 4),
-			},
-		}},
-		{"// hello\n", []Token{
-			{
-				Type: Newline,
-				Text: "// hello\n",
-				Span: span(1, 10),
-			},
-			{
-				Type: EOF,
-				Span: span(10, 10),
-			},
-		}},
-		{"//", []Token{
-			{
-				Type: Newline,
-				Text: "//",
-				Span: span(1, 3),
-			},
-			{
-				Type: EOF,
-				Span: span(3, 3),
-			},
-		}},
-		{"\n//", []Token{
-			{
-				Type: Newline,
-				Text: "\n",
-				Span: span(1, 2),
-			},
-			{
-				Type: Newline,
-				Text: "//",
-				Span: span(2, 4),
-			},
-			{
-				Type: EOF,
-				Span: span(4, 4),
-			},
-		}},
+	tests := multiTokenTests{
+		{"//\n", []TokenType{Newline, EOF}},
+		{"// hello\n", []TokenType{Newline, EOF}},
+		{"//", []TokenType{Newline, EOF}},
+		{"\n//", []TokenType{Newline, Newline, EOF}},
 	}
-
-	for i, test := range tests {
-		test.run(i, t)
-	}
+	tests.run(t)
 }
 
-func TestGeneralComment(t *testing.T) {
-	tests := [...]test{
-		{"/* comment */", []Token{
-			{
-				Type: Whitespace,
-				Text: "/* comment */",
-				Span: span(1, 14),
-			},
-			{
-				Type: Newline,
-				Span: span(14, 14),
-			},
-			{
-				Type: EOF,
-				Span: span(14, 14),
-			},
-		}},
-		{"/*\ncomment */", []Token{
-			{
-				Type: Newline,
-				Text: "/*\ncomment */",
-				Span: span(1, 14),
-			},
-			{
-				Type: EOF,
-				Span: span(14, 14),
-			},
-		}},
-		{"/*\ncomment\n*/", []Token{
-			{
-				Type: Newline,
-				Text: "/*\ncomment\n*/",
-				Span: span(1, 14),
-			},
-			{
-				Type: EOF,
-				Span: span(14, 14),
-			},
-		}},
-		{"/* // comment */", []Token{
-			{
-				Type: Whitespace,
-				Text: "/* // comment */",
-				Span: span(1, 17),
-			},
-			{
-				Type: Newline,
-				Span: span(17, 17),
-			},
-			{
-				Type: EOF,
-				Span: span(17, 17),
-			},
-		}},
-		{"/* // /*comment*/ */", []Token{
-			{
-				Type: Whitespace,
-				Text: "/* // /*comment*/",
-				Span: span(1, 18),
-			},
-			{
-				Type: Whitespace,
-				Text: " ",
-				Span: span(18, 19),
-			},
-			{
-				Type: Star,
-				Text: "*",
-				Span: span(19, 20),
-			},
-			{
-				Type: Divide,
-				Text: "/",
-				Span: span(20, 21),
-			},
-			{
-				Type: Newline,
-				Text: "",
-				Span: span(21, 21),
-			},
-			{
-				Type: EOF,
-				Text: "",
-				Span: span(21, 21),
-			},
-		}},
+func TestMultiLineComment(t *testing.T) {
+	tests := multiTokenTests{
+		{"/* comment */", []TokenType{Whitespace, Newline, EOF}},
+		{"/*\ncomment */", []TokenType{Newline, EOF}},
+		{"/*\ncomment\n*/", []TokenType{Newline, EOF}},
+		{"/* // comment */", []TokenType{Whitespace, Newline, EOF}},
+		{"/* // /*comment*/ */", []TokenType{Whitespace, Whitespace, Star, Divide, Newline, EOF}},
 	}
-
-	for i, test := range tests {
-		test.run(i, t)
-	}
+	tests.run(t)
 }
 
 func TestSemicolonInsertion(t *testing.T) {
-	tests := [...]test{
-		{"identifier\n", []Token{
-			{
-				Type: Identifier,
-				Text: "identifier",
-				Span: span(1, 11),
-			},
-			{
-				Type: Semicolon,
-				Span: span(11, 11),
-			},
-			{
-				Type: Newline,
-				Text: "\n",
-				Span: span(11, 12),
-			},
-			{
-				Type: EOF,
-				Span: span(12, 12),
-			},
-		}},
-		{"identifier", []Token{
-			{
-				Type: Identifier,
-				Text: "identifier",
-				Span: span(1, 11),
-			},
-			{
-				Type: Semicolon,
-				Span: span(11, 11),
-			},
-			{
-				Type: Newline,
-				Span: span(11, 11),
-			},
-			{
-				Type: EOF,
-				Span: span(11, 11),
-			},
-		}},
-		{"++", []Token{
-			{
-				Type: PlusPlus,
-				Text: "++",
-				Span: span(1, 3),
-			},
-			{
-				Type: Semicolon,
-				Span: span(3, 3),
-			},
-			{
-				Type: Newline,
-				Span: span(3, 3),
-			},
-			{
-				Type: EOF,
-				Span: span(3, 3),
-			},
-		}},
-		{"++//hi", []Token{
-			{
-				Type: PlusPlus,
-				Text: "++",
-				Span: span(1, 3),
-			},
-			{
-				Type: Semicolon,
-				Span: span(3, 3),
-			},
-			{
-				Type: Newline,
-				Text: "//hi",
-				Span: span(3, 7),
-			},
-			{
-				Type: EOF,
-				Span: span(7, 7),
-			},
-		}},
+	tests := multiTokenTests{
+		{"identifier\n", []TokenType{Identifier, Semicolon, Newline, EOF}},
+		{"identifier", []TokenType{Identifier, Semicolon, Newline, EOF}},
+		{"++", []TokenType{PlusPlus, Semicolon, Newline, EOF}},
+		{"++//hi", []TokenType{PlusPlus, Semicolon, Newline, EOF}},
 	}
-
-	for i, test := range tests {
-		test.run(i, t)
-	}
+	tests.run(t)
 }
 
 func TestKeywords(t *testing.T) {
-	var tests []test
-	for text, keyword := range keywords {
-		end := len(text) + 1
-		toks := []Token{
-			{
-				Type: keyword,
-				Text: text,
-				Span: span(1, end),
-			},
-			{
-				Type: Newline,
-				Span: span(end, end),
-			},
-			{
-				Type: EOF,
-				Span: span(end, end),
-			},
-		}
-		switch keyword {
-		case Break, Continue, Fallthrough, Return:
-			semi := Token{
-				Type: Semicolon,
-				Span: span(end, end),
-			}
-			toks = []Token{toks[0], semi, toks[1], toks[2]}
-		}
-		tests = append(tests, test{
-			text: text,
-			want: toks,
-		})
+	tests := multiTokenTests{
+		{"break", []TokenType{Break, Semicolon, Newline, EOF}},
+		{"default", []TokenType{Default, Newline, EOF}},
+		{"func", []TokenType{Func, Newline, EOF}},
+		{"interface", []TokenType{Interface, Newline, EOF}},
+		{"select", []TokenType{Select, Newline, EOF}},
+		{"case", []TokenType{Case, Newline, EOF}},
+		{"defer", []TokenType{Defer, Newline, EOF}},
+		{"go", []TokenType{Go, Newline, EOF}},
+		{"map", []TokenType{Map, Newline, EOF}},
+		{"struct", []TokenType{Struct, Newline, EOF}},
+		{"chan", []TokenType{Chan, Newline, EOF}},
+		{"else", []TokenType{Else, Newline, EOF}},
+		{"goto", []TokenType{Goto, Newline, EOF}},
+		{"package", []TokenType{Package, Newline, EOF}},
+		{"switch", []TokenType{Switch, Newline, EOF}},
+		{"const", []TokenType{Const, Newline, EOF}},
+		{"fallthrough", []TokenType{Fallthrough, Semicolon, Newline, EOF}},
+		{"if", []TokenType{If, Newline, EOF}},
+		{"range", []TokenType{Range, Newline, EOF}},
+		{"type", []TokenType{Type, Newline, EOF}},
+		{"continue", []TokenType{Continue, Semicolon, Newline, EOF}},
+		{"for", []TokenType{For, Newline, EOF}},
+		{"import", []TokenType{Import, Newline, EOF}},
+		{"return", []TokenType{Return, Semicolon, Newline, EOF}},
+		{"var", []TokenType{Var, Newline, EOF}},
 	}
-
-	for i, test := range tests {
-		test.run(i, t)
-	}
+	tests.run(t)
 }
 
 func TestOperators(t *testing.T) {
-	var tests []test
-	for text, op := range operators {
-		end := len(text) + 1
-		toks := []Token{
-			{
-				Type: op,
-				Text: text,
-				Span: span(1, end),
-			},
-			{
-				Type: Newline,
-				Span: span(end, end),
-			},
-			{
-				Type: EOF,
-				Span: span(end, end),
-			},
-		}
-		switch op {
-		case PlusPlus, MinusMinus, CloseParen, CloseBracket, CloseBrace:
-			semi := Token{
-				Type: Semicolon,
-				Span: span(end, end),
-			}
-			toks = []Token{toks[0], semi, toks[1], toks[2]}
-		}
-		tests = append(tests, test{
-			text: text,
-			want: toks,
-		})
+	tests := multiTokenTests{
+		{"+", []TokenType{Plus, Newline, EOF}},
+		{"&", []TokenType{And, Newline, EOF}},
+		{"+=", []TokenType{PlusEqual, Newline, EOF}},
+		{"&=", []TokenType{AndEqual, Newline, EOF}},
+		{"&&", []TokenType{AndAnd, Newline, EOF}},
+		{"==", []TokenType{EqualEqual, Newline, EOF}},
+		{"!=", []TokenType{BangEqual, Newline, EOF}},
+		{"(", []TokenType{enParen, Newline, EOF}},
+		{")", []TokenType{CloseParen, Semicolon, Newline, EOF}},
+		{"-", []TokenType{Minus, Newline, EOF}},
+		{"|", []TokenType{Or, Newline, EOF}},
+		{"-=", []TokenType{MinusEqual, Newline, EOF}},
+		{"|=", []TokenType{OrEqual, Newline, EOF}},
+		{"||", []TokenType{OrOr, Newline, EOF}},
+		{"<", []TokenType{Less, Newline, EOF}},
+		{"<=", []TokenType{LessEqual, Newline, EOF}},
+		{"[", []TokenType{enBracket, Newline, EOF}},
+		{"]", []TokenType{CloseBracket, Semicolon, Newline, EOF}},
+		{"*", []TokenType{Star, Newline, EOF}},
+		{"^", []TokenType{Carrot, Newline, EOF}},
+		{"*=", []TokenType{StarEqual, Newline, EOF}},
+		{"^=", []TokenType{CarrotEqual, Newline, EOF}},
+		{"<-", []TokenType{LessMinus, Newline, EOF}},
+		{">", []TokenType{Greater, Newline, EOF}},
+		{">=", []TokenType{GreaterEqual, Newline, EOF}},
+		{"{", []TokenType{enBrace, Newline, EOF}},
+		{"}", []TokenType{CloseBrace, Semicolon, Newline, EOF}},
+		{"/", []TokenType{Divide, Newline, EOF}},
+		{"<<", []TokenType{LessLess, Newline, EOF}},
+		{"/=", []TokenType{DivideEqual, Newline, EOF}},
+		{"<<=", []TokenType{LessLessEqual, Newline, EOF}},
+		{"++", []TokenType{PlusPlus, Semicolon, Newline, EOF}},
+		{"=", []TokenType{Equal, Newline, EOF}},
+		{":=", []TokenType{ColonEqual, Newline, EOF}},
+		{",", []TokenType{Comma, Newline, EOF}},
+		{";", []TokenType{Semicolon, Newline, EOF}},
+		{"%", []TokenType{Percent, Newline, EOF}},
+		{">>", []TokenType{GreaterGreater, Newline, EOF}},
+		{"%=", []TokenType{PercentEqual, Newline, EOF}},
+		{">>=", []TokenType{GreaterGreaterEqual, Newline, EOF}},
+		{"--", []TokenType{MinusMinus, Semicolon, Newline, EOF}},
+		{"!", []TokenType{Bang, Newline, EOF}},
+		{"...", []TokenType{DotDotDot, Newline, EOF}},
+		{".", []TokenType{Dot, Newline, EOF}},
+		{":", []TokenType{Colon, Newline, EOF}},
+		{"&^", []TokenType{AndCarrot, Newline, EOF}},
+		{"&^=", []TokenType{AndCarrotEqual, Newline, EOF}},
 	}
+	tests.run(t)
+}
 
+type singleTokenTests []struct {
+	text string
+	want TokenType
+}
+
+func (tests singleTokenTests) run(t *testing.T) {
 	for i, test := range tests {
-		test.run(i, t)
+		lex := New(strings.NewReader(test.text))
+		got := lex.Next().Type
+		if got != test.want {
+			t.Errorf("test %d: got %s, wanted %s", i, got, test.want)
+		}
 	}
 }
 
 func TestIdentifier(t *testing.T) {
-	texts := []string{
-		"a",
-		"_x9",
-		"ThisVariableIsExported",
-		"αβ",
+	tests := singleTokenTests{
+		{"a", Identifier},
+		{"_x9", Identifier},
+		{"ThisVariableIsExported", Identifier},
+		{"αβ", Identifier},
 	}
-	literalThenSemicolon(t, texts, Identifier)
+	tests.run(t)
 }
 
 func TestIntegerLiteral(t *testing.T) {
-	texts := []string{
-		"42",
-		"0600",
-		"0xBadFace",
-		"170141183460469231731687303715884105727",
-		"0",
-		"01",
-		"0777",
-		"0xF",
-		"0XF",
-		"9832",
+	tests := singleTokenTests{
+		{"42", IntegerLiteral},
+		{"0600", IntegerLiteral},
+		{"0xBadFace", IntegerLiteral},
+		{"170141183460469231731687303715884105727", IntegerLiteral},
+		{"0", IntegerLiteral},
+		{"01", IntegerLiteral},
+		{"0777", IntegerLiteral},
+		{"0xF", IntegerLiteral},
+		{"0XF", IntegerLiteral},
+		{"9832", IntegerLiteral},
 	}
-	literalThenSemicolon(t, texts, IntegerLiteral)
+	tests.run(t)
 }
 
 func TestFloatLiteral(t *testing.T) {
-	texts := []string{
-		"0.",
-		"72.40",
-		"072.40",
-		"2.71828",
-		"1.e+0",
-		"6.67428e-11",
-		"1E6",
-		".25",
-		".12345E+5",
+	tests := singleTokenTests{
+		{"0.", FloatLiteral},
+		{"72.40", FloatLiteral},
+		{"072.40", FloatLiteral},
+		{"2.71828", FloatLiteral},
+		{"1.e+0", FloatLiteral},
+		{"6.67428e-11", FloatLiteral},
+		{"1E6", FloatLiteral},
+		{".25", FloatLiteral},
+		{".12345E+5", FloatLiteral},
 	}
-	literalThenSemicolon(t, texts, FloatLiteral)
+	tests.run(t)
 }
 
 func TestImaginaryLiteral(t *testing.T) {
-	texts := []string{
-		"0i",
-		"011i",
-		"0.i",
-		"2.71828i",
-		"1.e+0i",
-		"6.67428e-11i",
-		"1E6i",
-		".25i",
-		".12345E+5i",
+	tests := singleTokenTests{
+		{"0i", ImaginaryLiteral},
+		{"011i", ImaginaryLiteral},
+		{"0.i", ImaginaryLiteral},
+		{"2.71828i", ImaginaryLiteral},
+		{"1.e+0i", ImaginaryLiteral},
+		{"6.67428e-11i", ImaginaryLiteral},
+		{"1E6i", ImaginaryLiteral},
+		{".25i", ImaginaryLiteral},
+		{".12345E+5i", ImaginaryLiteral},
 	}
-	literalThenSemicolon(t, texts, ImaginaryLiteral)
-}
-
-func literalThenSemicolon(t *testing.T, texts []string, kind TokenType) {
-	var tests []test
-	for _, text := range texts {
-		end := utf8.RuneCountInString(text) + 1
-		tests = append(tests, test{
-			text: text,
-			want: []Token{
-				{
-					Type: kind,
-					Text: text,
-					Span: span(1, end),
-				},
-				{
-					Type: Semicolon,
-					Span: span(end, end),
-				},
-				{
-					Type: Newline,
-					Span: span(end, end),
-				},
-				{
-					Type: EOF,
-					Span: span(end, end),
-				},
-			},
-		})
-	}
-
-	for i, test := range tests {
-		test.run(i, t)
-	}
+	tests.run(t)
 }
