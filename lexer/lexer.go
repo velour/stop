@@ -32,6 +32,7 @@ const (
 	RuneLiteral
 	StringLiteral
 	Newline
+	// Whitespace is any non-newline whitespace.
 	Whitespace
 
 	// Keywords
