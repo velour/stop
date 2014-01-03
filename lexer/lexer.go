@@ -9,351 +9,276 @@ import (
 	"bitbucket.org/eaburns/stop/loc"
 )
 
+// A TokenType identifies the type of a token in the input file.
+type TokenType int
+
+const (
+	EOF             = -1
+	Error TokenType = iota
+	Identifier
+	IntegerLiteral
+	FloatLiteral
+	ImaginaryLiteral
+	RuneLiteral
+	StringLiteral
+	Newline
+	Whitespace
+
+	// Keywords
+	Break
+	Default
+	Func
+	Interface
+	Select
+	Case
+	Defer
+	Go
+	Map
+	Struct
+	Chan
+	Else
+	Goto
+	Package
+	Switch
+	Const
+	Fallthrough
+	If
+	Range
+	Type
+	Continue
+	For
+	Import
+	Return
+	Var
+
+	// Operators
+	Plus
+	And
+	PlusEqual
+	AndEqual
+	AndAnd
+	EqualEqual
+	BangEqual
+	enParen
+	CloseParen
+	Minus
+	Or
+	MinusEqual
+	OrEqual
+	OrOr
+	Less
+	LessEqual
+	enBracket
+	CloseBracket
+	Star
+	Carrot
+	StarEqual
+	CarrotEqual
+	LessMinus
+	Greater
+	GreaterEqual
+	enBrace
+	CloseBrace
+	Divide
+	LessLess
+	DivideEqual
+	LessLessEqual
+	PlusPlus
+	Equal
+	ColonEqual
+	Comma
+	Semicolon
+	Percent
+	GreaterGreater
+	PercentEqual
+	GreaterGreaterEqual
+	MinusMinus
+	Bang
+	DotDotDot
+	Dot
+	Colon
+	AndCarrot
+	AndCarrotEqual
+)
+
+var tokenTypeNames = map[TokenType]string{
+	EOF:                 "EOF",
+	Error:               "Error",
+	Identifier:          "Identifier",
+	IntegerLiteral:      "IntegerLiteral",
+	FloatLiteral:        "FloatLiteral",
+	ImaginaryLiteral:    "ImaginaryLiteral",
+	RuneLiteral:         "RuneLiteral",
+	StringLiteral:       "StringLiteral",
+	Newline:             "Newline",
+	Whitespace:          "Whitespace",
+	Break:               "Break",
+	Default:             "Default",
+	Func:                "Func",
+	Interface:           "Interface",
+	Select:              "Select",
+	Case:                "Case",
+	Defer:               "Defer",
+	Go:                  "Go",
+	Map:                 "Map",
+	Struct:              "Struct",
+	Chan:                "Chan",
+	Else:                "Else",
+	Goto:                "Goto",
+	Package:             "Package",
+	Switch:              "Switch",
+	Const:               "Const",
+	Fallthrough:         "Fallthrough",
+	If:                  "If",
+	Range:               "Range",
+	Type:                "Type",
+	Continue:            "Continue",
+	For:                 "For",
+	Import:              "Import",
+	Return:              "Return",
+	Var:                 "Var",
+	Plus:                "Plus",
+	And:                 "And",
+	PlusEqual:           "PlusEqual",
+	AndEqual:            "AndEqual",
+	AndAnd:              "AndAnd",
+	EqualEqual:          "EqualEqual",
+	BangEqual:           "BangEqual",
+	enParen:             "enParen",
+	CloseParen:          "CloseParen",
+	Minus:               "Minus",
+	Or:                  "Or",
+	MinusEqual:          "MinusEqual",
+	OrEqual:             "OrEqual",
+	OrOr:                "OrOr",
+	Less:                "Less",
+	LessEqual:           "LessEqual",
+	enBracket:           "enBracket",
+	CloseBracket:        "CloseBracket",
+	Star:                "Star",
+	Carrot:              "Carrot",
+	StarEqual:           "StarEqual",
+	CarrotEqual:         "CarrotEqual",
+	LessMinus:           "LessMinus",
+	Greater:             "Greater",
+	GreaterEqual:        "GreaterEqual",
+	enBrace:             "enBrace",
+	CloseBrace:          "CloseBrace",
+	Divide:              "Divide",
+	LessLess:            "LessLess",
+	DivideEqual:         "DivideEqual",
+	LessLessEqual:       "LessLessEqual",
+	PlusPlus:            "PlusPlus",
+	Equal:               "Equal",
+	ColonEqual:          "ColonEqual",
+	Comma:               "Comma",
+	Semicolon:           "Semicolon",
+	Percent:             "Percent",
+	GreaterGreater:      "GreaterGreater",
+	PercentEqual:        "PercentEqual",
+	GreaterGreaterEqual: "GreaterGreaterEqual",
+	MinusMinus:          "MinusMinus",
+	Bang:                "Bang",
+	DotDotDot:           "DotDotDot",
+	Dot:                 "Dot",
+	Colon:               "Colon",
+	AndCarrot:           "AndCarrot",
+	AndCarrotEqual:      "AndCarrotEqual",
+}
+
+// String returns the string represenation of the token type.
+func (tt TokenType) String() string {
+	return tokenTypeNames[tt]
+}
+
+var keywords = map[string]TokenType{
+	"break":       Break,
+	"default":     Default,
+	"func":        Func,
+	"interface":   Interface,
+	"select":      Select,
+	"case":        Case,
+	"defer":       Defer,
+	"go":          Go,
+	"map":         Map,
+	"struct":      Struct,
+	"chan":        Chan,
+	"else":        Else,
+	"goto":        Goto,
+	"package":     Package,
+	"switch":      Switch,
+	"const":       Const,
+	"fallthrough": Fallthrough,
+	"if":          If,
+	"range":       Range,
+	"type":        Type,
+	"continue":    Continue,
+	"for":         For,
+	"import":      Import,
+	"return":      Return,
+	"var":         Var,
+}
+
+var operators = map[string]TokenType{
+	"+":   Plus,
+	"&":   And,
+	"+=":  PlusEqual,
+	"&=":  AndEqual,
+	"&&":  AndAnd,
+	"==":  EqualEqual,
+	"!=":  BangEqual,
+	"(":   enParen,
+	")":   CloseParen,
+	"-":   Minus,
+	"|":   Or,
+	"-=":  MinusEqual,
+	"|=":  OrEqual,
+	"||":  OrOr,
+	"<":   Less,
+	"<=":  LessEqual,
+	"[":   enBracket,
+	"]":   CloseBracket,
+	"*":   Star,
+	"^":   Carrot,
+	"*=":  StarEqual,
+	"^=":  CarrotEqual,
+	"<-":  LessMinus,
+	">":   Greater,
+	">=":  GreaterEqual,
+	"{":   enBrace,
+	"}":   CloseBrace,
+	"/":   Divide,
+	"<<":  LessLess,
+	"/=":  DivideEqual,
+	"<<=": LessLessEqual,
+	"++":  PlusPlus,
+	"=":   Equal,
+	":=":  ColonEqual,
+	",":   Comma,
+	";":   Semicolon,
+	"%":   Percent,
+	">>":  GreaterGreater,
+	"%=":  PercentEqual,
+	">>=": GreaterGreaterEqual,
+	"--":  MinusMinus,
+	"!":   Bang,
+	"...": DotDotDot,
+	".":   Dot,
+	":":   Colon,
+	"&^":  AndCarrot,
+	"&^=": AndCarrotEqual,
+}
+
 // Token is a the atomic unit of the vocabulary of a Go program.
 type Token struct {
 	Type TokenType
 	Text string
 	Span loc.Span
-	// Keyword holds the keyword if Type is TokenKeyword.
-	Keyword Keyword
-	// Operator holds the operator if Type is TokenOperator.
-	Operator Operator
 }
 
 // String returns a human-readable string representation of the token.
 func (t Token) String() string {
-	str := "Token{Type:" + t.Type.String() + ", Text:`" + t.Text + "`, Span:" + t.Span.String()
-	switch t.Type {
-	case TokenKeyword:
-		str += ", Keyword:" + t.Keyword.String()
-	case TokenOperator:
-		str += ", Operator:" + t.Operator.String()
-	}
-	return str + "}"
-}
-
-// A TokenType identifies the type of a token in the input file.
-type TokenType int
-
-const (
-	TokenIdentifier TokenType = iota
-	TokenKeyword
-	TokenOperator
-	TokenIntegerLiteral
-	TokenFloatLiteral
-	TokenImaginaryLiteral
-	TokenRuneLiteral
-	TokenStringLiteral
-	TokenNewline
-	TokenWhitespace
-	TokenEOF
-	TokenError
-)
-
-var tokenTypeNames = [...]string{
-	TokenIdentifier:       "TokenIdentifier",
-	TokenKeyword:          "TokenKeyword",
-	TokenOperator:         "TokenOperator",
-	TokenIntegerLiteral:   "TokenIntegerLiteral",
-	TokenFloatLiteral:     "TokenFloatLiteral",
-	TokenImaginaryLiteral: "TokenImaginaryLiteral",
-	TokenRuneLiteral:      "TokenRuneLiteral",
-	TokenStringLiteral:    "TokenStringLiteral",
-	TokenNewline:          "TokenNewline",
-	TokenWhitespace:       "TokenWhitespace",
-	TokenEOF:              "TokenEOF",
-	TokenError:            "TokenError",
-}
-
-// String returns the string representation of the token type.
-func (t TokenType) String() string {
-	return tokenTypeNames[t]
-}
-
-// Keyword is a reserved word that may not be used as an identifier.
-type Keyword int
-
-const (
-	KeywordNone Keyword = iota
-	KeywordBreak
-	KeywordDefault
-	KeywordFunc
-	KeywordInterface
-	KeywordSelect
-	KeywordCase
-	KeywordDefer
-	KeywordGo
-	KeywordMap
-	KeywordStruct
-	KeywordChan
-	KeywordElse
-	KeywordGoto
-	KeywordPackage
-	KeywordSwitch
-	KeywordConst
-	KeywordFallthrough
-	KeywordIf
-	KeywordRange
-	KeywordType
-	KeywordContinue
-	KeywordFor
-	KeywordImport
-	KeywordReturn
-	KeywordVar
-)
-
-var keywords = map[string]Keyword{
-	"none":        KeywordNone,
-	"break":       KeywordBreak,
-	"default":     KeywordDefault,
-	"func":        KeywordFunc,
-	"interface":   KeywordInterface,
-	"select":      KeywordSelect,
-	"case":        KeywordCase,
-	"defer":       KeywordDefer,
-	"go":          KeywordGo,
-	"map":         KeywordMap,
-	"struct":      KeywordStruct,
-	"chan":        KeywordChan,
-	"else":        KeywordElse,
-	"goto":        KeywordGoto,
-	"package":     KeywordPackage,
-	"switch":      KeywordSwitch,
-	"const":       KeywordConst,
-	"fallthrough": KeywordFallthrough,
-	"if":          KeywordIf,
-	"range":       KeywordRange,
-	"type":        KeywordType,
-	"continue":    KeywordContinue,
-	"for":         KeywordFor,
-	"import":      KeywordImport,
-	"return":      KeywordReturn,
-	"var":         KeywordVar,
-}
-
-var keywordText = func() []string {
-	text := make([]string, len(keywords))
-	for t, k := range keywords {
-		text[k] = t
-	}
-	return text
-}()
-
-var keywordNames = [...]string{
-	KeywordNone:        "KeywordNone",
-	KeywordBreak:       "KeywordBreak",
-	KeywordDefault:     "KeywordDefault",
-	KeywordFunc:        "KeywordFunc",
-	KeywordInterface:   "KeywordInterface",
-	KeywordSelect:      "KeywordSelect",
-	KeywordCase:        "KeywordCase",
-	KeywordDefer:       "KeywordDefer",
-	KeywordGo:          "KeywordGo",
-	KeywordMap:         "KeywordMap",
-	KeywordStruct:      "KeywordStruct",
-	KeywordChan:        "KeywordChan",
-	KeywordElse:        "KeywordElse",
-	KeywordGoto:        "KeywordGoto",
-	KeywordPackage:     "KeywordPackage",
-	KeywordSwitch:      "KeywordSwitch",
-	KeywordConst:       "KeywordConst",
-	KeywordFallthrough: "KeywordFallthrough",
-	KeywordIf:          "KeywordIf",
-	KeywordRange:       "KeywordRange",
-	KeywordType:        "KeywordType",
-	KeywordContinue:    "KeywordContinue",
-	KeywordFor:         "KeywordFor",
-	KeywordImport:      "KeywordImport",
-	KeywordReturn:      "KeywordReturn",
-	KeywordVar:         "KeywordVar",
-}
-
-// String returns the string representation of a Keyword constant.
-// For example, KeywordDefault.String() will return "KeywordDefault."
-func (k Keyword) String() string {
-	return keywordNames[k]
-}
-
-// Text returns the textual representation of the Keyword.
-// For example, KeywordDefault.Text() will return "default."
-func (k Keyword) Text() string {
-	return keywordText[k]
-}
-
-// An Operator is an operator.
-type Operator int
-
-const (
-	OpNone Operator = iota
-	OpPlus
-	OpAnd
-	OpPlusEqual
-	OpAndEqual
-	OpAndAnd
-	OpEqualEqual
-	OpBangEqual
-	OpOpenParen
-	OpCloseParen
-	OpMinus
-	OpOr
-	OpMinusEqual
-	OpOrEqual
-	OpOrOr
-	OpLess
-	OpLessEqual
-	OpOpenBracket
-	OpCloseBracket
-	OpStar
-	OpCarrot
-	OpStarEqual
-	OpCarrotEqual
-	OpLessMinus
-	OpGreater
-	OpGreaterEqual
-	OpOpenBrace
-	OpCloseBrace
-	OpDivide
-	OpLessLess
-	OpDivideEqual
-	OpLessLessEqual
-	OpPlusPlus
-	OpEqual
-	OpColonEqual
-	OpComma
-	OpSemicolon
-	OpPercent
-	OpGreaterGreater
-	OpPercentEqual
-	OpGreaterGreaterEqual
-	OpMinusMinus
-	OpBang
-	OpDotDotDot
-	OpDot
-	OpColon
-	OpAndCarrot
-	OpAndCarrotEqual
-)
-
-var operators = map[string]Operator{
-	"none": OpNone,
-	"+":    OpPlus,
-	"&":    OpAnd,
-	"+=":   OpPlusEqual,
-	"&=":   OpAndEqual,
-	"&&":   OpAndAnd,
-	"==":   OpEqualEqual,
-	"!=":   OpBangEqual,
-	"(":    OpOpenParen,
-	")":    OpCloseParen,
-	"-":    OpMinus,
-	"|":    OpOr,
-	"-=":   OpMinusEqual,
-	"|=":   OpOrEqual,
-	"||":   OpOrOr,
-	"<":    OpLess,
-	"<=":   OpLessEqual,
-	"[":    OpOpenBracket,
-	"]":    OpCloseBracket,
-	"*":    OpStar,
-	"^":    OpCarrot,
-	"*=":   OpStarEqual,
-	"^=":   OpCarrotEqual,
-	"<-":   OpLessMinus,
-	">":    OpGreater,
-	">=":   OpGreaterEqual,
-	"{":    OpOpenBrace,
-	"}":    OpCloseBrace,
-	"/":    OpDivide,
-	"<<":   OpLessLess,
-	"/=":   OpDivideEqual,
-	"<<=":  OpLessLessEqual,
-	"++":   OpPlusPlus,
-	"=":    OpEqual,
-	":=":   OpColonEqual,
-	",":    OpComma,
-	";":    OpSemicolon,
-	"%":    OpPercent,
-	">>":   OpGreaterGreater,
-	"%=":   OpPercentEqual,
-	">>=":  OpGreaterGreaterEqual,
-	"--":   OpMinusMinus,
-	"!":    OpBang,
-	"...":  OpDotDotDot,
-	".":    OpDot,
-	":":    OpColon,
-	"&^":   OpAndCarrot,
-	"&^=":  OpAndCarrotEqual,
-}
-
-var operatorText = func() []string {
-	text := make([]string, len(operators))
-	for t, o := range operators {
-		text[o] = t
-	}
-	return text
-}()
-
-var operatorNames = [...]string{
-	OpNone:                "OpNone",
-	OpPlus:                "OpPlus",
-	OpAnd:                 "OpAnd",
-	OpPlusEqual:           "OpPlusEqual",
-	OpAndEqual:            "OpAndEqual",
-	OpAndAnd:              "OpAndAnd",
-	OpEqualEqual:          "OpEqualEqual",
-	OpBangEqual:           "OpBangEqual",
-	OpOpenParen:           "OpOpenParen",
-	OpCloseParen:          "OpCloseParen",
-	OpMinus:               "OpMinus",
-	OpOr:                  "OpOr",
-	OpMinusEqual:          "OpMinusEqual",
-	OpOrEqual:             "OpOrEqual",
-	OpOrOr:                "OpOrOr",
-	OpLess:                "OpLess",
-	OpLessEqual:           "OpLessEqual",
-	OpOpenBracket:         "OpOpenBracket",
-	OpCloseBracket:        "OpCloseBracket",
-	OpStar:                "OpStar",
-	OpCarrot:              "OpCarrot",
-	OpStarEqual:           "OpStarEqual",
-	OpCarrotEqual:         "OpCarrotEqual",
-	OpLessMinus:           "OpLessMinus",
-	OpGreater:             "OpGreater",
-	OpGreaterEqual:        "OpGreaterEqual",
-	OpOpenBrace:           "OpOpenBrace",
-	OpCloseBrace:          "OpCloseBrace",
-	OpDivide:              "OpDivide",
-	OpLessLess:            "OpLessLess",
-	OpDivideEqual:         "OpDivideEqual",
-	OpLessLessEqual:       "OpLessLessEqual",
-	OpPlusPlus:            "OpPlusPlus",
-	OpEqual:               "OpEqual",
-	OpColonEqual:          "OpColonEqual",
-	OpComma:               "OpComma",
-	OpSemicolon:           "OpSemicolon",
-	OpPercent:             "OpPercent",
-	OpGreaterGreater:      "OpGreaterGreater",
-	OpPercentEqual:        "OpPercentEqual",
-	OpGreaterGreaterEqual: "OpGreaterGreaterEqual",
-	OpMinusMinus:          "OpMinusMinus",
-	OpBang:                "OpBang",
-	OpDotDotDot:           "OpDotDotDot",
-	OpDot:                 "OpDot",
-	OpColon:               "OpColon",
-	OpAndCarrot:           "OpAndCarrot",
-	OpAndCarrotEqual:      "OpAndCarrotEqual",
-}
-
-// String returns the string representation of the operator constant.
-// For example, OpColon.String() will return "OpColon."
-func (o Operator) String() string {
-	return operatorNames[o]
-}
-
-// Text returns the textual representation of the operator.
-// For example, OpColon.Text() will return ":."
-func (o Operator) Text() string {
-	return operatorText[o]
+	return "Token{Type:" + t.Type.String() + ", Text:`" + t.Text + "`, Span:" + t.Span.String() + "}"
 }
 
 // A Lexer lexes Go tokens from an input stream.
@@ -453,7 +378,7 @@ func (l *Lexer) unexpected(r rune) *Token {
 	l.in = nil
 	return &Token{
 		Text: "unexpected input rune: " + string([]rune{r}),
-		Type: TokenError,
+		Type: Error,
 		Span: l.span,
 	}
 }
@@ -462,9 +387,9 @@ func (l *Lexer) nextLiteralToken() *Token {
 	r := l.rune()
 	switch {
 	case r < 0:
-		return l.token(TokenEOF)
+		return l.token(EOF)
 	case r == '\n':
-		return l.token(TokenNewline)
+		return l.token(Newline)
 	case isWhitespace(r):
 		return whitespace(l)
 	case isIdentStart(r):
@@ -559,19 +484,18 @@ func (l *Lexer) Next() *Token {
 	if tok == nil {
 		tok = l.nextLiteralToken()
 	}
-	if tok.Type == TokenEOF && (l.prev == nil || l.prev.Type != TokenNewline) {
+	if tok.Type == EOF && (l.prev == nil || l.prev.Type != Newline) {
 		l.next = tok
 		tok = &Token{
-			Type: TokenNewline,
+			Type: Newline,
 			Span: tok.Span,
 		}
 	}
-	if tok.Type == TokenNewline && l.prev != nil && needsSemicolon(l.prev) {
+	if tok.Type == Newline && l.prev != nil && needsSemicolon(l.prev) {
 		l.next = tok
 		tok = &Token{
-			Type:     TokenOperator,
-			Span:     loc.Span{l.next.Span[0], l.next.Span[0]},
-			Operator: OpSemicolon,
+			Type: Semicolon,
+			Span: loc.Span{l.next.Span[0], l.next.Span[0]},
 		}
 	}
 	l.prev = tok
@@ -579,32 +503,30 @@ func (l *Lexer) Next() *Token {
 }
 
 func needsSemicolon(tok *Token) bool {
-	return tok.Type == TokenIdentifier ||
-		tok.Type == TokenIntegerLiteral ||
-		tok.Type == TokenFloatLiteral ||
-		tok.Type == TokenImaginaryLiteral ||
-		tok.Type == TokenRuneLiteral ||
-		tok.Type == TokenStringLiteral ||
-		(tok.Type == TokenKeyword &&
-			(tok.Keyword == KeywordBreak ||
-				tok.Keyword == KeywordContinue ||
-				tok.Keyword == KeywordFallthrough ||
-				tok.Keyword == KeywordReturn)) ||
-		(tok.Type == TokenOperator &&
-			(tok.Operator == OpPlusPlus ||
-				tok.Operator == OpMinusMinus ||
-				tok.Operator == OpCloseParen ||
-				tok.Operator == OpCloseBracket ||
-				tok.Operator == OpCloseBrace))
+	return tok.Type == Identifier ||
+		tok.Type == IntegerLiteral ||
+		tok.Type == FloatLiteral ||
+		tok.Type == ImaginaryLiteral ||
+		tok.Type == RuneLiteral ||
+		tok.Type == StringLiteral ||
+		tok.Type == Break ||
+		tok.Type == Continue ||
+		tok.Type == Fallthrough ||
+		tok.Type == Return ||
+		tok.Type == PlusPlus ||
+		tok.Type == MinusMinus ||
+		tok.Type == CloseParen ||
+		tok.Type == CloseBracket ||
+		tok.Type == CloseBrace
 }
 
 func operator(l *Lexer) *Token {
-	tok := l.token(TokenOperator)
+	tok := l.token(Error)
 	oper, ok := operators[tok.Text]
 	if !ok {
 		panic("bad operator: \"" + tok.Text + "\"")
 	}
-	tok.Operator = oper
+	tok.Type = oper
 	return tok
 }
 
@@ -614,10 +536,9 @@ func identifier(l *Lexer) *Token {
 		r = l.rune()
 	}
 	l.replace()
-	tok := l.token(TokenIdentifier)
+	tok := l.token(Identifier)
 	if keyword, ok := keywords[tok.Text]; ok {
-		tok.Type = TokenKeyword
-		tok.Keyword = keyword
+		tok.Type = keyword
 	}
 	return tok
 }
@@ -636,7 +557,7 @@ func whitespace(l *Lexer) *Token {
 		r = l.rune()
 	}
 	l.replace()
-	return l.token(TokenWhitespace)
+	return l.token(Whitespace)
 }
 
 func isWhitespace(r rune) bool {
@@ -645,7 +566,7 @@ func isWhitespace(r rune) bool {
 
 func comment(l *Lexer, closing []rune) *Token {
 	i := 0
-	typ := TokenWhitespace
+	typ := Whitespace
 	for i < len(closing) {
 		r := l.rune()
 		switch {
@@ -660,7 +581,7 @@ func comment(l *Lexer, closing []rune) *Token {
 			i++
 		}
 		if r == '\n' {
-			typ = TokenNewline
+			typ = Newline
 		}
 	}
 	return l.token(typ)
@@ -678,10 +599,10 @@ func number(r0 rune, l *Lexer) *Token {
 		case r == '.':
 			return fraction(l)
 		case r == 'i':
-			return l.token(TokenImaginaryLiteral)
+			return l.token(ImaginaryLiteral)
 		case !isDecimalDigit(r):
 			l.replace()
-			return l.token(TokenIntegerLiteral)
+			return l.token(IntegerLiteral)
 		}
 		r = l.rune()
 	}
@@ -697,10 +618,10 @@ func mantissa(l *Lexer) *Token {
 		r = l.rune()
 	}
 	if r == 'i' {
-		return l.token(TokenImaginaryLiteral)
+		return l.token(ImaginaryLiteral)
 	}
 	l.replace()
-	return l.token(TokenFloatLiteral)
+	return l.token(FloatLiteral)
 }
 
 func fraction(l *Lexer) *Token {
@@ -710,12 +631,12 @@ func fraction(l *Lexer) *Token {
 	}
 	switch {
 	case r == 'i':
-		return l.token(TokenImaginaryLiteral)
+		return l.token(ImaginaryLiteral)
 	case r == 'e' || r == 'E':
 		return mantissa(l)
 	}
 	l.replace()
-	return l.token(TokenFloatLiteral)
+	return l.token(FloatLiteral)
 }
 
 func hex(l *Lexer) *Token {
@@ -724,7 +645,7 @@ func hex(l *Lexer) *Token {
 		r = l.rune()
 	}
 	l.replace()
-	return l.token(TokenIntegerLiteral)
+	return l.token(IntegerLiteral)
 }
 
 func isDecimalDigit(r rune) bool {

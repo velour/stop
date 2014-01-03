@@ -38,19 +38,17 @@ type Span [2]Location
 // String returns the string representation of a span as an Acme address.
 // Spans that cross file boundaries, will not result in valid addresses.
 func (s Span) String() string {
-	/*
-		switch {
-		case s[0].Path != s[1].Path:
-			return s[0].String() + "-" + s[1].String()
-		case s[0] != s[1]:
-			l0 := strconv.Itoa(s[0].Line)
-			r0 := strconv.Itoa(s[0].RuneOnLine())
-			l1 := strconv.Itoa(s[1].Line)
-			r1 := strconv.Itoa(s[1].RuneOnLine())
-			return s[0].Path + ":" + l0 + "-+#" + r0 + "," + l1 + "-+#" + r1
-		default:
-			return s[0].String()
-		}
-	*/
+	switch {
+	case s[0].Path != s[1].Path:
+		return s[0].String() + "-" + s[1].String()
+	case s[0] != s[1]:
+		l0 := strconv.Itoa(s[0].Line)
+		r0 := strconv.Itoa(s[0].RuneOnLine())
+		l1 := strconv.Itoa(s[1].Line)
+		r1 := strconv.Itoa(s[1].RuneOnLine())
+		return s[0].Path + ":" + l0 + "-+#" + r0 + "," + l1 + "-+#" + r1
+	default:
+		return s[0].String()
+	}
 	return strconv.Itoa(s[0].Rune) + "-" + strconv.Itoa(s[1].Rune)
 }
