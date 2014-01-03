@@ -6,6 +6,21 @@ import (
 	"testing"
 )
 
+type singleTokenTests []struct {
+	text string
+	want TokenType
+}
+
+func (tests singleTokenTests) run(t *testing.T) {
+	for i, test := range tests {
+		lex := New(strings.NewReader(test.text))
+		got := lex.Next()
+		if got.Type != test.want {
+			t.Errorf("test %d: %s got %s, wanted %s", i, test.text, got, test.want)
+		}
+	}
+}
+
 type multiTokenTests []struct {
 	text string
 	want []TokenType
@@ -26,7 +41,7 @@ func (tests multiTokenTests) run(t *testing.T) {
 
 func TestEOF(t *testing.T) {
 	tests := multiTokenTests{
-		{"", []TokenType{Newline, EOF}},
+		{"", []TokenType{EOF}},
 		{"\n", []TokenType{Newline, EOF}},
 	}
 	tests.run(t)
@@ -44,11 +59,11 @@ func TestLineComment(t *testing.T) {
 
 func TestMultiLineComment(t *testing.T) {
 	tests := multiTokenTests{
-		{"/* comment */", []TokenType{Whitespace, Newline, EOF}},
+		{"/* comment */", []TokenType{Whitespace, EOF}},
 		{"/*\ncomment */", []TokenType{Newline, EOF}},
 		{"/*\ncomment\n*/", []TokenType{Newline, EOF}},
-		{"/* // comment */", []TokenType{Whitespace, Newline, EOF}},
-		{"/* // /*comment*/ */", []TokenType{Whitespace, Whitespace, Star, Divide, Newline, EOF}},
+		{"/* // comment */", []TokenType{Whitespace, EOF}},
+		{"/* // /*comment*/ */", []TokenType{Whitespace, Whitespace, Star, Divide, EOF}},
 	}
 	tests.run(t)
 }
@@ -56,110 +71,97 @@ func TestMultiLineComment(t *testing.T) {
 func TestSemicolonInsertion(t *testing.T) {
 	tests := multiTokenTests{
 		{"identifier\n", []TokenType{Identifier, Semicolon, Newline, EOF}},
-		{"identifier", []TokenType{Identifier, Semicolon, Newline, EOF}},
-		{"++", []TokenType{PlusPlus, Semicolon, Newline, EOF}},
+		{"++\n", []TokenType{PlusPlus, Semicolon, Newline, EOF}},
 		{"++//hi", []TokenType{PlusPlus, Semicolon, Newline, EOF}},
+		{"5\n", []TokenType{IntegerLiteral, Semicolon, Newline, EOF}},
+		{"'a'\n", []TokenType{RuneLiteral, Semicolon, Newline, EOF}},
+		{"\"hello\"\n", []TokenType{StringLiteral, Semicolon, Newline, EOF}},
 	}
 	tests.run(t)
 }
 
 func TestKeywords(t *testing.T) {
-	tests := multiTokenTests{
-		{"break", []TokenType{Break, Semicolon, Newline, EOF}},
-		{"default", []TokenType{Default, Newline, EOF}},
-		{"func", []TokenType{Func, Newline, EOF}},
-		{"interface", []TokenType{Interface, Newline, EOF}},
-		{"select", []TokenType{Select, Newline, EOF}},
-		{"case", []TokenType{Case, Newline, EOF}},
-		{"defer", []TokenType{Defer, Newline, EOF}},
-		{"go", []TokenType{Go, Newline, EOF}},
-		{"map", []TokenType{Map, Newline, EOF}},
-		{"struct", []TokenType{Struct, Newline, EOF}},
-		{"chan", []TokenType{Chan, Newline, EOF}},
-		{"else", []TokenType{Else, Newline, EOF}},
-		{"goto", []TokenType{Goto, Newline, EOF}},
-		{"package", []TokenType{Package, Newline, EOF}},
-		{"switch", []TokenType{Switch, Newline, EOF}},
-		{"const", []TokenType{Const, Newline, EOF}},
-		{"fallthrough", []TokenType{Fallthrough, Semicolon, Newline, EOF}},
-		{"if", []TokenType{If, Newline, EOF}},
-		{"range", []TokenType{Range, Newline, EOF}},
-		{"type", []TokenType{Type, Newline, EOF}},
-		{"continue", []TokenType{Continue, Semicolon, Newline, EOF}},
-		{"for", []TokenType{For, Newline, EOF}},
-		{"import", []TokenType{Import, Newline, EOF}},
-		{"return", []TokenType{Return, Semicolon, Newline, EOF}},
-		{"var", []TokenType{Var, Newline, EOF}},
+	tests := singleTokenTests{
+		{"break", Break},
+		{"default", Default},
+		{"func", Func},
+		{"interface", Interface},
+		{"select", Select},
+		{"case", Case},
+		{"defer", Defer},
+		{"go", Go},
+		{"map", Map},
+		{"struct", Struct},
+		{"chan", Chan},
+		{"else", Else},
+		{"goto", Goto},
+		{"package", Package},
+		{"switch", Switch},
+		{"const", Const},
+		{"fallthrough", Fallthrough},
+		{"if", If},
+		{"range", Range},
+		{"type", Type},
+		{"continue", Continue},
+		{"for", For},
+		{"import", Import},
+		{"return", Return},
+		{"var", Var},
 	}
 	tests.run(t)
 }
 
 func TestOperators(t *testing.T) {
-	tests := multiTokenTests{
-		{"+", []TokenType{Plus, Newline, EOF}},
-		{"&", []TokenType{And, Newline, EOF}},
-		{"+=", []TokenType{PlusEqual, Newline, EOF}},
-		{"&=", []TokenType{AndEqual, Newline, EOF}},
-		{"&&", []TokenType{AndAnd, Newline, EOF}},
-		{"==", []TokenType{EqualEqual, Newline, EOF}},
-		{"!=", []TokenType{BangEqual, Newline, EOF}},
-		{"(", []TokenType{OpenParen, Newline, EOF}},
-		{")", []TokenType{CloseParen, Semicolon, Newline, EOF}},
-		{"-", []TokenType{Minus, Newline, EOF}},
-		{"|", []TokenType{Or, Newline, EOF}},
-		{"-=", []TokenType{MinusEqual, Newline, EOF}},
-		{"|=", []TokenType{OrEqual, Newline, EOF}},
-		{"||", []TokenType{OrOr, Newline, EOF}},
-		{"<", []TokenType{Less, Newline, EOF}},
-		{"<=", []TokenType{LessEqual, Newline, EOF}},
-		{"[", []TokenType{OpenBracket, Newline, EOF}},
-		{"]", []TokenType{CloseBracket, Semicolon, Newline, EOF}},
-		{"*", []TokenType{Star, Newline, EOF}},
-		{"^", []TokenType{Carrot, Newline, EOF}},
-		{"*=", []TokenType{StarEqual, Newline, EOF}},
-		{"^=", []TokenType{CarrotEqual, Newline, EOF}},
-		{"<-", []TokenType{LessMinus, Newline, EOF}},
-		{">", []TokenType{Greater, Newline, EOF}},
-		{">=", []TokenType{GreaterEqual, Newline, EOF}},
-		{"{", []TokenType{OpenBrace, Newline, EOF}},
-		{"}", []TokenType{CloseBrace, Semicolon, Newline, EOF}},
-		{"/", []TokenType{Divide, Newline, EOF}},
-		{"<<", []TokenType{LessLess, Newline, EOF}},
-		{"/=", []TokenType{DivideEqual, Newline, EOF}},
-		{"<<=", []TokenType{LessLessEqual, Newline, EOF}},
-		{"++", []TokenType{PlusPlus, Semicolon, Newline, EOF}},
-		{"=", []TokenType{Equal, Newline, EOF}},
-		{":=", []TokenType{ColonEqual, Newline, EOF}},
-		{",", []TokenType{Comma, Newline, EOF}},
-		{";", []TokenType{Semicolon, Newline, EOF}},
-		{"%", []TokenType{Percent, Newline, EOF}},
-		{">>", []TokenType{GreaterGreater, Newline, EOF}},
-		{"%=", []TokenType{PercentEqual, Newline, EOF}},
-		{">>=", []TokenType{GreaterGreaterEqual, Newline, EOF}},
-		{"--", []TokenType{MinusMinus, Semicolon, Newline, EOF}},
-		{"!", []TokenType{Bang, Newline, EOF}},
-		{"...", []TokenType{DotDotDot, Newline, EOF}},
-		{".", []TokenType{Dot, Newline, EOF}},
-		{":", []TokenType{Colon, Newline, EOF}},
-		{"&^", []TokenType{AndCarrot, Newline, EOF}},
-		{"&^=", []TokenType{AndCarrotEqual, Newline, EOF}},
+	tests := singleTokenTests{
+		{"+", Plus},
+		{"&", And},
+		{"+=", PlusEqual},
+		{"&=", AndEqual},
+		{"&&", AndAnd},
+		{"==", EqualEqual},
+		{"!=", BangEqual},
+		{"(", OpenParen},
+		{")", CloseParen},
+		{"-", Minus},
+		{"|", Or},
+		{"-=", MinusEqual},
+		{"|=", OrEqual},
+		{"||", OrOr},
+		{"<", Less},
+		{"<=", LessEqual},
+		{"[", OpenBracket},
+		{"]", CloseBracket},
+		{"*", Star},
+		{"^", Carrot},
+		{"*=", StarEqual},
+		{"^=", CarrotEqual},
+		{"<-", LessMinus},
+		{">", Greater},
+		{">=", GreaterEqual},
+		{"{", OpenBrace},
+		{"}", CloseBrace},
+		{"/", Divide},
+		{"<<", LessLess},
+		{"/=", DivideEqual},
+		{"<<=", LessLessEqual},
+		{"++", PlusPlus},
+		{"=", Equal},
+		{":=", ColonEqual},
+		{",", Comma},
+		{";", Semicolon},
+		{"%", Percent},
+		{">>", GreaterGreater},
+		{"%=", PercentEqual},
+		{">>=", GreaterGreaterEqual},
+		{"--", MinusMinus},
+		{"!", Bang},
+		{"...", DotDotDot},
+		{".", Dot},
+		{":", Colon},
+		{"&^", AndCarrot},
+		{"&^=", AndCarrotEqual},
 	}
 	tests.run(t)
-}
-
-type singleTokenTests []struct {
-	text string
-	want TokenType
-}
-
-func (tests singleTokenTests) run(t *testing.T) {
-	for i, test := range tests {
-		lex := New(strings.NewReader(test.text))
-		got := lex.Next()
-		if got.Type != test.want {
-			t.Errorf("test %d: %s got %s, wanted %s", i, test.text, got, test.want)
-		}
-	}
 }
 
 func TestIdentifier(t *testing.T) {

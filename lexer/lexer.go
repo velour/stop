@@ -494,22 +494,30 @@ func (l *Lexer) nextLiteralToken() *Token {
 }
 
 // Next returns the next logical token from the token stream.
-// Semicolons are inserted, and if there is no newline before the end of
-// the file, on is added.
+// Once an Error or EOF token is returned, all subsequent tokens will
+// be of type EOF.
 func (l *Lexer) Next() *Token {
 	tok := l.next
 	l.next = nil
 	if tok == nil {
 		tok = l.nextLiteralToken()
 	}
-	if tok.Type == EOF && (l.prev == nil || l.prev.Type != Newline) {
-		l.next = tok
-		tok = &Token{
-			Type: Newline,
-			Span: tok.Span,
-		}
-	}
-	if tok.Type == Newline && l.prev != nil && needsSemicolon(l.prev) {
+	if tok.Type == Newline && l.prev != nil &&
+		(l.prev.Type == Identifier ||
+			l.prev.Type == IntegerLiteral ||
+			l.prev.Type == FloatLiteral ||
+			l.prev.Type == ImaginaryLiteral ||
+			l.prev.Type == RuneLiteral ||
+			l.prev.Type == StringLiteral ||
+			l.prev.Type == Break ||
+			l.prev.Type == Continue ||
+			l.prev.Type == Fallthrough ||
+			l.prev.Type == Return ||
+			l.prev.Type == PlusPlus ||
+			l.prev.Type == MinusMinus ||
+			l.prev.Type == CloseParen ||
+			l.prev.Type == CloseBracket ||
+			l.prev.Type == CloseBrace) {
 		l.next = tok
 		tok = &Token{
 			Type: Semicolon,
@@ -518,24 +526,6 @@ func (l *Lexer) Next() *Token {
 	}
 	l.prev = tok
 	return tok
-}
-
-func needsSemicolon(tok *Token) bool {
-	return tok.Type == Identifier ||
-		tok.Type == IntegerLiteral ||
-		tok.Type == FloatLiteral ||
-		tok.Type == ImaginaryLiteral ||
-		tok.Type == RuneLiteral ||
-		tok.Type == StringLiteral ||
-		tok.Type == Break ||
-		tok.Type == Continue ||
-		tok.Type == Fallthrough ||
-		tok.Type == Return ||
-		tok.Type == PlusPlus ||
-		tok.Type == MinusMinus ||
-		tok.Type == CloseParen ||
-		tok.Type == CloseBracket ||
-		tok.Type == CloseBrace
 }
 
 func operator(l *Lexer) *Token {
