@@ -1,3 +1,8 @@
+// Package lexer provides a lexer for the Go language.
+//
+// Quirks:
+//
+// Mal-formed octal literals that begin with 0 followed by any number of decmial digits are returned as valid integer literals.
 package lexer
 
 import (
@@ -396,7 +401,7 @@ func (l *Lexer) nextLiteralToken() *Token {
 		return whitespace(l)
 	case isIdentStart(r):
 		return identifier(l)
-	case isDecimalDigit(r) || isOctalDigit(r) || isHexDigit(r):
+	case isDecimalDigit(r) || isHexDigit(r):
 		return number(r, l)
 	case r == '^':
 		if l.rune() != '=' {
@@ -651,10 +656,6 @@ func hex(l *Lexer) *Token {
 
 func isDecimalDigit(r rune) bool {
 	return r >= '0' && r <= '9'
-}
-
-func isOctalDigit(r rune) bool {
-	return r >= '0' && r <= '7'
 }
 
 func isHexDigit(r rune) bool {
