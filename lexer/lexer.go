@@ -13,7 +13,7 @@ import (
 type TokenType int
 
 const (
-	EOF             = -1
+	EOF   TokenType = -1
 	Error TokenType = iota
 	Identifier
 	IntegerLiteral
@@ -25,6 +25,7 @@ const (
 	Whitespace
 
 	// Keywords
+
 	Break
 	Default
 	Func
@@ -52,6 +53,7 @@ const (
 	Var
 
 	// Operators
+
 	Plus
 	And
 	PlusEqual
@@ -302,7 +304,7 @@ func New(in io.Reader) *Lexer {
 	}
 	return &Lexer{
 		in:            bufio.NewReader(in),
-		span:          loc.Span{loc.Zero(path), loc.Zero(path)},
+		span:          loc.Span{0: loc.Zero(path), 1: loc.Zero(path)},
 		prevLineStart: -1,
 	}
 }
@@ -495,7 +497,7 @@ func (l *Lexer) Next() *Token {
 		l.next = tok
 		tok = &Token{
 			Type: Semicolon,
-			Span: loc.Span{l.next.Span[0], l.next.Span[0]},
+			Span: loc.Span{0: l.next.Span[0], 1: l.next.Span[0]},
 		}
 	}
 	l.prev = tok
@@ -606,7 +608,6 @@ func number(r0 rune, l *Lexer) *Token {
 		}
 		r = l.rune()
 	}
-	panic("unreachable")
 }
 
 func mantissa(l *Lexer) *Token {

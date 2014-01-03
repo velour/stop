@@ -26,7 +26,7 @@ func (l Location) String() string {
 	return l.Path + ":" + strconv.Itoa(l.Line) + "-+#" + strconv.Itoa(l.RuneOnLine())
 }
 
-// Return the beginning, or zero, location for a path.
+// Zero returns the beginning, or zero, location for a path.
 func Zero(path string) Location {
 	return Location{Path: path, Line: 1, Rune: 1, LineStart: 1}
 }
@@ -35,7 +35,7 @@ func Zero(path string) Location {
 // The end location is exclusive.
 type Span [2]Location
 
-// String returns the string representation of a span as an Acme address.
+// String returns the string representation of a span as an Acme address (it's a bit ugly, but often convenient).
 // Spans that cross file boundaries, will not result in valid addresses.
 func (s Span) String() string {
 	switch {
@@ -50,5 +50,4 @@ func (s Span) String() string {
 	default:
 		return s[0].String()
 	}
-	return strconv.Itoa(s[0].Rune) + "-" + strconv.Itoa(s[1].Rune)
 }

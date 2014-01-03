@@ -1,0 +1,1 @@
+lexer/lexer.go:16:2: exported const EOF should have comment (or a comment on this block) or be unexported
