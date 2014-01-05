@@ -39,6 +39,28 @@ func (tests multiTokenTests) run(t *testing.T) {
 	}
 }
 
+type locTests []struct {
+	text string
+	want [][2]int
+}
+
+func (tests locTests) run(t *testing.T, loc func(*Token) [2]int) {
+	for i, test := range tests {
+		lex := New(strings.NewReader(test.text))
+		got := make([][2]int, 0, len(test.want))
+		for {
+			tok := lex.Next()
+			if tok.Type == EOF {
+				break
+			}
+			got = append(got, loc(tok))
+		}
+		if !reflect.DeepEqual(got, test.want) {
+			t.Errorf("test %d: %s got %v, wanted %v", i, test.text, got, test.want)
+		}
+	}
+}
+
 func TestEOF(t *testing.T) {
 	tests := multiTokenTests{
 		{"", []TokenType{EOF}},
@@ -279,4 +301,35 @@ func TestRawStringLiteral(t *testing.T) {
 		{"\x60not terminated", Error},
 	}
 	tests.run(t)
+}
+
+func TestLineNumbers(t *testing.T) {
+	tests := locTests{
+		{"\n", [][2]int{{1, 2}}},
+		{"\n\n", [][2]int{{1, 2}, {2, 3}}},
+		{"// foo \n", [][2]int{{1, 2}}},
+		{"/* foo */", [][2]int{{1, 1}}},
+		{"/* foo \n*/", [][2]int{{1, 2}}},
+		{"/* foo \n*/\n", [][2]int{{1, 2}, {2, 3}}},
+		{"\nident", [][2]int{{1, 2}, {2, 2}}},
+		{"\nα", [][2]int{{1, 2}, {2, 2}}},
+		{"\nident\n&&", [][2]int{{1, 2}, {2, 2}, {2, 2}, {2, 3}, {3, 3}}},
+	}
+	tests.run(t, func(tok *Token) [2]int {
+		return [2]int{tok.Span[0].Line, tok.Span[1].Line}
+	})
+}
+
+func TestRuneNumbers(t *testing.T) {
+	tests := locTests{
+		{"\n", [][2]int{{1, 2}}},
+		{"hello", [][2]int{{1, 6}}},
+		{"α", [][2]int{{1, 2}}},
+		{"αβ", [][2]int{{1, 3}}},
+		{"α β", [][2]int{{1, 2}, {2, 3}, {3, 4}}},
+		{"α\nβ", [][2]int{{1, 2}, {2, 2}, {2, 3}, {3, 4}}},
+	}
+	tests.run(t, func(tok *Token) [2]int {
+		return [2]int{tok.Span[0].Rune, tok.Span[1].Rune}
+	})
 }
