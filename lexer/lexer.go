@@ -23,6 +23,7 @@ import (
 // A TokenType identifies the type of a token in the input file.
 type TokenType int
 
+// The set of constants defining the types of tokens.
 const (
 	EOF   TokenType = -1
 	Error TokenType = iota
