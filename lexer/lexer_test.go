@@ -247,6 +247,10 @@ func TestRuneLiteral(t *testing.T) {
 		{"'a'", RuneLiteral},
 		{"'ä'", RuneLiteral},
 		{"'本'", RuneLiteral},
+		{"'\\''", RuneLiteral},
+		{`'\"'`, RuneLiteral},
+		{"'\\b'", RuneLiteral},
+		{"'\\r'", RuneLiteral},
 		{"'\\t'", RuneLiteral},
 		{"'\\000'", RuneLiteral},
 		{"'\\007'", RuneLiteral},
@@ -324,6 +328,7 @@ func TestRuneNumbers(t *testing.T) {
 	tests := locTests{
 		{"\n", [][2]int{{1, 2}}},
 		{"hello", [][2]int{{1, 6}}},
+		{"\t\t\t\t\t", [][2]int{{1, 6}}},
 		{"α", [][2]int{{1, 2}}},
 		{"αβ", [][2]int{{1, 3}}},
 		{"α β", [][2]int{{1, 2}, {2, 3}, {3, 4}}},
