@@ -14,6 +14,7 @@ import (
 	"bufio"
 	"io"
 	"os"
+	"strings"
 	"unicode"
 
 	"bitbucket.org/eaburns/stop/loc"
@@ -31,8 +32,7 @@ const (
 	ImaginaryLiteral
 	RuneLiteral
 	StringLiteral
-	Newline
-	// Whitespace is any non-newline whitespace.
+	Comment
 	Whitespace
 
 	// Keywords
@@ -123,7 +123,7 @@ var tokenTypeNames = map[TokenType]string{
 	ImaginaryLiteral:    "ImaginaryLiteral",
 	RuneLiteral:         "RuneLiteral",
 	StringLiteral:       "StringLiteral",
-	Newline:             "Newline",
+	Comment:             "Comment",
 	Whitespace:          "Whitespace",
 	Break:               "Break",
 	Default:             "Default",
@@ -290,8 +290,19 @@ type Token struct {
 }
 
 // String returns a human-readable string representation of the token.
-func (t Token) String() string {
+func (t *Token) String() string {
 	return "Token{Type:" + t.Type.String() + ", Text:`" + t.Text + "`, Span:" + t.Span.String() + "}"
+}
+
+// IsNewline returns true if the token acts as a newline.
+func (t *Token) IsNewline() bool {
+	if t.Type != Whitespace && t.Type != Comment {
+		return false
+	}
+	// The first clause is a special check for line comments,
+	// because they may not end with a \n if they occur
+	// immediately before EOF.
+	return t.Type == Comment && strings.HasPrefix(t.Text, "//") || strings.ContainsRune(t.Text, '\n')
 }
 
 // A Lexer lexes Go tokens from an input stream.
@@ -401,8 +412,6 @@ func (l *Lexer) nextLiteralToken() *Token {
 	switch {
 	case r < 0:
 		return l.token(EOF)
-	case r == '\n':
-		return l.token(Newline)
 	case isWhitespace(r):
 		return whitespace(l)
 	case isIdentStart(r):
@@ -503,7 +512,7 @@ func (l *Lexer) Next() *Token {
 	if tok == nil {
 		tok = l.nextLiteralToken()
 	}
-	if tok.Type == Newline && l.prev != nil &&
+	if tok.IsNewline() && l.prev != nil &&
 		(l.prev.Type == Identifier ||
 			l.prev.Type == IntegerLiteral ||
 			l.prev.Type == FloatLiteral ||
@@ -570,12 +579,11 @@ func whitespace(l *Lexer) *Token {
 }
 
 func isWhitespace(r rune) bool {
-	return r == ' ' || r == '\t' || r == '\v' || r == '\r'
+	return r == ' ' || r == '\t' || r == '\v' || r == '\r' || r == '\n'
 }
 
 func comment(l *Lexer, closing []rune) *Token {
 	i := 0
-	typ := Whitespace
 	for i < len(closing) {
 		r := l.rune()
 		switch {
@@ -589,11 +597,8 @@ func comment(l *Lexer, closing []rune) *Token {
 		default:
 			i++
 		}
-		if r == '\n' {
-			typ = Newline
-		}
 	}
-	return l.token(typ)
+	return l.token(Comment)
 }
 
 func number(r0 rune, l *Lexer) *Token {

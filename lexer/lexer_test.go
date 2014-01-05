@@ -16,7 +16,7 @@ func (tests singleTokenTests) run(t *testing.T) {
 		lex := New(strings.NewReader(test.text))
 		got := lex.Next()
 		if got.Type != test.want {
-			t.Errorf("test %d: %s got %s, wanted %s", i, test.text, got, test.want)
+			t.Errorf("test %d: %s got %v, wanted %v", i, test.text, got, test.want)
 		}
 	}
 }
@@ -34,7 +34,7 @@ func (tests multiTokenTests) run(t *testing.T) {
 			got = append(got, lex.Next().Type)
 		}
 		if !reflect.DeepEqual(got, test.want) {
-			t.Errorf("test %d: %s got %s, wanted %s", i, test.text, got, test.want)
+			t.Errorf("test %d: %s got %v, wanted %v", i, test.text, got, test.want)
 		}
 	}
 }
@@ -64,40 +64,65 @@ func (tests locTests) run(t *testing.T, loc func(*Token) [2]int) {
 func TestEOF(t *testing.T) {
 	tests := multiTokenTests{
 		{"", []TokenType{EOF}},
-		{"\n", []TokenType{Newline, EOF}},
+		{"\n", []TokenType{Whitespace, EOF}},
 	}
 	tests.run(t)
 }
 
+func TestIsNewline(t *testing.T) {
+	tests := []struct {
+		text      string
+		isNewline bool
+	}{
+		{"\n", true},
+		{"//\n", true},
+		{"//foo\n", true},
+		{"//foo", true},
+		{"/*f\noo*/", true},
+		{"", false},
+		{"/*foo*/", false},
+		{" ", false},
+		{"\r", false},
+	}
+	for i, test := range tests {
+		lex := New(strings.NewReader(test.text))
+		got := lex.Next()
+		if got.IsNewline() != test.isNewline {
+			t.Errorf("test %d: %s got %v, wanted %v", i, test.text, got.IsNewline(), test.isNewline)
+		}
+	}
+}
+
 func TestLineComment(t *testing.T) {
 	tests := multiTokenTests{
-		{"//\n", []TokenType{Newline, EOF}},
-		{"// hello\n", []TokenType{Newline, EOF}},
-		{"//", []TokenType{Newline, EOF}},
-		{"\n//", []TokenType{Newline, Newline, EOF}},
+		{"//\n", []TokenType{Comment, EOF}},
+		{"// hello\n", []TokenType{Comment, EOF}},
+		{"//", []TokenType{Comment, EOF}},
+		{"\n//", []TokenType{Whitespace, Comment, EOF}},
 	}
 	tests.run(t)
 }
 
 func TestMultiLineComment(t *testing.T) {
 	tests := multiTokenTests{
-		{"/* comment */", []TokenType{Whitespace, EOF}},
-		{"/*\ncomment */", []TokenType{Newline, EOF}},
-		{"/*\ncomment\n*/", []TokenType{Newline, EOF}},
-		{"/* // comment */", []TokenType{Whitespace, EOF}},
-		{"/* // /*comment*/ */", []TokenType{Whitespace, Whitespace, Star, Divide, EOF}},
+		{"/* comment */", []TokenType{Comment, EOF}},
+		{"/*\ncomment */", []TokenType{Comment, EOF}},
+		{"/*\ncomment\n*/", []TokenType{Comment, EOF}},
+		{"/* // comment */", []TokenType{Comment, EOF}},
+		{"/* // /*comment*/ */", []TokenType{Comment, Whitespace, Star, Divide, EOF}},
 	}
 	tests.run(t)
 }
 
 func TestSemicolonInsertion(t *testing.T) {
 	tests := multiTokenTests{
-		{"identifier\n", []TokenType{Identifier, Semicolon, Newline, EOF}},
-		{"++\n", []TokenType{PlusPlus, Semicolon, Newline, EOF}},
-		{"++//hi", []TokenType{PlusPlus, Semicolon, Newline, EOF}},
-		{"5\n", []TokenType{IntegerLiteral, Semicolon, Newline, EOF}},
-		{"'a'\n", []TokenType{RuneLiteral, Semicolon, Newline, EOF}},
-		{"\"hello\"\n", []TokenType{StringLiteral, Semicolon, Newline, EOF}},
+		{"identifier\n", []TokenType{Identifier, Semicolon, Whitespace, EOF}},
+		{"++\n", []TokenType{PlusPlus, Semicolon, Whitespace, EOF}},
+		{"++//hi", []TokenType{PlusPlus, Semicolon, Comment, EOF}},
+		{"++/**/", []TokenType{PlusPlus, Comment, EOF}},
+		{"5\n", []TokenType{IntegerLiteral, Semicolon, Whitespace, EOF}},
+		{"'a'\n", []TokenType{RuneLiteral, Semicolon, Whitespace, EOF}},
+		{"\"hello\"\n", []TokenType{StringLiteral, Semicolon, Whitespace, EOF}},
 	}
 	tests.run(t)
 }
@@ -310,7 +335,7 @@ func TestRawStringLiteral(t *testing.T) {
 func TestLineNumbers(t *testing.T) {
 	tests := locTests{
 		{"\n", [][2]int{{1, 2}}},
-		{"\n\n", [][2]int{{1, 2}, {2, 3}}},
+		{"\n\n", [][2]int{{1, 3}}},
 		{"// foo \n", [][2]int{{1, 2}}},
 		{"/* foo */", [][2]int{{1, 1}}},
 		{"/* foo \n*/", [][2]int{{1, 2}}},
