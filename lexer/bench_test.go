@@ -4,12 +4,9 @@ import (
 	"go/scanner"
 	"go/token"
 	"testing"
-
-	//	"github.com/davecheney/profile"
 )
 
 func BenchmarkLexer(b *testing.B) {
-	//	defer profile.Start(profile.CPUProfile).Stop()
 	lex := New("", prog)
 	for i := 0; i < b.N; i++ {
 		lex.Reset("", prog)

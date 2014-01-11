@@ -389,39 +389,11 @@ func (l *Lexer) replace() {
 	}
 }
 
-func (l *Lexer) token(typ TokenType) *Token {
-	t := &Token{
-		Text: l.src[l.start:l.cur],
-		Type: typ,
-		Span: l.span,
-	}
-	l.span[0] = l.span[1]
-	l.start = l.cur
-	l.w = 0
-	return t
-}
-
-func (l *Lexer) unexpected(r rune) *Token {
-	l.span[0] = l.span[1]
-	l0 := &l.span[0]
-	l0.Rune--
-	if l0.Rune < l0.LineStart {
-		l0.Line--
-		l0.LineStart = l.prevLineStart
-	}
-	l.eof = true
-	return &Token{
-		Text: "unexpected input rune: " + string([]rune{r}),
-		Type: Error,
-		Span: l.span,
-	}
-}
-
-func (l *Lexer) nextLiteralToken() *Token {
+func (l *Lexer) nextType() TokenType {
 	r := l.rune()
 	switch {
 	case r < 0:
-		return l.token(EOF)
+		return EOF
 	case isWhitespace(r):
 		return whitespace(l)
 	case isLetter(r):
@@ -481,7 +453,7 @@ func (l *Lexer) nextLiteralToken() *Token {
 	case r == '.':
 		if r = l.rune(); r == '.' {
 			if r = l.rune(); r != '.' {
-				return l.unexpected(r)
+				return Error
 			}
 		} else if isDecimalDigit(r) {
 			return fraction(l)
@@ -510,17 +482,19 @@ func (l *Lexer) nextLiteralToken() *Token {
 	case r == '`':
 		return rawStringLiteral(l)
 	}
-	return l.unexpected(r)
+	return Error
 }
 
 // Next returns the next logical token from the token stream.
 // Once an Error or EOF token is returned, all subsequent tokens will
 // be of type EOF.
-func (l *Lexer) Next() *Token {
-	tok := l.next
-	l.next = nil
-	if tok == nil {
-		tok = l.nextLiteralToken()
+func (l *Lexer) Next() Token {
+	var tok Token
+	if l.next == nil {
+		tok = l.token(l.nextType())
+	} else {
+		tok = *l.next
+		l.next = nil
 	}
 	if (tok.IsNewline() || tok.Type == EOF) &&
 		(l.prev == Identifier ||
@@ -538,8 +512,9 @@ func (l *Lexer) Next() *Token {
 			l.prev == CloseParen ||
 			l.prev == CloseBracket ||
 			l.prev == CloseBrace) {
-		l.next = tok
-		tok = &Token{
+		l.next = new(Token)
+		*l.next = tok
+		tok = Token{
 			Type: Semicolon,
 			Span: loc.Span{0: l.next.Span[0], 1: l.next.Span[0]},
 		}
@@ -550,39 +525,54 @@ func (l *Lexer) Next() *Token {
 	return tok
 }
 
-func operator(l *Lexer) *Token {
-	tok := l.token(Error)
-	oper, ok := operators[tok.Text]
-	if !ok {
-		panic("bad operator: \"" + string(tok.Text) + "\"")
+func (l *Lexer) token(typ TokenType) Token {
+	if typ == Error {
+		// Error means that the most-recently read rune was unexpected.
+		l.start = l.cur - 1
 	}
-	tok.Type = oper
-	return tok
+	t := Token{
+		Text: l.src[l.start:l.cur],
+		Type: typ,
+		Span: l.span,
+	}
+	l.span[0] = l.span[1]
+	l.start = l.cur
+	l.w = 0
+	return t
 }
 
-func identifier(l *Lexer) *Token {
+func operator(l *Lexer) TokenType {
+	text := l.src[l.start:l.cur]
+	oper, ok := operators[text]
+	if !ok {
+		panic("bad operator: \"" + string(text) + "\"")
+	}
+	return oper
+}
+
+func identifier(l *Lexer) TokenType {
 	r := l.rune()
 	for isIdent(r) {
 		r = l.rune()
 	}
 	l.replace()
-	tok := l.token(Identifier)
-	if keyword, ok := keywords[tok.Text]; ok {
-		tok.Type = keyword
+	text := l.src[l.start:l.cur]
+	if keyword, ok := keywords[text]; ok {
+		return keyword
 	}
-	return tok
+	return Identifier
 }
 
-func whitespace(l *Lexer) *Token {
+func whitespace(l *Lexer) TokenType {
 	r := l.rune()
 	for isWhitespace(r) {
 		r = l.rune()
 	}
 	l.replace()
-	return l.token(Whitespace)
+	return Whitespace
 }
 
-func comment(l *Lexer, closing []rune) *Token {
+func comment(l *Lexer, closing []rune) TokenType {
 	i := 0
 	for i < len(closing) {
 		r := l.rune()
@@ -598,10 +588,10 @@ func comment(l *Lexer, closing []rune) *Token {
 			i++
 		}
 	}
-	return l.token(Comment)
+	return Comment
 }
 
-func number(r0 rune, l *Lexer) *Token {
+func number(r0 rune, l *Lexer) TokenType {
 	r := l.rune()
 	if r0 == '0' && (r == 'x' || r == 'X') {
 		return hex(l)
@@ -613,16 +603,16 @@ func number(r0 rune, l *Lexer) *Token {
 		case r == '.':
 			return fraction(l)
 		case r == 'i':
-			return l.token(ImaginaryLiteral)
+			return ImaginaryLiteral
 		case !isDecimalDigit(r):
 			l.replace()
-			return l.token(IntegerLiteral)
+			return IntegerLiteral
 		}
 		r = l.rune()
 	}
 }
 
-func mantissa(l *Lexer) *Token {
+func mantissa(l *Lexer) TokenType {
 	r := l.rune()
 	if r == '+' || r == '-' {
 		r = l.rune()
@@ -631,128 +621,128 @@ func mantissa(l *Lexer) *Token {
 		r = l.rune()
 	}
 	if r == 'i' {
-		return l.token(ImaginaryLiteral)
+		return ImaginaryLiteral
 	}
 	l.replace()
-	return l.token(FloatLiteral)
+	return FloatLiteral
 }
 
-func fraction(l *Lexer) *Token {
+func fraction(l *Lexer) TokenType {
 	r := l.rune()
 	for isDecimalDigit(r) {
 		r = l.rune()
 	}
 	switch {
 	case r == 'i':
-		return l.token(ImaginaryLiteral)
+		return ImaginaryLiteral
 	case r == 'e' || r == 'E':
 		return mantissa(l)
 	}
 	l.replace()
-	return l.token(FloatLiteral)
+	return FloatLiteral
 }
 
-func hex(l *Lexer) *Token {
+func hex(l *Lexer) TokenType {
 	r := l.rune()
 	for isHexDigit(r) {
 		r = l.rune()
 	}
 	l.replace()
-	return l.token(IntegerLiteral)
+	return IntegerLiteral
 }
 
-func runeLiteral(l *Lexer) *Token {
+func runeLiteral(l *Lexer) TokenType {
 	if l.rune() == '\\' {
-		if err := unicodeValue(l, '\''); err != nil {
-			return err
+		if !unicodeValue(l, '\'') {
+			return Error
 		}
 	}
 	if r := l.rune(); r != '\'' {
-		return l.unexpected(r)
+		return Error
 	}
-	return l.token(RuneLiteral)
+	return RuneLiteral
 }
 
-func interpertedStringLiteral(l *Lexer) *Token {
+func interpertedStringLiteral(l *Lexer) TokenType {
 	for {
 		r := l.rune()
 		switch {
 		case r == '"':
-			return l.token(StringLiteral)
+			return StringLiteral
 		case r == '\n':
-			return l.unexpected(r)
+			return Error
 		case r == '\\':
-			if err := unicodeValue(l, '"'); err != nil {
-				return err
+			if !unicodeValue(l, '"') {
+				return Error
 			}
 		case r < 0:
-			return l.unexpected(r)
+			return Error
 		}
 	}
 }
 
-func rawStringLiteral(l *Lexer) *Token {
+func rawStringLiteral(l *Lexer) TokenType {
 	for {
 		r := l.rune()
 		switch {
 		case r == '`':
-			return l.token(StringLiteral)
+			return StringLiteral
 		case r < 0:
-			return l.unexpected(r)
+			return Error
 		}
 	}
 }
 
 // Parses a unicode value (assuming that the leading '\' has
-// already been consumed), and returns nil on success or
-// an error token if the parse failed.
-func unicodeValue(l *Lexer, quote rune) *Token {
+// already been consumed), and returns true on success or
+// false if the last rune read was unexpected.
+func unicodeValue(l *Lexer, quote rune) bool {
 	r := l.rune()
 	switch {
 	case r == 'U':
 		if s := l.rune(); !isHexDigit(s) {
-			return l.unexpected(s)
+			return false
 		}
 		if s := l.rune(); !isHexDigit(s) {
-			return l.unexpected(s)
+			return false
 		}
 		if s := l.rune(); !isHexDigit(s) {
-			return l.unexpected(s)
+			return false
 		}
 		if s := l.rune(); !isHexDigit(s) {
-			return l.unexpected(s)
+			return false
 		}
 		fallthrough
 
 	case r == 'u':
 		if s := l.rune(); !isHexDigit(s) {
-			return l.unexpected(s)
+			return false
 		}
 		if s := l.rune(); !isHexDigit(s) {
-			return l.unexpected(s)
+			return false
 		}
 		fallthrough
 
 	case r == 'x':
 		if s := l.rune(); !isHexDigit(s) {
-			return l.unexpected(s)
+			return false
 		}
 		if s := l.rune(); !isHexDigit(s) {
-			return l.unexpected(s)
+			return false
 		}
 
 	case isOctalDigit(r):
 		if s := l.rune(); !isOctalDigit(s) {
-			return l.unexpected(s)
+			return false
 		}
 		if s := l.rune(); !isOctalDigit(s) {
-			return l.unexpected(s)
+			return false
 		}
 
 	case r != 'a' && r != 'b' && r != 'f' && r != 'n' && r != 'r' && r != 't' && r != 'v' && r != '\\' && r != quote:
-		return l.unexpected(r)
+		return false
 	}
-	return nil
+	return true
 }
 
 func isDecimalDigit(r rune) bool {
