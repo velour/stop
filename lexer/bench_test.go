@@ -9,7 +9,12 @@ import (
 func BenchmarkLexer(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		lex := New("", prog)
-		for lex.Next().Type != EOF {
+		ttype := Semicolon
+		for ttype != EOF && ttype != Error {
+			ttype = lex.Next().Type
+		}
+		if ttype == Error {
+			b.Fatalf("lex error")
 		}
 	}
 }
