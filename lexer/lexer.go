@@ -309,6 +309,7 @@ func (t *Token) IsNewline() bool {
 // A Lexer scans and returns Go tokens from an input stream.
 type Lexer struct {
 	in            *bufio.Reader
+	eof           bool
 	text          []rune
 	span          loc.Span
 	prevLineStart int
@@ -322,22 +323,31 @@ type Lexer struct {
 // If the underlying type of the reader is an os.File, then all Locations
 // produced by the lexer use the file name as their path.
 func New(in io.Reader) *Lexer {
+	l := &Lexer{in: bufio.NewReader(in)}
+	l.Reset(in)
+	return l
+}
+
+// Reset resets the lexer for use with a new reader.
+func (l *Lexer) Reset(in io.Reader) {
 	path := ""
 	if file, ok := in.(*os.File); ok {
 		path = file.Name()
 	}
-	return &Lexer{
-		in:            bufio.NewReader(in),
-		span:          loc.Span{0: loc.Zero(path), 1: loc.Zero(path)},
-		prevLineStart: -1,
-	}
+	l.span = loc.Span{0: loc.Zero(path), 1: loc.Zero(path)}
+	l.prevLineStart = -1
+	l.in.Reset(in)
+	l.text = nil
+	l.prev = nil
+	l.next = nil
+	l.eof = false
 }
 
 // Rune reads and returns the next rune from the input stream and updates the
 // span and text of the current token.  If an error is encountered then it panicks.
 // If the end of the input is reached -1 is returned.
 func (l *Lexer) rune() rune {
-	if l.in == nil {
+	if l.eof {
 		return -1
 	}
 	r, _, err := l.in.ReadRune()
@@ -346,7 +356,7 @@ func (l *Lexer) rune() rune {
 	}
 	loc := &l.span[1]
 	if err == io.EOF {
-		l.in = nil
+		l.eof = true
 		return -1
 	}
 	loc.Rune++
@@ -365,7 +375,7 @@ func (l *Lexer) replace() {
 	if len(l.text) == 0 {
 		panic("nothing to replace")
 	}
-	if l.in == nil {
+	if l.eof {
 		return
 	}
 	l.text = l.text[:len(l.text)-1]
