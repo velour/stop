@@ -250,6 +250,8 @@ func TestOperators(t *testing.T) {
 		{":", Colon},
 		{"&^", AndCarrot},
 		{"&^=", AndCarrotEqual},
+
+		{"..*", Error},
 	}
 	tests.run(t)
 }
@@ -373,6 +375,23 @@ func TestRuneLiteral(t *testing.T) {
 		{"'\\0'", Error},
 		{"'\\z'", Error},
 		{`'\"'`, Error},
+		{`'\xZ'`, Error},
+		{`'\x0Z'`, Error},
+		{`'\uZ'`, Error},
+		{`'\u0Z'`, Error},
+		{`'\u00Z'`, Error},
+		{`'\u000Z'`, Error},
+		{`'\UZ'`, Error},
+		{`'\U0Z'`, Error},
+		{`'\U00Z'`, Error},
+		{`'\U000Z'`, Error},
+		{`'\U0000Z'`, Error},
+		{`'\U00000Z'`, Error},
+		{`'\U000000Z'`, Error},
+		{`'\U0000000Z'`, Error},
+		{`'\Z'`, Error},
+		{`'\0Z'`, Error},
+		{`'\00Z'`, Error},
 
 		// The following two should be errors, but we don't validate the Unicode code points.
 		{"'\\uDFFF'", RuneLiteral},
