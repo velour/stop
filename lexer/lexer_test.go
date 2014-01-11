@@ -2,7 +2,6 @@ package lexer
 
 import (
 	"reflect"
-	"strings"
 	"testing"
 )
 
@@ -13,7 +12,7 @@ type singleTokenTests []struct {
 
 func (tests singleTokenTests) run(t *testing.T) {
 	for i, test := range tests {
-		lex := New(strings.NewReader(test.text))
+		lex := New("", test.text)
 		got := lex.Next()
 		if got.Type != test.want {
 			t.Errorf("test %d: %s got %v, wanted %v", i, test.text, got, test.want)
@@ -28,7 +27,7 @@ type multiTokenTests []struct {
 
 func (tests multiTokenTests) run(t *testing.T) {
 	for i, test := range tests {
-		lex := New(strings.NewReader(test.text))
+		lex := New("", test.text)
 		got := make([]TokenType, 0, len(test.want))
 		for len(got) == 0 || got[len(got)-1] != EOF {
 			got = append(got, lex.Next().Type)
@@ -46,7 +45,7 @@ type locTests []struct {
 
 func (tests locTests) run(t *testing.T, loc func(*Token) [2]int) {
 	for i, test := range tests {
-		lex := New(strings.NewReader(test.text))
+		lex := New("", test.text)
 		got := make([][2]int, 0, len(test.want))
 		for {
 			tok := lex.Next()
@@ -58,6 +57,20 @@ func (tests locTests) run(t *testing.T, loc func(*Token) [2]int) {
 		if !reflect.DeepEqual(got, test.want) {
 			t.Errorf("test %d: %s got %v, wanted %v", i, test.text, got, test.want)
 		}
+	}
+}
+
+func TestReplace(t *testing.T) {
+	l := New("", "αβ")
+	if l.rune() != 'α' {
+		t.Fatalf("first rune was not α")
+	}
+	l.replace()
+	if l.rune() != 'α' {
+		t.Errorf("expected α")
+	}
+	if l.rune() != 'β' {
+		t.Errorf("expected β")
 	}
 }
 
@@ -85,7 +98,7 @@ func TestIsNewline(t *testing.T) {
 		{"\r", false},
 	}
 	for i, test := range tests {
-		lex := New(strings.NewReader(test.text))
+		lex := New("", test.text)
 		got := lex.Next()
 		if got.IsNewline() != test.isNewline {
 			t.Errorf("test %d: %s got %v, wanted %v", i, test.text, got.IsNewline(), test.isNewline)

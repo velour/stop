@@ -3,16 +3,16 @@ package lexer
 import (
 	"go/scanner"
 	"go/token"
-	"strings"
 	"testing"
+
+	//	"github.com/davecheney/profile"
 )
 
 func BenchmarkLexer(b *testing.B) {
-	src := strings.NewReader(prog)
-	lex := New(src)
+	//	defer profile.Start(profile.CPUProfile).Stop()
+	lex := New("", prog)
 	for i := 0; i < b.N; i++ {
-		src.Seek(0, 0)
-		lex.Reset(src)
+		lex.Reset("", prog)
 		for lex.Next().Type != EOF {
 		}
 	}

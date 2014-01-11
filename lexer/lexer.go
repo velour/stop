@@ -11,11 +11,8 @@
 package lexer
 
 import (
-	"bufio"
-	"io"
-	"os"
-	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"bitbucket.org/eaburns/stop/loc"
 )
@@ -292,7 +289,7 @@ type Token struct {
 
 // String returns a human-readable string representation of the token.
 func (t *Token) String() string {
-	return "Token{Type:" + t.Type.String() + ", Text:`" + t.Text + "`, Span:" + t.Span.String() + "}"
+	return "Token{Type:" + t.Type.String() + ", Text:`" + string(t.Text) + "`, Span:" + t.Span.String() + "}"
 }
 
 // IsNewline returns true if the token acts as a newline.
@@ -303,14 +300,22 @@ func (t *Token) IsNewline() bool {
 	// The first clause is a special check for line comments,
 	// because they may not end with a \n if they occur
 	// immediately before EOF.
-	return t.Type == Comment && strings.HasPrefix(t.Text, "//") || strings.ContainsRune(t.Text, '\n')
+	if t.Type == Comment && len(t.Text) >= 2 && t.Text[0] == '/' && t.Text[1] == '/' {
+		return true
+	}
+	for _, b := range t.Text {
+		if b == '\n' {
+			return true
+		}
+	}
+	return false
 }
 
 // A Lexer scans and returns Go tokens from an input stream.
 type Lexer struct {
-	in            *bufio.Reader
+	src           string
+	start, cur, w int
 	eof           bool
-	text          []rune
 	span          loc.Span
 	prevLineStart int
 
@@ -322,66 +327,57 @@ type Lexer struct {
 // New returns a new Lexer that reads tokens from an input file.
 // If the underlying type of the reader is an os.File, then all Locations
 // produced by the lexer use the file name as their path.
-func New(in io.Reader) *Lexer {
-	l := &Lexer{in: bufio.NewReader(in)}
-	l.Reset(in)
+func New(path string, src string) *Lexer {
+	l := new(Lexer)
+	l.Reset(path, src)
 	return l
 }
 
 // Reset resets the lexer for use with a new reader.
-func (l *Lexer) Reset(in io.Reader) {
-	path := ""
-	if file, ok := in.(*os.File); ok {
-		path = file.Name()
-	}
+func (l *Lexer) Reset(path string, src string) {
+	l.src = src
+	l.start = 0
+	l.cur = 0
+	l.w = 0
+	l.eof = false
 	l.span = loc.Span{0: loc.Zero(path), 1: loc.Zero(path)}
 	l.prevLineStart = -1
-	l.in.Reset(in)
-	l.text = nil
 	l.prev = nil
 	l.next = nil
-	l.eof = false
 }
 
 // Rune reads and returns the next rune from the input stream and updates the
 // span and text of the current token.  If an error is encountered then it panicks.
 // If the end of the input is reached -1 is returned.
 func (l *Lexer) rune() rune {
-	if l.eof {
-		return -1
-	}
-	r, _, err := l.in.ReadRune()
-	if err != nil && err != io.EOF {
-		panic(err)
-	}
-	loc := &l.span[1]
-	if err == io.EOF {
+	if l.cur >= len(l.src) {
 		l.eof = true
 		return -1
 	}
+	r, w := utf8.DecodeRuneInString(l.src[l.cur:])
+	l.cur += w
+	l.w = w
+	loc := &l.span[1]
 	loc.Rune++
 	if r == '\n' {
 		loc.Line++
 		l.prevLineStart = loc.LineStart
 		loc.LineStart = loc.Rune
 	}
-	l.text = append(l.text, r)
 	return r
 }
 
 // Replace replaces the most-recently-read rune into the input stream.  If an
 // error is encountered then it panicks.
 func (l *Lexer) replace() {
-	if len(l.text) == 0 {
+	if l.cur == l.start {
 		panic("nothing to replace")
 	}
 	if l.eof {
 		return
 	}
-	l.text = l.text[:len(l.text)-1]
-	if err := l.in.UnreadRune(); err != nil {
-		panic(err)
-	}
+	l.cur -= l.w
+	l.w = 0
 
 	loc := &l.span[1]
 	loc.Rune--
@@ -394,12 +390,13 @@ func (l *Lexer) replace() {
 
 func (l *Lexer) token(typ TokenType) *Token {
 	t := &Token{
-		Text: string(l.text),
+		Text: l.src[l.start:l.cur],
 		Type: typ,
 		Span: l.span,
 	}
 	l.span[0] = l.span[1]
-	l.text = nil
+	l.start = l.cur
+	l.w = 0
 	return t
 }
 
@@ -411,7 +408,7 @@ func (l *Lexer) unexpected(r rune) *Token {
 		l0.Line--
 		l0.LineStart = l.prevLineStart
 	}
-	l.in = nil
+	l.eof = true
 	return &Token{
 		Text: "unexpected input rune: " + string([]rune{r}),
 		Type: Error,
@@ -556,7 +553,7 @@ func operator(l *Lexer) *Token {
 	tok := l.token(Error)
 	oper, ok := operators[tok.Text]
 	if !ok {
-		panic("bad operator: \"" + tok.Text + "\"")
+		panic("bad operator: \"" + string(tok.Text) + "\"")
 	}
 	tok.Type = oper
 	return tok
