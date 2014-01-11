@@ -389,7 +389,7 @@ func (l *Lexer) token(typ TokenType) *Token {
 		Span: l.span,
 	}
 	l.span[0] = l.span[1]
-	l.text = l.text[:0]
+	l.text = nil
 	return t
 }
 
