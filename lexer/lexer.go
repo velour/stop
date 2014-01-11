@@ -344,22 +344,12 @@ type Lexer struct {
 // If the underlying type of the reader is an os.File, then all Locations
 // produced by the lexer use the file name as their path.
 func New(path string, src string) *Lexer {
-	l := new(Lexer)
-	l.Reset(path, src)
+	l := &Lexer{
+		src:           src,
+		span:          loc.Span{0: loc.Zero(path), 1: loc.Zero(path)},
+		prevLineStart: -1,
+	}
 	return l
-}
-
-// Reset resets the lexer for use with a new reader.
-func (l *Lexer) Reset(path string, src string) {
-	l.src = src
-	l.start = 0
-	l.cur = 0
-	l.w = 0
-	l.eof = false
-	l.span = loc.Span{0: loc.Zero(path), 1: loc.Zero(path)}
-	l.prevLineStart = -1
-	l.prev = EOF
-	l.next = nil
 }
 
 // Rune reads and returns the next rune from the input stream and updates the

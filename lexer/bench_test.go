@@ -7,9 +7,8 @@ import (
 )
 
 func BenchmarkLexer(b *testing.B) {
-	lex := New("", prog)
 	for i := 0; i < b.N; i++ {
-		lex.Reset("", prog)
+		lex := New("", prog)
 		for lex.Next().Type != EOF {
 		}
 	}
