@@ -1,3 +1,5 @@
+// Package loc provides types for representing the location of items
+// in an input stream.
 package loc
 
 import (
@@ -32,11 +34,11 @@ func Zero(path string) Location {
 }
 
 // A Span specifies a range of runes in an input stream by a start and end location.
-// The end location is exclusive.
+// The start location is inclusive and the end location is exclusive.
 type Span [2]Location
 
 // String returns the string representation of a span as an Acme address (it's a bit ugly, but often convenient).
-// Spans that cross file boundaries, will not result in valid addresses.
+// Spans that cross file boundaries, will not result in valid Acme addresses.
 func (s Span) String() string {
 	switch {
 	case s[0].Path != s[1].Path:

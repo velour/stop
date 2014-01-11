@@ -119,10 +119,14 @@ func TestSemicolonInsertion(t *testing.T) {
 		{"identifier\n", []TokenType{Identifier, Semicolon, Whitespace, EOF}},
 		{"++\n", []TokenType{PlusPlus, Semicolon, Whitespace, EOF}},
 		{"++//hi", []TokenType{PlusPlus, Semicolon, Comment, EOF}},
-		{"++/**/", []TokenType{PlusPlus, Comment, EOF}},
+		{"++/**/", []TokenType{PlusPlus, Comment, Semicolon, EOF}},
+		{"++ ", []TokenType{PlusPlus, Whitespace, Semicolon, EOF}},
 		{"5\n", []TokenType{IntegerLiteral, Semicolon, Whitespace, EOF}},
 		{"'a'\n", []TokenType{RuneLiteral, Semicolon, Whitespace, EOF}},
 		{"\"hello\"\n", []TokenType{StringLiteral, Semicolon, Whitespace, EOF}},
+		// No semicolon inserted on blank lines.
+		{"\n\n", []TokenType{Whitespace, EOF}},
+		{"\n \n", []TokenType{Whitespace, EOF}},
 	}
 	tests.run(t)
 }
@@ -217,6 +221,47 @@ func TestIdentifier(t *testing.T) {
 		{"_x9", Identifier},
 		{"ThisVariableIsExported", Identifier},
 		{"αβ", Identifier},
+
+		// Pre-declared identifiers.
+		{"bool", Identifier},
+		{"byte", Identifier},
+		{"complex64", Identifier},
+		{"complex128", Identifier},
+		{"error", Identifier},
+		{"float32", Identifier},
+		{"float64", Identifier},
+		{"int", Identifier},
+		{"int8", Identifier},
+		{"int16", Identifier},
+		{"int32", Identifier},
+		{"int64", Identifier},
+		{"rune", Identifier},
+		{"string", Identifier},
+		{"uint", Identifier},
+		{"uint8", Identifier},
+		{"uint16", Identifier},
+		{"uint32", Identifier},
+		{"uint64", Identifier},
+		{"uintptr", Identifier},
+		{"true", Identifier},
+		{"false", Identifier},
+		{"iota", Identifier},
+		{"nil", Identifier},
+		{"append", Identifier},
+		{"cap", Identifier},
+		{"close", Identifier},
+		{"complex", Identifier},
+		{"copy", Identifier},
+		{"delete", Identifier},
+		{"imag", Identifier},
+		{"len", Identifier},
+		{"make", Identifier},
+		{"new", Identifier},
+		{"panic", Identifier},
+		{"print", Identifier},
+		{"println", Identifier},
+		{"real", Identifier},
+		{"recover", Identifier},
 	}
 	tests.run(t)
 }
@@ -273,7 +318,6 @@ func TestRuneLiteral(t *testing.T) {
 		{"'ä'", RuneLiteral},
 		{"'本'", RuneLiteral},
 		{"'\\''", RuneLiteral},
-		{`'\"'`, RuneLiteral},
 		{"'\\b'", RuneLiteral},
 		{"'\\r'", RuneLiteral},
 		{"'\\t'", RuneLiteral},
@@ -288,6 +332,8 @@ func TestRuneLiteral(t *testing.T) {
 		{"'aa'", Error},
 		{"'\\xa'", Error},
 		{"'\\0'", Error},
+		{"'\\z'", Error},
+		{`'\"'`, Error},
 
 		// The following two should be errors, but we don't validate the Unicode code points.
 		{"'\\uDFFF'", RuneLiteral},
@@ -308,7 +354,11 @@ func TestInterpretedStringLiteral(t *testing.T) {
 		{`"\u65e5\u672c\u8a9e"`, StringLiteral},
 		{`"\U000065e5\U0000672c\U00008a9e"`, StringLiteral},
 		{`"\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e"`, StringLiteral},
+		{`"\""`, StringLiteral},
 
+		{"\"\x0A\"", Error},
+		{`"\z"`, Error},
+		{`"\'"`, Error},
 		{`"not terminated`, Error},
 
 		// The following two should be errors, but we don`t validate the Unicode code points.
@@ -340,9 +390,10 @@ func TestLineNumbers(t *testing.T) {
 		{"/* foo */", [][2]int{{1, 1}}},
 		{"/* foo \n*/", [][2]int{{1, 2}}},
 		{"/* foo \n*/\n", [][2]int{{1, 2}, {2, 3}}},
-		{"\nident", [][2]int{{1, 2}, {2, 2}}},
-		{"\nα", [][2]int{{1, 2}, {2, 2}}},
+		{"\nident", [][2]int{{1, 2}, {2, 2}, {2, 2}}},
+		{"\nα", [][2]int{{1, 2}, {2, 2}, {2, 2}}},
 		{"\nident\n&&", [][2]int{{1, 2}, {2, 2}, {2, 2}, {2, 3}, {3, 3}}},
+		{"\x60\x0A\x0A\x60", [][2]int{{1, 3}, {3, 3}}},
 	}
 	tests.run(t, func(tok *Token) [2]int {
 		return [2]int{tok.Span[0].Line, tok.Span[1].Line}
@@ -352,12 +403,12 @@ func TestLineNumbers(t *testing.T) {
 func TestRuneNumbers(t *testing.T) {
 	tests := locTests{
 		{"\n", [][2]int{{1, 2}}},
-		{"hello", [][2]int{{1, 6}}},
+		{"hello", [][2]int{{1, 6}, {6, 6}}},
 		{"\t\t\t\t\t", [][2]int{{1, 6}}},
-		{"α", [][2]int{{1, 2}}},
-		{"αβ", [][2]int{{1, 3}}},
-		{"α β", [][2]int{{1, 2}, {2, 3}, {3, 4}}},
-		{"α\nβ", [][2]int{{1, 2}, {2, 2}, {2, 3}, {3, 4}}},
+		{"α", [][2]int{{1, 2}, {2, 2}}},
+		{"αβ", [][2]int{{1, 3}, {3, 3}}},
+		{"α β", [][2]int{{1, 2}, {2, 3}, {3, 4}, {4, 4}}},
+		{"α\nβ", [][2]int{{1, 2}, {2, 2}, {2, 3}, {3, 4}, {4, 4}}},
 	}
 	tests.run(t, func(tok *Token) [2]int {
 		return [2]int{tok.Span[0].Rune, tok.Span[1].Rune}

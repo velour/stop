@@ -283,7 +283,7 @@ var operators = map[string]TokenType{
 	"&^=": AndCarrotEqual,
 }
 
-// Token is a the atomic unit of the vocabulary of a Go program.
+// A Token is a the atomic unit of the vocabulary of a Go program.
 type Token struct {
 	Type TokenType
 	Text string
@@ -306,13 +306,14 @@ func (t *Token) IsNewline() bool {
 	return t.Type == Comment && strings.HasPrefix(t.Text, "//") || strings.ContainsRune(t.Text, '\n')
 }
 
-// A Lexer lexes Go tokens from an input stream.
+// A Lexer scans and returns Go tokens from an input stream.
 type Lexer struct {
 	in            *bufio.Reader
 	text          []rune
 	span          loc.Span
 	prevLineStart int
 
+	// Prev is the previous non-comment, non-whitespace token.
 	prev *Token
 	next *Token
 }
@@ -415,7 +416,7 @@ func (l *Lexer) nextLiteralToken() *Token {
 		return l.token(EOF)
 	case isWhitespace(r):
 		return whitespace(l)
-	case isIdentStart(r):
+	case isLetter(r):
 		return identifier(l)
 	case isDecimalDigit(r) || isHexDigit(r):
 		return number(r, l)
@@ -513,7 +514,7 @@ func (l *Lexer) Next() *Token {
 	if tok == nil {
 		tok = l.nextLiteralToken()
 	}
-	if tok.IsNewline() && l.prev != nil &&
+	if (tok.IsNewline() || tok.Type == EOF) && l.prev != nil &&
 		(l.prev.Type == Identifier ||
 			l.prev.Type == IntegerLiteral ||
 			l.prev.Type == FloatLiteral ||
@@ -535,7 +536,9 @@ func (l *Lexer) Next() *Token {
 			Span: loc.Span{0: l.next.Span[0], 1: l.next.Span[0]},
 		}
 	}
-	l.prev = tok
+	if tok.Type != Whitespace && tok.Type != Comment {
+		l.prev = tok
+	}
 	return tok
 }
 
@@ -562,14 +565,6 @@ func identifier(l *Lexer) *Token {
 	return tok
 }
 
-func isIdentStart(r rune) bool {
-	return unicode.IsLetter(r) || r == '_'
-}
-
-func isIdent(r rune) bool {
-	return isIdentStart(r) || unicode.IsDigit(r)
-}
-
 func whitespace(l *Lexer) *Token {
 	r := l.rune()
 	for isWhitespace(r) {
@@ -577,10 +572,6 @@ func whitespace(l *Lexer) *Token {
 	}
 	l.replace()
 	return l.token(Whitespace)
-}
-
-func isWhitespace(r rune) bool {
-	return r == ' ' || r == '\t' || r == '\v' || r == '\r' || r == '\n'
 }
 
 func comment(l *Lexer, closing []rune) *Token {
@@ -664,7 +655,7 @@ func hex(l *Lexer) *Token {
 
 func runeLiteral(l *Lexer) *Token {
 	if l.rune() == '\\' {
-		if err := unicodeValue(l); err != nil {
+		if err := unicodeValue(l, '\''); err != nil {
 			return err
 		}
 	}
@@ -680,8 +671,10 @@ func interpertedStringLiteral(l *Lexer) *Token {
 		switch {
 		case r == '"':
 			return l.token(StringLiteral)
+		case r == '\n':
+			return l.unexpected(r)
 		case r == '\\':
-			if err := unicodeValue(l); err != nil {
+			if err := unicodeValue(l, '"'); err != nil {
 				return err
 			}
 		case r < 0:
@@ -705,7 +698,7 @@ func rawStringLiteral(l *Lexer) *Token {
 // Parses a unicode value (assuming that the leading '\' has
 // already been consumed), and returns nil on success or
 // an error token if the parse failed.
-func unicodeValue(l *Lexer) *Token {
+func unicodeValue(l *Lexer, quote rune) *Token {
 	r := l.rune()
 	switch {
 	case r == 'U':
@@ -748,8 +741,8 @@ func unicodeValue(l *Lexer) *Token {
 			return l.unexpected(s)
 		}
 
-	case r != 'a' && r != 'b' && r != 'f' && r != 'n' && r != 'r' && r != 't' && r != 'v' && r != '\\' && r != '\'' && r != '"':
-		l.replace()
+	case r != 'a' && r != 'b' && r != 'f' && r != 'n' && r != 'r' && r != 't' && r != 'v' && r != '\\' && r != quote:
+		return l.unexpected(r)
 	}
 	return nil
 }
@@ -764,4 +757,16 @@ func isOctalDigit(r rune) bool {
 
 func isHexDigit(r rune) bool {
 	return (r >= '0' && r <= '9') || (r >= 'A' && r <= 'F') || (r >= 'a' && r <= 'f')
+}
+
+func isWhitespace(r rune) bool {
+	return r == ' ' || r == '\t' || r == '\v' || r == '\r' || r == '\n'
+}
+
+func isLetter(r rune) bool {
+	return unicode.IsLetter(r) || r == '_'
+}
+
+func isIdent(r rune) bool {
+	return isLetter(r) || unicode.IsDigit(r)
 }
