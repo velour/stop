@@ -319,8 +319,9 @@ type Lexer struct {
 	span          loc.Span
 	prevLineStart int
 
-	// Prev is the previous non-comment, non-whitespace token.
-	prev *Token
+	// Prev is the type of the most-recent, non-comment,
+	// non-whitespace token.
+	prev TokenType
 	next *Token
 }
 
@@ -342,7 +343,7 @@ func (l *Lexer) Reset(path string, src string) {
 	l.eof = false
 	l.span = loc.Span{0: loc.Zero(path), 1: loc.Zero(path)}
 	l.prevLineStart = -1
-	l.prev = nil
+	l.prev = EOF
 	l.next = nil
 }
 
@@ -521,22 +522,22 @@ func (l *Lexer) Next() *Token {
 	if tok == nil {
 		tok = l.nextLiteralToken()
 	}
-	if (tok.IsNewline() || tok.Type == EOF) && l.prev != nil &&
-		(l.prev.Type == Identifier ||
-			l.prev.Type == IntegerLiteral ||
-			l.prev.Type == FloatLiteral ||
-			l.prev.Type == ImaginaryLiteral ||
-			l.prev.Type == RuneLiteral ||
-			l.prev.Type == StringLiteral ||
-			l.prev.Type == Break ||
-			l.prev.Type == Continue ||
-			l.prev.Type == Fallthrough ||
-			l.prev.Type == Return ||
-			l.prev.Type == PlusPlus ||
-			l.prev.Type == MinusMinus ||
-			l.prev.Type == CloseParen ||
-			l.prev.Type == CloseBracket ||
-			l.prev.Type == CloseBrace) {
+	if (tok.IsNewline() || tok.Type == EOF) &&
+		(l.prev == Identifier ||
+			l.prev == IntegerLiteral ||
+			l.prev == FloatLiteral ||
+			l.prev == ImaginaryLiteral ||
+			l.prev == RuneLiteral ||
+			l.prev == StringLiteral ||
+			l.prev == Break ||
+			l.prev == Continue ||
+			l.prev == Fallthrough ||
+			l.prev == Return ||
+			l.prev == PlusPlus ||
+			l.prev == MinusMinus ||
+			l.prev == CloseParen ||
+			l.prev == CloseBracket ||
+			l.prev == CloseBrace) {
 		l.next = tok
 		tok = &Token{
 			Type: Semicolon,
@@ -544,7 +545,7 @@ func (l *Lexer) Next() *Token {
 		}
 	}
 	if tok.Type != Whitespace && tok.Type != Comment {
-		l.prev = tok
+		l.prev = tok.Type
 	}
 	return tok
 }
