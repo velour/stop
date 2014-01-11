@@ -110,6 +110,8 @@ const (
 	Colon
 	AndCarrot
 	AndCarrotEqual
+
+	nTypes
 )
 
 var tokenTypeNames = map[TokenType]string{
@@ -279,6 +281,19 @@ var operators = map[string]TokenType{
 	"&^":  AndCarrot,
 	"&^=": AndCarrotEqual,
 }
+
+// CanonicalText holds the single canonical string representation
+// for operators and keywords.
+var canonicalText = func() []string {
+	texts := make([]string, nTypes)
+	for text, op := range operators {
+		texts[op] = text
+	}
+	for text, kwd := range keywords {
+		texts[kwd] = text
+	}
+	return texts
+}()
 
 // A Token is a the atomic unit of the vocabulary of a Go program.
 type Token struct {
@@ -531,7 +546,7 @@ func (l *Lexer) token(typ TokenType) Token {
 		l.start = l.cur - 1
 	}
 	t := Token{
-		Text: l.src[l.start:l.cur],
+		Text: l.text(typ),
 		Type: typ,
 		Span: l.span,
 	}
@@ -539,6 +554,17 @@ func (l *Lexer) token(typ TokenType) Token {
 	l.start = l.cur
 	l.w = 0
 	return t
+}
+
+// Returns the text for the current token with the given type.  The
+// returned string is never a slice of the source file, so the source
+// file text does not need to remain in memory when lexing is
+// finished.
+func (l *Lexer) text(typ TokenType) string {
+	if typ >= 0 && canonicalText[typ] != "" {
+		return canonicalText[typ]
+	}
+	return string([]byte(l.src[l.start:l.cur]))
 }
 
 func operator(l *Lexer) TokenType {
