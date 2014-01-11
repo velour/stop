@@ -74,6 +74,32 @@ func TestReplace(t *testing.T) {
 	}
 }
 
+func TestError(t *testing.T) {
+	tests := []struct {
+		text       string
+		unexpected rune
+	}{
+		{`'\z'`, 'z'},
+		{`/\`, '\\'},
+		{`*\`, '\\'},
+		{`"\'"`, '\''},
+		{`'\"'`, '"'},
+	}
+	for i, test := range tests {
+		lex := New("", test.text)
+		got := Token{Type: Semicolon}
+		for got.Type != EOF && got.Type != Error {
+			got = lex.Next()
+		}
+		if got.Type == EOF {
+			t.Fatalf("no error token")
+		}
+		if got.Text != string([]rune{test.unexpected}) {
+			t.Errorf("test %d: %s got %s, wanted %c", i, test.text, got.Text, test.unexpected)
+		}
+	}
+}
+
 func TestEOF(t *testing.T) {
 	tests := multiTokenTests{
 		{"", []TokenType{EOF}},
