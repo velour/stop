@@ -521,6 +521,7 @@ func (l *Lexer) Next() Token {
 		*l.next = tok
 		tok = Token{
 			Type: Semicolon,
+			Text: canonicalText[Semicolon],
 			Span: loc.Span{0: l.next.Span[0], 1: l.next.Span[0]},
 		}
 	}
