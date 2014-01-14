@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"os"
 
-	"bitbucket.org/eaburns/stop/lexer"
+	"bitbucket.org/eaburns/stop/token"
 )
 
 func main() {
 	l := lexer.New(os.Stdin)
 	for {
-		tok := l.Next()
+		tok := token.NewScanner()
 		fmt.Printf("%+v\n", tok)
-		if tok.Type == lexer.EOF {
+		if tok.Type == token.EOF {
 			break
 		}
 	}

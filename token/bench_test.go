@@ -1,4 +1,4 @@
-package lexer
+package token
 
 import (
 	"go/scanner"
@@ -8,7 +8,7 @@ import (
 
 func BenchmarkLexer(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		lex := New("", prog)
+		lex := NewLexer("", prog)
 		tok := Semicolon
 		for tok != EOF && tok != Error {
 			tok = lex.Next()

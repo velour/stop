@@ -1,4 +1,4 @@
-package lexer
+package token
 
 import (
 	"reflect"
@@ -12,7 +12,7 @@ type singleTokenTests []struct {
 
 func (tests singleTokenTests) run(t *testing.T) {
 	for i, test := range tests {
-		lex := New("", test.text)
+		lex := NewLexer("", test.text)
 		got := lex.Next()
 		if got != test.want {
 			t.Errorf("test %d: %s got %s, wanted %v", i, test.text, got, test.want)
@@ -27,7 +27,7 @@ type multiTokenTests []struct {
 
 func (tests multiTokenTests) run(t *testing.T) {
 	for i, test := range tests {
-		lex := New("", test.text)
+		lex := NewLexer("", test.text)
 		got := make([]Token, 0, len(test.want))
 		for len(got) == 0 || got[len(got)-1] != EOF {
 			got = append(got, lex.Next())
@@ -45,7 +45,7 @@ type locTests []struct {
 
 func (tests locTests) run(t *testing.T, loc func(s, e Location) [2]int) {
 	for i, test := range tests {
-		lex := New("", test.text)
+		lex := NewLexer("", test.text)
 		got := make([][2]int, 0, len(test.want))
 		for {
 			tok := lex.Next()
@@ -61,7 +61,7 @@ func (tests locTests) run(t *testing.T, loc func(s, e Location) [2]int) {
 }
 
 func TestReplace(t *testing.T) {
-	l := New("", "αβ")
+	l := NewLexer("", "αβ")
 	if l.rune() != 'α' {
 		t.Fatalf("first rune was not α")
 	}
@@ -86,7 +86,7 @@ func TestError(t *testing.T) {
 		{`'\"'`, '"'},
 	}
 	for i, test := range tests {
-		lex := New("", test.text)
+		lex := NewLexer("", test.text)
 		got := Semicolon
 		for got != EOF && got != Error {
 			got = lex.Next()
