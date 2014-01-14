@@ -3,6 +3,8 @@ package lexer
 import (
 	"reflect"
 	"testing"
+
+	"bitbucket.org/eaburns/stop/loc"
 )
 
 type singleTokenTests []struct {
@@ -43,7 +45,7 @@ type locTests []struct {
 	want [][2]int
 }
 
-func (tests locTests) run(t *testing.T, loc func(Token) [2]int) {
+func (tests locTests) run(t *testing.T, loc func(s, e loc.Location) [2]int) {
 	for i, test := range tests {
 		lex := New("", test.text)
 		got := make([][2]int, 0, len(test.want))
@@ -52,7 +54,7 @@ func (tests locTests) run(t *testing.T, loc func(Token) [2]int) {
 			if tok.Type == EOF {
 				break
 			}
-			got = append(got, loc(tok))
+			got = append(got, loc(tok.Start, tok.End))
 		}
 		if !reflect.DeepEqual(got, test.want) {
 			t.Errorf("test %d: %s got %v, wanted %v", i, test.text, got, test.want)
@@ -453,8 +455,8 @@ func TestLineNumbers(t *testing.T) {
 		{"\nident\n&&", [][2]int{{1, 2}, {2, 2}, {2, 2}, {2, 3}, {3, 3}}},
 		{"\x60\x0A\x0A\x60", [][2]int{{1, 3}, {3, 3}}},
 	}
-	tests.run(t, func(tok Token) [2]int {
-		return [2]int{tok.Span[0].Line, tok.Span[1].Line}
+	tests.run(t, func(start, end loc.Location) [2]int {
+		return [2]int{start.Line, end.Line}
 	})
 }
 
@@ -468,7 +470,7 @@ func TestRuneNumbers(t *testing.T) {
 		{"α β", [][2]int{{1, 2}, {2, 3}, {3, 4}, {4, 4}}},
 		{"α\nβ", [][2]int{{1, 2}, {2, 2}, {2, 3}, {3, 4}, {4, 4}}},
 	}
-	tests.run(t, func(tok Token) [2]int {
-		return [2]int{tok.Span[0].Rune, tok.Span[1].Rune}
+	tests.run(t, func(start, end loc.Location) [2]int {
+		return [2]int{start.Rune, end.Rune}
 	})
 }

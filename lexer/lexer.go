@@ -297,14 +297,14 @@ var canonicalText = func() []string {
 
 // A Token is a the atomic unit of the vocabulary of a Go program.
 type Token struct {
-	Type TokenType
-	Text string
-	Span loc.Span
+	Type       TokenType
+	Text       string
+	Start, End loc.Location
 }
 
 // String returns a human-readable string representation of the token.
 func (t *Token) String() string {
-	return "Token{Type:" + t.Type.String() + ", Text:`" + string(t.Text) + "`, Span:" + t.Span.String() + "}"
+	return "Token{Type:" + t.Type.String() + ", Text:`" + string(t.Text) + "`, Start:" + t.Start.String() + ", End:" + t.End.String() + "}"
 }
 
 // IsNewline returns true if the token acts as a newline.
@@ -329,10 +329,10 @@ func (t *Token) IsNewline() bool {
 // A Lexer scans and returns Go tokens from an input stream.
 type Lexer struct {
 	src           string
-	start, cur, w int
+	n, w          int
 	eof           bool
-	span          loc.Span
 	prevLineStart int
+	Start, End    loc.Location
 
 	// Prev is the type of the most-recent, non-comment,
 	// non-whitespace token.
@@ -346,8 +346,9 @@ type Lexer struct {
 func New(path string, src string) *Lexer {
 	l := &Lexer{
 		src:           src,
-		span:          loc.Span{0: loc.Zero(path), 1: loc.Zero(path)},
 		prevLineStart: -1,
+		Start:         loc.Zero(path),
+		End:           loc.Zero(path),
 	}
 	return l
 }
@@ -356,19 +357,18 @@ func New(path string, src string) *Lexer {
 // span and text of the current token.  If an error is encountered then it panicks.
 // If the end of the input is reached -1 is returned.
 func (l *Lexer) rune() rune {
-	if l.cur >= len(l.src) {
+	if l.n >= len(l.src) {
 		l.eof = true
 		return -1
 	}
-	r, w := utf8.DecodeRuneInString(l.src[l.cur:])
-	l.cur += w
+	r, w := utf8.DecodeRuneInString(l.src[l.n:])
+	l.n += w
 	l.w = w
-	loc := &l.span[1]
-	loc.Rune++
+	l.End.Rune++
 	if r == '\n' {
-		loc.Line++
-		l.prevLineStart = loc.LineStart
-		loc.LineStart = loc.Rune
+		l.End.Line++
+		l.prevLineStart = l.End.LineStart
+		l.End.LineStart = l.End.Rune
 	}
 	return r
 }
@@ -376,20 +376,19 @@ func (l *Lexer) rune() rune {
 // Replace replaces the most-recently-read rune into the input stream.  If an
 // error is encountered then it panicks.
 func (l *Lexer) replace() {
-	if l.cur == l.start {
+	if l.n == 0 {
 		panic("nothing to replace")
 	}
 	if l.eof {
 		return
 	}
-	l.cur -= l.w
+	l.n -= l.w
 	l.w = 0
 
-	loc := &l.span[1]
-	loc.Rune--
-	if loc.Rune < loc.LineStart {
-		loc.Line--
-		loc.LineStart = l.prevLineStart
+	l.End.Rune--
+	if l.End.Rune < l.End.LineStart {
+		l.End.Line--
+		l.End.LineStart = l.prevLineStart
 		l.prevLineStart = -1
 	}
 }
@@ -520,9 +519,10 @@ func (l *Lexer) Next() Token {
 		l.next = new(Token)
 		*l.next = tok
 		tok = Token{
-			Type: Semicolon,
-			Text: canonicalText[Semicolon],
-			Span: loc.Span{0: l.next.Span[0], 1: l.next.Span[0]},
+			Type:  Semicolon,
+			Text:  canonicalText[Semicolon],
+			Start: l.next.Start,
+			End:   l.next.Start,
 		}
 	}
 	if tok.Type != Whitespace && tok.Type != Comment {
@@ -534,15 +534,18 @@ func (l *Lexer) Next() Token {
 func (l *Lexer) token(typ TokenType) Token {
 	if typ == Error {
 		// Error means that the most-recently read rune was unexpected.
-		l.start = l.cur - 1
+		l.src = l.src[l.n-1:]
+		l.n = 1
 	}
 	t := Token{
-		Text: l.text(typ),
-		Type: typ,
-		Span: l.span,
+		Text:  l.text(typ),
+		Type:  typ,
+		Start: l.Start,
+		End:   l.End,
 	}
-	l.span[0] = l.span[1]
-	l.start = l.cur
+	l.Start = l.End
+	l.src = l.src[l.n:]
+	l.n = 0
 	l.w = 0
 	return t
 }
@@ -555,11 +558,11 @@ func (l *Lexer) text(typ TokenType) string {
 	if typ >= 0 && canonicalText[typ] != "" {
 		return canonicalText[typ]
 	}
-	return string([]byte(l.src[l.start:l.cur]))
+	return string([]byte(l.src[:l.n]))
 }
 
 func operator(l *Lexer) TokenType {
-	text := l.src[l.start:l.cur]
+	text := l.src[:l.n]
 	oper, ok := operators[text]
 	if !ok {
 		panic("bad operator: \"" + string(text) + "\"")
@@ -573,7 +576,7 @@ func identifier(l *Lexer) TokenType {
 		r = l.rune()
 	}
 	l.replace()
-	text := l.src[l.start:l.cur]
+	text := l.src[:l.n]
 	if keyword, ok := keywords[text]; ok {
 		return keyword
 	}
