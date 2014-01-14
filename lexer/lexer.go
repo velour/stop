@@ -44,7 +44,7 @@ type Token int
 // The set of constants defining the types of tokens.
 const (
 	EOF   Token = -1
-	Error Token = iota
+	Error Token = iota - 1 // 0, since EOF came first
 	Identifier
 	IntegerLiteral
 	FloatLiteral
@@ -131,8 +131,6 @@ const (
 	Colon
 	AndCarrot
 	AndCarrotEqual
-
-	nTypes
 )
 
 var tokenTypeNames = map[Token]string{
@@ -309,12 +307,13 @@ type Lexer struct {
 	n, w          int
 	eof           bool
 	prevLineStart int
-	Start, End    Location
+	// Start and End are the locations of the start and end of the
+	// last token scanned by Next.  They are left unmodified
+	// when Next returns an inserted semicolon.
+	Start, End Location
 
-	// Prev is the type of the most-recent, non-comment,
-	// non-whitespace token.
+	// The most-recent, non-comment, non-whitespace token.
 	prev Token
-	next *Token
 }
 
 // New returns a new Lexer that reads tokens from an input file.
@@ -330,47 +329,62 @@ func New(path string, src string) *Lexer {
 	return l
 }
 
-// Rune reads and returns the next rune from the input stream and updates the
-// span and text of the current token.  If an error is encountered then it panicks.
-// If the end of the input is reached -1 is returned.
-func (l *Lexer) rune() rune {
-	if l.n >= len(l.src) {
-		l.eof = true
-		return -1
-	}
-	r, w := utf8.DecodeRuneInString(l.src[l.n:])
-	l.n += w
-	l.w = w
-	l.End.Rune++
-	if r == '\n' {
-		l.End.Line++
-		l.prevLineStart = l.End.LineStart
-		l.End.LineStart = l.End.Rune
-	}
-	return r
+// Text returns the text of the last token scanned by Next.  Inserted
+// semicolons do not update the string retuned by Text, so if Next
+// returns an inserted semicolon then Text will return the text of the
+// token preceeding the semicolon.
+func (l *Lexer) Text() string {
+	return l.src[:l.n]
 }
 
-// Replace replaces the most-recently-read rune into the input stream.  If an
-// error is encountered then it panicks.
-func (l *Lexer) replace() {
-	if l.n == 0 {
-		panic("nothing to replace")
-	}
-	if l.eof {
-		return
-	}
-	l.n -= l.w
+// Next returns the next token, inserting semicolons where required.
+// Once an Error or EOF token is returned, all subsequent tokens will
+// be of type EOF.
+func (l *Lexer) Next() Token {
+	// Saved, to be reset if a semicolon is inserted.
+	src, n, start, end := l.src, l.n, l.Start, l.End
+
+	l.src = l.src[l.n:]
+	l.n = 0
 	l.w = 0
+	l.Start = l.End
+	tok := l.scan()
 
-	l.End.Rune--
-	if l.End.Rune < l.End.LineStart {
-		l.End.Line--
-		l.End.LineStart = l.prevLineStart
-		l.prevLineStart = -1
+	if tok == Error {
+		// The most-recently read rune was unexpected.
+		l.src = l.src[l.n-1:]
+		l.n = 1
 	}
+
+	newline := (tok == Comment || tok == Whitespace) && l.End.Line > l.Start.Line
+	if (newline || tok == EOF) &&
+		(l.prev == Identifier ||
+			l.prev == IntegerLiteral ||
+			l.prev == FloatLiteral ||
+			l.prev == ImaginaryLiteral ||
+			l.prev == RuneLiteral ||
+			l.prev == StringLiteral ||
+			l.prev == Break ||
+			l.prev == Continue ||
+			l.prev == Fallthrough ||
+			l.prev == Return ||
+			l.prev == PlusPlus ||
+			l.prev == MinusMinus ||
+			l.prev == CloseParen ||
+			l.prev == CloseBracket ||
+			l.prev == CloseBrace) {
+		l.src, l.n, l.Start, l.End = src, n, start, end
+		tok = Semicolon
+	}
+	if tok != Comment && tok != Whitespace {
+		l.prev = tok
+		return tok
+	}
+	return tok
 }
 
-func (l *Lexer) nextType() Token {
+// Scan scans the next token and returns it.
+func (l *Lexer) scan() Token {
 	r := l.rune()
 	switch {
 	case r < 0:
@@ -466,60 +480,44 @@ func (l *Lexer) nextType() Token {
 	return Error
 }
 
-// Next returns the next logical token from the token stream.
-// Once an Error or EOF token is returned, all subsequent tokens will
-// be of type EOF.
-func (l *Lexer) Next() Token {
-	var tok Token
-	if l.next == nil {
-		l.Start = l.End
-		l.src = l.src[l.n:]
-		l.n = 0
-		l.w = 0
-		tok = l.nextType()
-	} else {
-		tok = *l.next
-		l.next = nil
+// Rune reads and returns the next rune from the input stream and updates the
+// span and text of the current token.  If an error is encountered then it panicks.
+// If the end of the input is reached -1 is returned.
+func (l *Lexer) rune() rune {
+	if l.n >= len(l.src) {
+		l.eof = true
+		return -1
 	}
-	if tok == Error {
-		// The most-recently read rune was unexpected.
-		l.src = l.src[l.n-1:]
-		l.n = 1
+	r, w := utf8.DecodeRuneInString(l.src[l.n:])
+	l.n += w
+	l.w = w
+	l.End.Rune++
+	if r == '\n' {
+		l.End.Line++
+		l.prevLineStart = l.End.LineStart
+		l.End.LineStart = l.End.Rune
 	}
-	lineComment := tok == Comment && l.n >= 2 && l.src[0] == '/' && l.src[1] == '/'
-	newline := (tok == Comment || tok == Whitespace) && l.End.Line > l.Start.Line
-	if (newline || lineComment || tok == EOF) &&
-		(l.prev == Identifier ||
-			l.prev == IntegerLiteral ||
-			l.prev == FloatLiteral ||
-			l.prev == ImaginaryLiteral ||
-			l.prev == RuneLiteral ||
-			l.prev == StringLiteral ||
-			l.prev == Break ||
-			l.prev == Continue ||
-			l.prev == Fallthrough ||
-			l.prev == Return ||
-			l.prev == PlusPlus ||
-			l.prev == MinusMinus ||
-			l.prev == CloseParen ||
-			l.prev == CloseBracket ||
-			l.prev == CloseBrace) {
-		l.next = new(Token)
-		*l.next = tok
-		tok = Semicolon
-	}
-	if tok != Whitespace && tok != Comment {
-		l.prev = tok
-	}
-	return tok
+	return r
 }
 
-// Text returns the text of the token that was most recently returned
-// via Next.  If the token was an inserted semicolon then the returned
-// string is the text of the newline or EOF token that caused the
-// semicolon to be inserted.
-func (l *Lexer) Text() string {
-	return l.src[:l.n]
+// Replace replaces the most-recently-read rune into the input stream.  If an
+// error is encountered then it panicks.
+func (l *Lexer) replace() {
+	if l.n == 0 {
+		panic("nothing to replace")
+	}
+	if l.eof {
+		return
+	}
+	l.n -= l.w
+	l.w = 0
+
+	l.End.Rune--
+	if l.End.Rune < l.End.LineStart {
+		l.End.Line--
+		l.End.LineStart = l.prevLineStart
+		l.prevLineStart = -1
+	}
 }
 
 func operator(l *Lexer) Token {

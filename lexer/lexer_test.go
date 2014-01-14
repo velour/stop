@@ -133,7 +133,7 @@ func TestSemicolonInsertion(t *testing.T) {
 	tests := multiTokenTests{
 		{"identifier\n", []Token{Identifier, Semicolon, Whitespace, EOF}},
 		{"++\n", []Token{PlusPlus, Semicolon, Whitespace, EOF}},
-		{"++//hi", []Token{PlusPlus, Semicolon, Comment, EOF}},
+		{"++//hi", []Token{PlusPlus, Comment, Semicolon, EOF}},
 		{"++/**/", []Token{PlusPlus, Comment, Semicolon, EOF}},
 		{"++ ", []Token{PlusPlus, Whitespace, Semicolon, EOF}},
 		{"5\n", []Token{IntegerLiteral, Semicolon, Whitespace, EOF}},
@@ -426,8 +426,8 @@ func TestLineNumbers(t *testing.T) {
 		{"/* foo \n*/\n", [][2]int{{1, 2}, {2, 3}}},
 		{"\nident", [][2]int{{1, 2}, {2, 2}, {2, 2}}},
 		{"\nα", [][2]int{{1, 2}, {2, 2}, {2, 2}}},
-		{"\nident\n&&", [][2]int{{1, 2}, {2, 2}, {2, 3}, {2, 3}, {3, 3}}},
-		{"\x60\x0A\x0A\x60", [][2]int{{1, 3}, {3, 3}}},
+		{"\nident\n&&", [][2]int{{1, 2}, {2, 2}, {2, 2}, {2, 3}, {3, 3}}},
+		{"\x60\x0A\x0A\x60", [][2]int{{1, 3}, {1, 3}}},
 	}
 	tests.run(t, func(start, end Location) [2]int {
 		return [2]int{start.Line, end.Line}
@@ -437,12 +437,12 @@ func TestLineNumbers(t *testing.T) {
 func TestRuneNumbers(t *testing.T) {
 	tests := locTests{
 		{"\n", [][2]int{{1, 2}}},
-		{"hello", [][2]int{{1, 6}, {6, 6}}},
+		{"hello", [][2]int{{1, 6}, {1, 6}}},
 		{"\t\t\t\t\t", [][2]int{{1, 6}}},
-		{"α", [][2]int{{1, 2}, {2, 2}}},
-		{"αβ", [][2]int{{1, 3}, {3, 3}}},
-		{"α β", [][2]int{{1, 2}, {2, 3}, {3, 4}, {4, 4}}},
-		{"α\nβ", [][2]int{{1, 2}, {2, 3}, {2, 3}, {3, 4}, {4, 4}}},
+		{"α", [][2]int{{1, 2}, {1, 2}}},
+		{"αβ", [][2]int{{1, 3}, {1, 3}}},
+		{"α β", [][2]int{{1, 2}, {2, 3}, {3, 4}, {3, 4}}},
+		{"α\nβ", [][2]int{{1, 2}, {1, 2}, {2, 3}, {3, 4}, {3, 4}}},
 	}
 	tests.run(t, func(start, end Location) [2]int {
 		return [2]int{start.Rune, end.Rune}
