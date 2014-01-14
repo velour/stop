@@ -38,13 +38,13 @@ func (l Location) String() string {
 	return l.Path + ":" + strconv.Itoa(l.Line) + "-+#" + strconv.Itoa(l.RuneOnLine())
 }
 
-// A TokenType identifies the type of a token in the input file.
-type TokenType int
+// A Token identifies the type of a token in the input file.
+type Token int
 
 // The set of constants defining the types of tokens.
 const (
-	EOF   TokenType = -1
-	Error TokenType = iota
+	EOF   Token = -1
+	Error Token = iota
 	Identifier
 	IntegerLiteral
 	FloatLiteral
@@ -135,7 +135,7 @@ const (
 	nTypes
 )
 
-var tokenTypeNames = map[TokenType]string{
+var tokenTypeNames = map[Token]string{
 	EOF:                 "EOF",
 	Error:               "Error",
 	Identifier:          "Identifier",
@@ -221,11 +221,11 @@ var tokenTypeNames = map[TokenType]string{
 }
 
 // String returns the string represenation of the token type.
-func (tt TokenType) String() string {
+func (tt Token) String() string {
 	return tokenTypeNames[tt]
 }
 
-var keywords = map[string]TokenType{
+var keywords = map[string]Token{
 	"break":       Break,
 	"default":     Default,
 	"func":        Func,
@@ -253,7 +253,7 @@ var keywords = map[string]TokenType{
 	"var":         Var,
 }
 
-var operators = map[string]TokenType{
+var operators = map[string]Token{
 	"+":   Plus,
 	"&":   And,
 	"+=":  PlusEqual,
@@ -303,17 +303,6 @@ var operators = map[string]TokenType{
 	"&^=": AndCarrotEqual,
 }
 
-// A Token is a the atomic unit of the vocabulary of a Go program.
-type Token struct {
-	Type       TokenType
-	Start, End Location
-}
-
-// String returns a human-readable string representation of the token.
-func (t *Token) String() string {
-	return "Token{Type:" + t.Type.String() + "`, Start:" + t.Start.String() + ", End:" + t.End.String() + "}"
-}
-
 // A Lexer scans and returns Go tokens from an input stream.
 type Lexer struct {
 	src           string
@@ -324,7 +313,7 @@ type Lexer struct {
 
 	// Prev is the type of the most-recent, non-comment,
 	// non-whitespace token.
-	prev TokenType
+	prev Token
 	next *Token
 }
 
@@ -381,26 +370,7 @@ func (l *Lexer) replace() {
 	}
 }
 
-func (l *Lexer) token(typ TokenType) Token {
-	if typ == Error {
-		// Error means that the most-recently read rune was unexpected.
-		l.src = l.src[l.n-1:]
-		l.n = 1
-	}
-	t := Token{
-		Type:  typ,
-		Start: l.Start,
-		End:   l.End,
-	}
-	return t
-}
-
-func (l *Lexer) nextType() TokenType {
-	l.Start = l.End
-	l.src = l.src[l.n:]
-	l.n = 0
-	l.w = 0
-
+func (l *Lexer) nextType() Token {
 	r := l.rune()
 	switch {
 	case r < 0:
@@ -502,14 +472,23 @@ func (l *Lexer) nextType() TokenType {
 func (l *Lexer) Next() Token {
 	var tok Token
 	if l.next == nil {
-		tok = l.token(l.nextType())
+		l.Start = l.End
+		l.src = l.src[l.n:]
+		l.n = 0
+		l.w = 0
+		tok = l.nextType()
 	} else {
 		tok = *l.next
 		l.next = nil
 	}
-	lineComment := tok.Type == Comment && l.n >= 2 && l.src[0] == '/' && l.src[1] == '/'
-	newline := (tok.Type == Comment || tok.Type == Whitespace) && tok.End.Line > tok.Start.Line
-	if (newline || lineComment || tok.Type == EOF) &&
+	if tok == Error {
+		// The most-recently read rune was unexpected.
+		l.src = l.src[l.n-1:]
+		l.n = 1
+	}
+	lineComment := tok == Comment && l.n >= 2 && l.src[0] == '/' && l.src[1] == '/'
+	newline := (tok == Comment || tok == Whitespace) && l.End.Line > l.Start.Line
+	if (newline || lineComment || tok == EOF) &&
 		(l.prev == Identifier ||
 			l.prev == IntegerLiteral ||
 			l.prev == FloatLiteral ||
@@ -527,14 +506,10 @@ func (l *Lexer) Next() Token {
 			l.prev == CloseBrace) {
 		l.next = new(Token)
 		*l.next = tok
-		tok = Token{
-			Type:  Semicolon,
-			Start: l.next.Start,
-			End:   l.next.Start,
-		}
+		tok = Semicolon
 	}
-	if tok.Type != Whitespace && tok.Type != Comment {
-		l.prev = tok.Type
+	if tok != Whitespace && tok != Comment {
+		l.prev = tok
 	}
 	return tok
 }
@@ -547,7 +522,7 @@ func (l *Lexer) Text() string {
 	return l.src[:l.n]
 }
 
-func operator(l *Lexer) TokenType {
+func operator(l *Lexer) Token {
 	text := l.src[:l.n]
 	oper, ok := operators[text]
 	if !ok {
@@ -556,7 +531,7 @@ func operator(l *Lexer) TokenType {
 	return oper
 }
 
-func identifier(l *Lexer) TokenType {
+func identifier(l *Lexer) Token {
 	r := l.rune()
 	for isIdent(r) {
 		r = l.rune()
@@ -569,7 +544,7 @@ func identifier(l *Lexer) TokenType {
 	return Identifier
 }
 
-func whitespace(l *Lexer) TokenType {
+func whitespace(l *Lexer) Token {
 	r := l.rune()
 	for isWhitespace(r) {
 		r = l.rune()
@@ -578,7 +553,7 @@ func whitespace(l *Lexer) TokenType {
 	return Whitespace
 }
 
-func comment(l *Lexer, closing []rune) TokenType {
+func comment(l *Lexer, closing []rune) Token {
 	i := 0
 	for i < len(closing) {
 		r := l.rune()
@@ -597,7 +572,7 @@ func comment(l *Lexer, closing []rune) TokenType {
 	return Comment
 }
 
-func number(r0 rune, l *Lexer) TokenType {
+func number(r0 rune, l *Lexer) Token {
 	r := l.rune()
 	if r0 == '0' && (r == 'x' || r == 'X') {
 		return hex(l)
@@ -618,7 +593,7 @@ func number(r0 rune, l *Lexer) TokenType {
 	}
 }
 
-func mantissa(l *Lexer) TokenType {
+func mantissa(l *Lexer) Token {
 	r := l.rune()
 	if r == '+' || r == '-' {
 		r = l.rune()
@@ -633,7 +608,7 @@ func mantissa(l *Lexer) TokenType {
 	return FloatLiteral
 }
 
-func fraction(l *Lexer) TokenType {
+func fraction(l *Lexer) Token {
 	r := l.rune()
 	for isDecimalDigit(r) {
 		r = l.rune()
@@ -648,7 +623,7 @@ func fraction(l *Lexer) TokenType {
 	return FloatLiteral
 }
 
-func hex(l *Lexer) TokenType {
+func hex(l *Lexer) Token {
 	r := l.rune()
 	for isHexDigit(r) {
 		r = l.rune()
@@ -657,7 +632,7 @@ func hex(l *Lexer) TokenType {
 	return IntegerLiteral
 }
 
-func runeLiteral(l *Lexer) TokenType {
+func runeLiteral(l *Lexer) Token {
 	if l.rune() == '\\' {
 		if !unicodeValue(l, '\'') {
 			return Error
@@ -669,7 +644,7 @@ func runeLiteral(l *Lexer) TokenType {
 	return RuneLiteral
 }
 
-func interpertedStringLiteral(l *Lexer) TokenType {
+func interpertedStringLiteral(l *Lexer) Token {
 	for {
 		r := l.rune()
 		switch {
@@ -687,7 +662,7 @@ func interpertedStringLiteral(l *Lexer) TokenType {
 	}
 }
 
-func rawStringLiteral(l *Lexer) TokenType {
+func rawStringLiteral(l *Lexer) Token {
 	for {
 		r := l.rune()
 		switch {
