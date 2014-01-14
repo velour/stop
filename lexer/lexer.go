@@ -18,24 +18,27 @@ import (
 
 // A Location is the address of a particular rune in an input stream.
 type Location struct {
-	// Path is the path to the file for this location, or "" if there is no file.
+	// Path is the path to the file for this location or "".
 	Path string
-	// Rune is the rune number of this location within the input stream.
+	// Rune is the rune offset within the input stream.
 	Rune int
-	// Line is the line number of this location.
+	// Line is the line number within the input stream.
 	Line int
-	// LineStart is the rune number of the first rune on the line of this location.
+	// LineStart is the rune offset of the first rune on this line.
 	LineStart int
 }
 
-// RuneOnLine returns the rune offset into the line of a location.
-func (l Location) RuneOnLine() int {
+// Column returns the rune offset into the line of a location.
+func (l Location) Column() int {
 	return l.Rune - l.LineStart
 }
 
-// String returns the string representation of a location as an Acme address.
+// String returns the string representation of a location as an
+// Acme address.
 func (l Location) String() string {
-	return l.Path + ":" + strconv.Itoa(l.Line) + "-+#" + strconv.Itoa(l.RuneOnLine())
+	line := strconv.Itoa(l.Line)
+	col := strconv.Itoa(l.Column())
+	return l.Path + ":" + line + "-+#" + col
 }
 
 // A Token identifies the type of a token in the input file.
@@ -43,8 +46,7 @@ type Token int
 
 // The set of constants defining the types of tokens.
 const (
-	EOF   Token = -1
-	Error Token = iota - 1 // 0, since EOF came first
+	Error Token = iota
 	Identifier
 	IntegerLiteral
 	FloatLiteral
@@ -131,9 +133,11 @@ const (
 	Colon
 	AndCarrot
 	AndCarrotEqual
+
+	EOF Token = -1
 )
 
-var tokenTypeNames = map[Token]string{
+var tokenNames = map[Token]string{
 	EOF:                 "EOF",
 	Error:               "Error",
 	Identifier:          "Identifier",
@@ -219,8 +223,8 @@ var tokenTypeNames = map[Token]string{
 }
 
 // String returns the string represenation of the token type.
-func (tt Token) String() string {
-	return tokenTypeNames[tt]
+func (tok Token) String() string {
+	return tokenNames[tok]
 }
 
 var keywords = map[string]Token{
@@ -307,13 +311,14 @@ type Lexer struct {
 	n, w          int
 	eof           bool
 	prevLineStart int
+
+	// The most-recent, non-comment, non-whitespace token.
+	prev Token
+
 	// Start and End are the locations of the start and end of the
 	// last token scanned by Next.  They are left unmodified
 	// when Next returns an inserted semicolon.
 	Start, End Location
-
-	// The most-recent, non-comment, non-whitespace token.
-	prev Token
 }
 
 // New returns a new Lexer that reads tokens from an input file.
@@ -345,19 +350,12 @@ func (l *Lexer) Next() Token {
 	src, n, start, end := l.src, l.n, l.Start, l.End
 
 	l.src = l.src[l.n:]
-	l.n = 0
-	l.w = 0
+	l.n, l.w = 0, 0
 	l.Start = l.End
-	tok := l.scan()
+	t := l.scan()
 
-	if tok == Error {
-		// The most-recently read rune was unexpected.
-		l.src = l.src[l.n-1:]
-		l.n = 1
-	}
-
-	newline := (tok == Comment || tok == Whitespace) && l.End.Line > l.Start.Line
-	if (newline || tok == EOF) &&
+	nl := (t == Comment || t == Whitespace) && l.End.Line > l.Start.Line
+	if (nl || t == EOF) &&
 		(l.prev == Identifier ||
 			l.prev == IntegerLiteral ||
 			l.prev == FloatLiteral ||
@@ -374,13 +372,17 @@ func (l *Lexer) Next() Token {
 			l.prev == CloseBracket ||
 			l.prev == CloseBrace) {
 		l.src, l.n, l.Start, l.End = src, n, start, end
-		tok = Semicolon
+		t = Semicolon
 	}
-	if tok != Comment && tok != Whitespace {
-		l.prev = tok
-		return tok
+	if t != Comment && t != Whitespace {
+		l.prev = t
 	}
-	return tok
+	if t == Error {
+		// Advance to the most-recent rune: the unexpected one.
+		l.src = l.src[l.n-1:]
+		l.n = 1
+	}
+	return t
 }
 
 // Scan scans the next token and returns it.
@@ -480,17 +482,16 @@ func (l *Lexer) scan() Token {
 	return Error
 }
 
-// Rune reads and returns the next rune from the input stream and updates the
-// span and text of the current token.  If an error is encountered then it panicks.
-// If the end of the input is reached -1 is returned.
-func (l *Lexer) rune() rune {
+// Rune reads and returns the next rune from the input stream and
+// updates the locations and text of the current token.  If the end of
+// the input is reached -1 is returned.
+func (l *Lexer) rune() (r rune) {
 	if l.n >= len(l.src) {
 		l.eof = true
 		return -1
 	}
-	r, w := utf8.DecodeRuneInString(l.src[l.n:])
-	l.n += w
-	l.w = w
+	r, l.w = utf8.DecodeRuneInString(l.src[l.n:])
+	l.n += l.w
 	l.End.Rune++
 	if r == '\n' {
 		l.End.Line++
@@ -500,8 +501,9 @@ func (l *Lexer) rune() rune {
 	return r
 }
 
-// Replace replaces the most-recently-read rune into the input stream.  If an
-// error is encountered then it panicks.
+// Replace replaces the most-recently-read rune into the input
+// stream.  If no runes were read since the last call to Next then
+// in panicks; nothing can be replaced.
 func (l *Lexer) replace() {
 	if l.n == 0 {
 		panic("nothing to replace")
@@ -511,7 +513,6 @@ func (l *Lexer) replace() {
 	}
 	l.n -= l.w
 	l.w = 0
-
 	l.End.Rune--
 	if l.End.Rune < l.End.LineStart {
 		l.End.Line--
