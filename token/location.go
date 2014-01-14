@@ -2,13 +2,13 @@ package token
 
 import "strconv"
 
-// A Location is the address of a particular rune in an input stream.
+// A Location is the address of a rune within the input text.
 type Location struct {
-	// Path is the path to the file for this location or "".
+	// Path is the path to the file containing the input.
 	Path string
-	// Rune is the rune offset within the input stream.
+	// Rune is the rune offset.
 	Rune int
-	// Line is the line number within the input stream.
+	// Line is the line number.
 	Line int
 	// LineStart is the rune offset of the first rune on this line.
 	LineStart int

@@ -44,8 +44,8 @@ func NewLexer(path string, src string) *Lexer {
 }
 
 // Text returns the text of the last token scanned by Next.  Inserted
-// semicolons do not update the string retuned by Text, so if Next
-// returns an inserted semicolon then Text will return the text of the
+// semicolons do not update the string retuned by Text.  If Next
+// returns an inserted semicolon, then Text will return the text of the
 // token preceeding the semicolon.
 func (l *Lexer) Text() string {
 	return l.src[:l.n]

@@ -13,7 +13,7 @@ package token
 // A Token identifies the type of a token in the input file.
 type Token int
 
-// The set of constants defining the types of tokens.
+// Constants defining the tokens.
 const (
 	Error Token = iota
 	Identifier
@@ -191,7 +191,7 @@ var tokenNames = map[Token]string{
 	AndCarrotEqual:      "AndCarrotEqual",
 }
 
-// String returns the string represenation of the token type.
+// String returns the string represenation of a token.
 func (tok Token) String() string {
 	return tokenNames[tok]
 }
