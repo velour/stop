@@ -303,48 +303,15 @@ var operators = map[string]TokenType{
 	"&^=": AndCarrotEqual,
 }
 
-// CanonicalText holds the single canonical string representation
-// for operators and keywords.
-var canonicalText = func() []string {
-	texts := make([]string, nTypes)
-	for text, op := range operators {
-		texts[op] = text
-	}
-	for text, kwd := range keywords {
-		texts[kwd] = text
-	}
-	return texts
-}()
-
 // A Token is a the atomic unit of the vocabulary of a Go program.
 type Token struct {
 	Type       TokenType
-	Text       string
 	Start, End Location
 }
 
 // String returns a human-readable string representation of the token.
 func (t *Token) String() string {
-	return "Token{Type:" + t.Type.String() + ", Text:`" + string(t.Text) + "`, Start:" + t.Start.String() + ", End:" + t.End.String() + "}"
-}
-
-// IsNewline returns true if the token acts as a newline.
-func (t *Token) IsNewline() bool {
-	if t.Type != Whitespace && t.Type != Comment {
-		return false
-	}
-	// The first clause is a special check for line comments,
-	// because they may not end with a \n if they occur
-	// immediately before EOF.
-	if t.Type == Comment && len(t.Text) >= 2 && t.Text[0] == '/' && t.Text[1] == '/' {
-		return true
-	}
-	for _, b := range t.Text {
-		if b == '\n' {
-			return true
-		}
-	}
-	return false
+	return "Token{Type:" + t.Type.String() + "`, Start:" + t.Start.String() + ", End:" + t.End.String() + "}"
 }
 
 // A Lexer scans and returns Go tokens from an input stream.
@@ -414,7 +381,26 @@ func (l *Lexer) replace() {
 	}
 }
 
+func (l *Lexer) token(typ TokenType) Token {
+	if typ == Error {
+		// Error means that the most-recently read rune was unexpected.
+		l.src = l.src[l.n-1:]
+		l.n = 1
+	}
+	t := Token{
+		Type:  typ,
+		Start: l.Start,
+		End:   l.End,
+	}
+	return t
+}
+
 func (l *Lexer) nextType() TokenType {
+	l.Start = l.End
+	l.src = l.src[l.n:]
+	l.n = 0
+	l.w = 0
+
 	r := l.rune()
 	switch {
 	case r < 0:
@@ -521,7 +507,9 @@ func (l *Lexer) Next() Token {
 		tok = *l.next
 		l.next = nil
 	}
-	if (tok.IsNewline() || tok.Type == EOF) &&
+	lineComment := tok.Type == Comment && l.n >= 2 && l.src[0] == '/' && l.src[1] == '/'
+	newline := (tok.Type == Comment || tok.Type == Whitespace) && tok.End.Line > tok.Start.Line
+	if (newline || lineComment || tok.Type == EOF) &&
 		(l.prev == Identifier ||
 			l.prev == IntegerLiteral ||
 			l.prev == FloatLiteral ||
@@ -541,7 +529,6 @@ func (l *Lexer) Next() Token {
 		*l.next = tok
 		tok = Token{
 			Type:  Semicolon,
-			Text:  canonicalText[Semicolon],
 			Start: l.next.Start,
 			End:   l.next.Start,
 		}
@@ -552,34 +539,12 @@ func (l *Lexer) Next() Token {
 	return tok
 }
 
-func (l *Lexer) token(typ TokenType) Token {
-	if typ == Error {
-		// Error means that the most-recently read rune was unexpected.
-		l.src = l.src[l.n-1:]
-		l.n = 1
-	}
-	t := Token{
-		Text:  l.text(typ),
-		Type:  typ,
-		Start: l.Start,
-		End:   l.End,
-	}
-	l.Start = l.End
-	l.src = l.src[l.n:]
-	l.n = 0
-	l.w = 0
-	return t
-}
-
-// Returns the text for the current token with the given type.  The
-// returned string is never a slice of the source file, so the source
-// file text does not need to remain in memory when lexing is
-// finished.
-func (l *Lexer) text(typ TokenType) string {
-	if typ >= 0 && canonicalText[typ] != "" {
-		return canonicalText[typ]
-	}
-	return string([]byte(l.src[:l.n]))
+// Text returns the text of the token that was most recently returned
+// via Next.  If the token was an inserted semicolon then the returned
+// string is the text of the newline or EOF token that caused the
+// semicolon to be inserted.
+func (l *Lexer) Text() string {
+	return l.src[:l.n]
 }
 
 func operator(l *Lexer) TokenType {

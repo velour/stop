@@ -94,8 +94,8 @@ func TestError(t *testing.T) {
 		if got.Type == EOF {
 			t.Fatalf("no error token")
 		}
-		if got.Text != string([]rune{test.unexpected}) {
-			t.Errorf("test %d: %s got %s, wanted %c", i, test.text, got.Text, test.unexpected)
+		if lex.Text() != string([]rune{test.unexpected}) {
+			t.Errorf("test %d: %s got %s, wanted %c", i, test.text, lex.Text(), test.unexpected)
 		}
 	}
 }
@@ -106,30 +106,6 @@ func TestEOF(t *testing.T) {
 		{"\n", []TokenType{Whitespace, EOF}},
 	}
 	tests.run(t)
-}
-
-func TestIsNewline(t *testing.T) {
-	tests := []struct {
-		text      string
-		isNewline bool
-	}{
-		{"\n", true},
-		{"//\n", true},
-		{"//foo\n", true},
-		{"//foo", true},
-		{"/*f\noo*/", true},
-		{"", false},
-		{"/*foo*/", false},
-		{" ", false},
-		{"\r", false},
-	}
-	for i, test := range tests {
-		lex := New("", test.text)
-		got := lex.Next()
-		if got.IsNewline() != test.isNewline {
-			t.Errorf("test %d: %s got %v, wanted %v", i, test.text, got.IsNewline(), test.isNewline)
-		}
-	}
 }
 
 func TestLineComment(t *testing.T) {
