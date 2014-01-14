@@ -307,12 +307,21 @@ var operators = map[string]Token{
 
 // A Lexer scans and returns Go tokens from an input stream.
 type Lexer struct {
-	src           string
-	n, w          int
-	eof           bool
+	// Src is the source text being scanned.
+	src string
+
+	// N is the next un-scanned byte in src and w is the width of the
+	// most-recently returned rune.  If n >= len(src) && w==0
+	// then an end of file, -1, rune has been returned by rune()
+	n, w int
+
+	// PrevLineStart is the rune offset of the start of the previous
+	// line.  It is needed to reset the LineStart field of the End
+	// location when replace is called on a newline rune.
 	prevLineStart int
 
-	// The most-recent, non-comment, non-whitespace token.
+	// Prev is the most-recent, non-comment, non-whitespace
+	// token returned by Next.
 	prev Token
 
 	// Start and End are the locations of the start and end of the
@@ -487,7 +496,7 @@ func (l *Lexer) scan() Token {
 // the input is reached -1 is returned.
 func (l *Lexer) rune() (r rune) {
 	if l.n >= len(l.src) {
-		l.eof = true
+		l.w = 0
 		return -1
 	}
 	r, l.w = utf8.DecodeRuneInString(l.src[l.n:])
@@ -508,7 +517,7 @@ func (l *Lexer) replace() {
 	if l.n == 0 {
 		panic("nothing to replace")
 	}
-	if l.eof {
+	if l.n >= len(l.src) && l.w == 0 {
 		return
 	}
 	l.n -= l.w
