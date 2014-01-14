@@ -56,7 +56,7 @@ func (l *Lexer) Text() string {
 // be of type EOF.
 func (l *Lexer) Next() Token {
 	// Saved, to be reset if a semicolon is inserted.
-	src, n, start, end := l.src, l.n, l.Start, l.End
+	src, n, start := l.src, l.n, l.Start
 
 	l.src = l.src[l.n:]
 	l.n, l.w = 0, 0
@@ -80,7 +80,7 @@ func (l *Lexer) Next() Token {
 			l.prev == CloseParen ||
 			l.prev == CloseBracket ||
 			l.prev == CloseBrace) {
-		l.src, l.n, l.Start, l.End = src, n, start, end
+		l.src, l.n, l.Start, l.End = src, n, start, l.Start
 		t = Semicolon
 	}
 	if t != Comment && t != Whitespace {
