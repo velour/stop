@@ -11,11 +11,32 @@
 package lexer
 
 import (
+	"strconv"
 	"unicode"
 	"unicode/utf8"
-
-	"bitbucket.org/eaburns/stop/loc"
 )
+
+// A Location is the address of a particular rune in an input stream.
+type Location struct {
+	// Path is the path to the file for this location, or "" if there is no file.
+	Path string
+	// Rune is the rune number of this location within the input stream.
+	Rune int
+	// Line is the line number of this location.
+	Line int
+	// LineStart is the rune number of the first rune on the line of this location.
+	LineStart int
+}
+
+// RuneOnLine returns the rune offset into the line of a location.
+func (l Location) RuneOnLine() int {
+	return l.Rune - l.LineStart
+}
+
+// String returns the string representation of a location as an Acme address.
+func (l Location) String() string {
+	return l.Path + ":" + strconv.Itoa(l.Line) + "-+#" + strconv.Itoa(l.RuneOnLine())
+}
 
 // A TokenType identifies the type of a token in the input file.
 type TokenType int
@@ -299,7 +320,7 @@ var canonicalText = func() []string {
 type Token struct {
 	Type       TokenType
 	Text       string
-	Start, End loc.Location
+	Start, End Location
 }
 
 // String returns a human-readable string representation of the token.
@@ -332,7 +353,7 @@ type Lexer struct {
 	n, w          int
 	eof           bool
 	prevLineStart int
-	Start, End    loc.Location
+	Start, End    Location
 
 	// Prev is the type of the most-recent, non-comment,
 	// non-whitespace token.
@@ -347,8 +368,8 @@ func New(path string, src string) *Lexer {
 	l := &Lexer{
 		src:           src,
 		prevLineStart: -1,
-		Start:         loc.Zero(path),
-		End:           loc.Zero(path),
+		Start:         Location{Path: path, Line: 1, Rune: 1, LineStart: 1},
+		End:           Location{Path: path, Line: 1, Rune: 1, LineStart: 1},
 	}
 	return l
 }
