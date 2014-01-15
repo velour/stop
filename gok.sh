@@ -22,4 +22,8 @@ echo Testing
 go test ./... 2>&1 > $o || fail
 
 echo Linting
-golint .
+golint . \
+	| grep -v 'Start should have comment'\
+	| grep -v 'Loc should have comment'\
+	| grep -v 'End should have comment'\
+
