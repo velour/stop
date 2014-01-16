@@ -1,6 +1,7 @@
 package ast
 
 import (
+	"io"
 	"math/big"
 
 	"bitbucket.org/eaburns/stop/token"
@@ -15,6 +16,11 @@ type Node interface {
 	// End returns the end location of the final token that induced
 	// this node.
 	End() token.Location
+
+	// Print writes a human-readable representation of the node
+	// and the subtree beneath it to out.  If an error occurs then
+	// it is panicked.
+	print(level int, out io.Writer)
 }
 
 // The Expression interface is implemented by all nodes that are
