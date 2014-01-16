@@ -341,10 +341,13 @@ func hex(l *Lexer) Token {
 }
 
 func runeLiteral(l *Lexer) Token {
-	if l.rune() == '\\' {
+	switch r := l.rune(); r {
+	case '\\':
 		if !unicodeValue(l, '\'') {
 			return Error
 		}
+	case '\'':
+		return Error
 	}
 	if r := l.rune(); r != '\'' {
 		return Error

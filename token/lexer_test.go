@@ -346,6 +346,7 @@ func TestRuneLiteral(t *testing.T) {
 		{"'\\u12e4'", RuneLiteral},
 		{"'\\U00101234'", RuneLiteral},
 
+		{"'''", Error},
 		{"'aa'", Error},
 		{"'\\xa'", Error},
 		{"'\\0'", Error},
