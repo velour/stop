@@ -21,6 +21,11 @@ type Node interface {
 	// and the subtree beneath it to out.  If an error occurs then
 	// it is panicked.
 	print(level int, out io.Writer)
+
+	// Dot writes the node and the subtree beneath it to a writer
+	// in the dot language of graphviz.  If an error occurs then it
+	// is panicked.
+	dot(cur int, out io.Writer) int
 }
 
 // The Expression interface is implemented by all nodes that are
