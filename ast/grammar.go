@@ -41,6 +41,25 @@ var (
 	}
 )
 
+// Parse returns the root of an abstract syntax tree for the Go language
+// or an error if one is encountered.
+//
+// TODO(eaburns): This is currently just for testing since it doesn't
+// parse the top-level production.
+func Parse(p *Parser) (root Node, err error) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			return
+		}
+		if e, ok := r.(*SyntaxError); ok {
+			err = e
+		}
+	}()
+	root = parseExpression(p)
+	return
+}
+
 func parseExpression(p *Parser) Expression {
 	return parseBinaryExpr(p, 1)
 }
