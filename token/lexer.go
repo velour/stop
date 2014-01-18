@@ -280,6 +280,8 @@ func comment(l *Lexer, closing []rune) Token {
 	return Comment
 }
 
+// BUG(eaburns): Malformed octal literals that begin with 0 followed by
+// any number of decmial digits are returned as valid integer literals.
 func number(r0 rune, l *Lexer) Token {
 	r := l.rune()
 	if r0 == '0' && (r == 'x' || r == 'X') {
@@ -388,6 +390,11 @@ func rawStringLiteral(l *Lexer) Token {
 // Parses a unicode value (assuming that the leading '\' has
 // already been consumed), and returns true on success or
 // false if the last rune read was unexpected.
+//
+// BUG(eaburns): Unicode code points are not validated, so characters
+// with invalid code points (such as '\U00110000' and '\uDFFF') are
+// returned as valid character literals.  Ideally they would be checked
+// here so that the parser would not have to error-check them.
 func unicodeValue(l *Lexer, quote rune) bool {
 	r := l.rune()
 	switch {

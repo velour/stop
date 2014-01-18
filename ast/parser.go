@@ -36,9 +36,9 @@ func (e *SyntaxError) Error() string {
 // value was malformed.  For example, an integer literal for which the
 // text is not parsable as an integer.
 //
-// In general, malformed literals are caught by the lexer and end up
-// being token.Error tokens, but some things get through; we catch
-// them while parsing instead.
+// BUG(eaburns): The parser should not have to deal with this class
+// of error.  The lexer should return an Error token if it scans a literal
+// that is lexicographically incorrect.
 type MalformedLiteral struct {
 	// The name for the literal type.
 	Type string

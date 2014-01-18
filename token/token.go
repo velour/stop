@@ -1,13 +1,4 @@
 // Package token provides tokens and a lexer for the Go language.
-//
-// Quirks:
-//
-// Mal-formed octal literals that begin with 0 followed by any
-// number of decmial digits are returned as valid integer literals.
-//
-// Unicode code points are not validated, so characters with
-// invalid code points (such as '\U00110000' and '\uDFFF') are
-// returned as valid character literals.
 package token
 
 // A Token identifies the type of a token in the input file.

@@ -1,5 +1,3 @@
-// TODO(eaburns): Should print type information for nodes if available.
-
 package ast
 
 import (

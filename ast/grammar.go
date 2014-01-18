@@ -9,11 +9,11 @@ import (
 )
 
 var (
-	// TODO(eaburns): Define tokens.nTokens and change
-	// map[token.Token]Whatever to [nTokens]Whatever.
-
 	// Binary op precedence for precedence climbing algorithm.
 	// http://www.engr.mun.ca/~theo/Misc/exp_parsing.htm
+	//
+	// BUG(eaburns): Define tokens.NTokens and change
+	// map[token.Token]Whatever to [nTokens]Whatever.
 	precedence = map[token.Token]int{
 		token.OrOr:           1,
 		token.AndAnd:         2,
@@ -51,7 +51,7 @@ var (
 // Parse returns the root of an abstract syntax tree for the Go language
 // or an error if one is encountered.
 //
-// TODO(eaburns): This is currently just for testing since it doesn't
+// BUG(eaburns): This is currently just for testing since it doesn't
 // parse the top-level production.
 func Parse(p *Parser) (root Node, err error) {
 	defer func() {
@@ -130,9 +130,9 @@ func parseOperand(p *Parser) Expression {
 	case token.StringLiteral:
 		return parseStringLiteral(p)
 
-	// TODO(eaburns): Composite literal
-	// TODO(eaburns): Function literal
-	// TODO(eaburns): MethodExpr—needs to be merged with the OpenParen case
+	// BUG(eaburns): Composite literal
+	// BUG(eaburns): Function literal
+	// BUG(eaburns): MethodExpr—needs to be merged with the OpenParen case
 
 	case token.OpenParen:
 		p.next()
@@ -152,6 +152,8 @@ func parseIntegerLiteral(p *Parser) Expression {
 		p.next()
 		return l
 	}
+	// This check is needed to catch malformed octal literals that
+	// are currently allowed by the lexer.  For example, 08.
 	panic(&MalformedLiteral{
 		Type:  "integer literal",
 		Text:  p.text(),
@@ -166,6 +168,9 @@ func parseFloatLiteral(p *Parser) Expression {
 		p.next()
 		return l
 	}
+	// I seem to recall that there was some case where the lexer
+	// may return a malformed float, but I can't remember the
+	// specifics.
 	panic(&MalformedLiteral{
 		Type:  "float literal",
 		Text:  p.text(),
@@ -185,6 +190,10 @@ func parseImaginaryLiteral(p *Parser) Expression {
 		p.next()
 		return l
 	}
+
+	// I seem to recall that there was some case where the lexer
+	// may return a malformed float, but I can't remember the
+	// specifics.
 	panic(&MalformedLiteral{
 		Type:  "imaginary literal",
 		Text:  p.text(),
@@ -203,14 +212,8 @@ func parseStringLiteral(p *Parser) Expression {
 		l.Value = strings.Replace(text[1:len(text)-1], "\r", "", -1)
 	} else {
 		var err error
-		l.Value, err = strconv.Unquote(text)
-		if err != nil {
-			panic(&MalformedLiteral{
-				Type:  "string literal",
-				Text:  p.text(),
-				Start: p.lex.Start,
-				End:   p.lex.End,
-			})
+		if l.Value, err = strconv.Unquote(text); err != nil {
+			panic("bad string literal: " + p.lex.Text())
 		}
 	}
 	p.next()
@@ -224,6 +227,8 @@ func parseRuneLiteral(p *Parser) Expression {
 	}
 	r, _, _, err := strconv.UnquoteChar(text[1:], '\'')
 	if err != nil {
+		// The lexer may allow bad rune literals (>0x0010FFFF and
+		// surrogate halves—whatever they are).
 		panic(&MalformedLiteral{
 			Type:  "rune literal",
 			Text:  p.text(),
