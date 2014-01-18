@@ -36,7 +36,7 @@ func (n *UnaryOp) dot(cur int, out io.Writer) int {
 	return n.Operand.dot(kid, out)
 }
 
-func (n *Identifier) dot(cur int, out io.Writer) int {
+func (n *OperandName) dot(cur int, out io.Writer) int {
 	id := n.Name
 	if n.Package != "" {
 		id = n.Package + "." + n.Name

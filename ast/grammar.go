@@ -310,7 +310,7 @@ malformed:
 }
 
 func parseOperandName(p *Parser) Expression {
-	name := &Identifier{Name: p.lex.Text(), span: p.span()}
+	name := &OperandName{Name: p.lex.Text(), span: p.span()}
 	p.next()
 	if p.tok == token.Dot {
 		p.next()

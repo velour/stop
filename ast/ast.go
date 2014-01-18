@@ -60,8 +60,9 @@ func (u *UnaryOp) Start() token.Location { return u.opLoc }
 func (u *UnaryOp) Loc() token.Location   { return u.opLoc }
 func (u *UnaryOp) End() token.Location   { return u.Operand.End() }
 
-// Identifier is an expression node representing an identifier.
-type Identifier struct {
+// OperandName is an expression node representing a, possibly
+// qualified,identifier.
+type OperandName struct {
 	Package string
 	Name    string
 	span

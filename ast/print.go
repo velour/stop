@@ -35,7 +35,7 @@ func (n *UnaryOp) print(level int, out io.Writer) {
 	format(out, level, "\n}")
 }
 
-func (n *Identifier) print(level int, out io.Writer) {
+func (n *OperandName) print(level int, out io.Writer) {
 	format(out, level, "Identifier{ Name: %s }", n.Name)
 }
 
