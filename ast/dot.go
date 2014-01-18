@@ -46,22 +46,22 @@ func (n *Identifier) dot(cur int, out io.Writer) int {
 }
 
 func (n *IntegerLiteral) dot(cur int, out io.Writer) int {
-	node(out, cur, n.StringValue)
+	node(out, cur, n.Value.String())
 	return cur + 1
 }
 
 func (n *FloatLiteral) dot(cur int, out io.Writer) int {
-	node(out, cur, n.StringValue)
+	node(out, cur, n.printString())
 	return cur + 1
 }
 
 func (n *ImaginaryLiteral) dot(cur int, out io.Writer) int {
-	node(out, cur, n.StringValue)
+	node(out, cur, n.printString())
 	return cur + 1
 }
 
 func (n *RuneLiteral) dot(cur int, out io.Writer) int {
-	node(out, cur, n.StringValue)
+	node(out, cur, strconv.QuoteRune(n.Value))
 	return cur + 1
 }
 

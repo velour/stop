@@ -71,30 +71,26 @@ type Identifier struct {
 // octal, or hex
 // integer literal.
 type IntegerLiteral struct {
-	StringValue string
-	Value       big.Int
+	Value *big.Int
 	span
 }
 
 // FloatLiteral is an expression node representing a floating point literal.
 type FloatLiteral struct {
-	StringValue string
-	Value       big.Rat
+	Value *big.Rat
 	span
 }
 
 // ImaginaryLiteral is an expression node representing an imaginary
 // literal, the imaginary component of a complex number.
 type ImaginaryLiteral struct {
-	StringValue string
-	Value       big.Rat
+	Value *big.Rat
 	span
 }
 
 // RuneLiteral is an expression node representing a rune literal.
 type RuneLiteral struct {
-	StringValue string
-	Value       rune
+	Value rune
 	span
 }
 

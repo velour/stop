@@ -3,8 +3,15 @@ package ast
 import (
 	"fmt"
 	"io"
+	"math/big"
+	"strconv"
 	"strings"
 )
+
+// PrintFloatPrecision is the number of digits of precision to use when
+// printing floating point values.  Trailing zeroes are trimmed, so
+// using a large value won't necessarily lead to extremely large strings.
+const printFloatPrecision = 20
 
 // Print writes a human-readable representation of an abstract
 // syntax tree to an io.Writer.
@@ -33,19 +40,27 @@ func (n *Identifier) print(level int, out io.Writer) {
 }
 
 func (n *IntegerLiteral) print(level int, out io.Writer) {
-	format(out, level, "IntegerLiteral{ StringValue: %s }", n.StringValue)
+	format(out, level, "IntegerLiteral{ Value: %s }", n.Value.String())
 }
 
 func (n *FloatLiteral) print(level int, out io.Writer) {
-	format(out, level, "FloatLiteral{ StringValue: %s }", n.StringValue)
+	format(out, level, "FloatLiteral{ Value: %s }", n.printString())
+}
+
+func (n *FloatLiteral) printString() string {
+	return ratPrintString(n.Value)
 }
 
 func (n *ImaginaryLiteral) print(level int, out io.Writer) {
-	format(out, level, "ImaginaryLiteral{ StringValue: %s }", n.StringValue)
+	format(out, level, "ImaginaryLiteral{ Value: %s }", n.printString())
+}
+
+func (n *ImaginaryLiteral) printString() string {
+	return ratPrintString(n.Value) + "i"
 }
 
 func (n *RuneLiteral) print(level int, out io.Writer) {
-	format(out, level, "RuneLiteral{ StringValue: %s }", n.StringValue)
+	format(out, level, "RuneLiteral{ Value: %s }", strconv.QuoteRune(n.Value))
 }
 
 func (n *StringLiteral) print(level int, out io.Writer) {
@@ -75,4 +90,14 @@ func recoverError(err *error) {
 	if e, ok := r.(error); ok {
 		*err = e
 	}
+}
+
+// RatPrintString returns a printable string representation of a big.Rat.
+func ratPrintString(rat *big.Rat) string {
+	s := rat.FloatString(printFloatPrecision)
+	s = strings.TrimRight(s, "0")
+	if len(s) > 0 && s[len(s)-1] == '.' {
+		s += "0"
+	}
+	return s
 }

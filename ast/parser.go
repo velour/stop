@@ -32,6 +32,26 @@ func (e *SyntaxError) Error() string {
 	return fmt.Sprintf("%s: expected %s, got %s", e.Start, e.Wanted, e.Text)
 }
 
+// A MalformedLiteral is an error that describes a literal for which the
+// value was malformed.  For example, an integer literal for which the
+// text is not parsable as an integer.
+//
+// In general, malformed literals are caught by the lexer and end up
+// being token.Error tokens, but some things get through; we catch
+// them while parsing instead.
+type MalformedLiteral struct {
+	// The name for the literal type.
+	Type string
+	// The malformed text.
+	Text string
+	// Start and End give the location of the error.
+	Start, End token.Location
+}
+
+func (e *MalformedLiteral) Error() string {
+	return fmt.Sprintf("%s: malformed %s: [%s]", e.Start, e.Type, e.Text)
+}
+
 // A Parser maintains the state needed to parse a stream of tokens
 // representing Go source code.
 type Parser struct {
