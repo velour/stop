@@ -3,7 +3,7 @@ package ast
 import (
 	"math/big"
 	"strconv"
-	"unicode/utf8"
+	"strings"
 
 	"bitbucket.org/eaburns/stop/token"
 )
@@ -45,19 +45,6 @@ var (
 		token.Star:      true,
 		token.And:       true,
 		token.LessMinus: true,
-	}
-
-	// UnEsc maps escape characters to their unescaped runes.
-	unEsc = [...]rune{
-		'a':  '\a',
-		'b':  '\b',
-		'f':  '\f',
-		'n':  '\n',
-		'r':  '\r',
-		't':  '\t',
-		'v':  '\v',
-		'\'': '\'',
-		'"':  '"',
 	}
 )
 
@@ -211,102 +198,42 @@ func parseStringLiteral(p *Parser) Expression {
 	if len(text) < 2 {
 		panic("bad string literal: " + text)
 	}
-	raw := text[0] == '`'
-	text = text[1 : len(text)-1]
-	esc := false
-	runes := make([]rune, 0, len(text))
-	for _, r := range text {
-		if raw {
-			if r != '\r' {
-				runes = append(runes, r)
-			}
-			continue
+	l := &StringLiteral{span: p.span()}
+	if text[0] == '`' {
+		l.Value = strings.Replace(text[1:len(text)-1], "\r", "", -1)
+	} else {
+		var err error
+		l.Value, err = strconv.Unquote(text)
+		if err != nil {
+			panic(&MalformedLiteral{
+				Type:  "string literal",
+				Text:  p.text(),
+				Start: p.lex.Start,
+				End:   p.lex.End,
+			})
 		}
-		if !esc && r == '\\' {
-			esc = true
-			continue
-		} else if esc {
-			esc = false
-			r = unEsc[r]
-			if r == 0 {
-				panic("bad escape sequence: " + p.lex.Text())
-			}
-		}
-		runes = append(runes, r)
 	}
-	l := &StringLiteral{Value: string(runes), span: p.span()}
 	p.next()
 	return l
 }
 
 func parseRuneLiteral(p *Parser) Expression {
-	l := &RuneLiteral{span: p.span()}
-
 	text := p.lex.Text()
 	if len(text) < 3 {
-		panic("bad rune literal: " + p.lex.Text())
+		panic("bad rune literal: " + text)
 	}
-
-	if text[1] != '\\' {
-		l.Value, _ = utf8.DecodeRuneInString(text[1:])
-		p.next()
-		return l
+	r, _, _, err := strconv.UnquoteChar(text[1:], '\'')
+	if err != nil {
+		panic(&MalformedLiteral{
+			Type:  "rune literal",
+			Text:  p.text(),
+			Start: p.lex.Start,
+			End:   p.lex.End,
+		})
 	}
-
-	if len(text) < 4 {
-		panic("bad rune literal: " + p.lex.Text())
-	}
-	kind := text[2]
-	text = text[3 : len(text)-1]
-	switch kind {
-	case 'U':
-		if len(text) < 8 {
-			panic("bad rune literal: " + p.lex.Text())
-		}
-		fallthrough
-	case 'u':
-		if len(text) < 4 {
-			panic("bad rune literal: " + p.lex.Text())
-		}
-		fallthrough
-	case 'x':
-		if len(text) < 2 {
-			panic("bad rune literal: " + p.lex.Text())
-		}
-		v, err := strconv.ParseUint(text, 16, 32)
-		// TODO(eaburns): Figure out what surrogate halves are and
-		// check for them here (they are malformed).
-		if err != nil || v > 0x10FFFF {
-			goto malformed
-		}
-		l.Value = rune(v)
-
-	case 'a', 'b', 'f', 'n', 'r', 't', 'v', '\\', '\'':
-		l.Value = unEsc[kind]
-		if l.Value == 0 {
-			panic("bad escape sequence: " + p.lex.Text())
-		}
-
-	default:
-		if len(text) != 3 {
-			panic("bad rune literal: " + p.lex.Text())
-		}
-		v, err := strconv.ParseUint(text, 8, 32)
-		if err != nil {
-			goto malformed
-		}
-		l.Value = rune(v)
-	}
+	l := &RuneLiteral{Value: r, span: p.span()}
 	p.next()
 	return l
-
-malformed:
-	panic(&MalformedLiteral{
-		Type:  "rune literal",
-		Text:  p.text(),
-		Start: p.lex.Start,
-		End:   p.lex.End,
-	})
 }
 
 func parseOperandName(p *Parser) Expression {

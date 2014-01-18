@@ -60,7 +60,7 @@ func (n *ImaginaryLiteral) printString() string {
 }
 
 func (n *RuneLiteral) print(level int, out io.Writer) {
-	format(out, level, "RuneLiteral{ Value: %s }", strconv.QuoteRune(n.Value))
+	format(out, level, "RuneLiteral{ Value: %s (0x%x) }", strconv.QuoteRune(n.Value), n.Value)
 }
 
 func (n *StringLiteral) print(level int, out io.Writer) {
