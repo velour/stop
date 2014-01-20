@@ -6,10 +6,17 @@ import (
 	"bitbucket.org/eaburns/stop/token"
 )
 
+var (
+	// Some convenient identifier matchers.
+	a, b, c, d = ident("a"), ident("b"), ident("c"), ident("d")
+)
+
 func TestPrimaryExpr(t *testing.T) {
-	a, b, c, d := opName("", "a"), opName("", "b"), opName("", "c"), opName("", "d")
 	tests := parserTests{
-		{`5`, intLit("5")}, // operand
+		// Operand
+		{`5`, intLit("5")},
+
+		// Call
 		{`a("bar")`, call(a, false, strLit("bar"))},
 		{`a(b, c, d)`, call(a, false, b, c, d)},
 		{`a(b, c, d...)`, call(a, true, b, c, d)},
@@ -17,14 +24,27 @@ func TestPrimaryExpr(t *testing.T) {
 		{`a(b*c-d)`, call(a, false, binOp(token.Minus, binOp(token.Star, b, c), d))},
 		{`a(b*c, d)`, call(a, false, binOp(token.Star, b, c), d)},
 		{`a(b(c), d)`, call(a, false, call(b, false, c), d)},
-		{`math.Atan2(3.14/2, 0.5)`, call(opName("math", "Atan2"), false, binOp(token.Divide, floatLit("3.14"), intLit("2")), floatLit("0.5"))},
+		{`math.Atan2(3.14/2, 0.5)`, call(sel(ident("math"), ident("Atan2")), false, binOp(token.Divide, floatLit("3.14"), intLit("2")), floatLit("0.5"))},
+
+		// Selector
+		{`a`, a},
+		{`a.b`, sel(a, b)},
+		{`a.b.c`, sel(sel(a, b), c)},
+		{`a.b.c.d`, sel(sel(sel(a, b), c), d)},
+		{`a(b).c`, sel(call(a, false, b), c)},
+		{`a(b).c(d)`, call(sel(call(a, false, b), c), false, d)},
+
+		// TypeAssertion
+		{`a.(b)`, tAssert(a, b)},
+		{`a.b.(c)`, tAssert(sel(a, b), c)},
+		{`a.(b).(c)`, tAssert(tAssert(a, b), c)},
+		{`a.(b).(c).d`, sel(tAssert(tAssert(a, b), c), d)},
 	}
 	tests.run(t)
 
 }
 
 func TestParseBinaryExpr(t *testing.T) {
-	a, b, c, d := opName("", "a"), opName("", "b"), opName("", "c"), opName("", "d")
 	tests := parserTests{
 		{`a + b`, binOp(token.Plus, a, b)},
 		{`a + b + c`, binOp(token.Plus, binOp(token.Plus, a, b), c)},
@@ -50,22 +70,22 @@ func TestParseBinaryExpr(t *testing.T) {
 
 func TestParseUnaryExpr(t *testing.T) {
 	tests := parserTests{
-		{`+a`, unOp(token.Plus, opName("", "a"))},
-		{`-math.b`, unOp(token.Minus, opName("math", "b"))},
+		{`+a`, unOp(token.Plus, a)},
+		{`-a.b`, unOp(token.Minus, sel(a, b))},
 		{`!0`, unOp(token.Bang, intLit("0"))},
-		{`^(a)`, unOp(token.Carrot, opName("", "a"))},
+		{`^(a)`, unOp(token.Carrot, a)},
 		{`*5.1`, unOp(token.Star, floatLit("5.1"))},
 		{`&!1`, unOp(token.And, unOp(token.Bang, intLit("1")))},
-		{`<-z`, unOp(token.LessMinus, opName("", "z"))},
-		{`<-!-z`, unOp(token.LessMinus, unOp(token.Bang, unOp(token.Minus, opName("", "z"))))},
+		{`<-a`, unOp(token.LessMinus, a)},
+		{`<-!-a`, unOp(token.LessMinus, unOp(token.Bang, unOp(token.Minus, a)))},
 	}
 	tests.run(t)
 }
 
-func TestParseOperandName(t *testing.T) {
+func TestParseIdentifier(t *testing.T) {
 	tests := parserTests{
-		{"_abc123", opName("", "_abc123")},
-		{"os.Stderr", opName("os", "Stderr")},
+		{"_abc123", ident("_abc123")},
+		{"_αβξ123", ident("_αβξ123")},
 	}
 	tests.run(t)
 }

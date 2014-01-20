@@ -119,7 +119,7 @@ func parsePrimaryExpr(p *Parser) Expression {
 		case token.OpenParen:
 			left = parseCall(p, left)
 		case token.Dot:
-			panic("unimplemented")
+			left = parseSelectorOrTypeAssertion(p, left)
 		default:
 			return left
 		}
@@ -156,7 +156,11 @@ func parseExpressionList(p *Parser) []Expression {
 func parseOperand(p *Parser) Expression {
 	switch p.tok {
 	case token.Identifier:
-		return parseOperandName(p)
+		id := parseIdentifier(p)
+		if p.tok == token.Dot {
+			return parseSelectorOrTypeAssertion(p, id)
+		}
+		return id
 
 	case token.IntegerLiteral:
 		return parseIntegerLiteral(p)
@@ -186,6 +190,37 @@ func parseOperand(p *Parser) Expression {
 	default:
 		panic(p.err("operand"))
 	}
+}
+
+func parseType(p *Parser) Node {
+	// BUG(eaburns): Types are more complex than just identifiers.  This is a place holder.
+	return parseIdentifier(p)
+}
+
+func parseSelectorOrTypeAssertion(p *Parser, left Expression) Expression {
+	p.expect(token.Dot)
+	dotLoc := p.lex.Start
+	p.next()
+
+	if p.tok == token.OpenParen { // TypeAssertion
+		p.next()
+		t := &TypeAssertion{Expression: left, dotLoc: dotLoc}
+		t.Type = parseType(p)
+		p.expect(token.CloseParen)
+		t.closeLoc = p.lex.Start
+		p.next()
+		return t
+	}
+
+	left = &Selector{
+		Expression: left,
+		Selection:  parseIdentifier(p).(*Identifier),
+		dotLoc:     dotLoc,
+	}
+	if p.tok == token.Dot {
+		return parseSelectorOrTypeAssertion(p, left)
+	}
+	return left
 }
 
 func parseIntegerLiteral(p *Parser) Expression {
@@ -262,6 +297,13 @@ func parseStringLiteral(p *Parser) Expression {
 	return l
 }
 
+func parseIdentifier(p *Parser) Expression {
+	p.expect(token.Identifier)
+	id := &Identifier{Name: p.text(), span: p.span()}
+	p.next()
+	return id
+}
+
 func parseRuneLiteral(p *Parser) Expression {
 	text := p.lex.Text()
 	if len(text) < 3 {
@@ -281,18 +323,4 @@ func parseRuneLiteral(p *Parser) Expression {
 	l := &RuneLiteral{Value: r, span: p.span()}
 	p.next()
 	return l
-}
-
-func parseOperandName(p *Parser) Expression {
-	name := &OperandName{Name: p.lex.Text(), span: p.span()}
-	p.next()
-	if p.tok == token.Dot {
-		p.next()
-		p.expect(token.Identifier)
-		name.Package = name.Name
-		name.Name = p.lex.Text()
-		name.span.end = p.lex.End
-		p.next()
-	}
-	return name
 }

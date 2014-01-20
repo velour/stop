@@ -50,6 +50,20 @@ func parseErr(reStr string) matcher {
 	}
 }
 
+func tAssert(expr, typ matcher) matcher {
+	return func(n Node, err error) bool {
+		t, ok := n.(*TypeAssertion)
+		return err == nil && ok && expr(t.Expression, nil) && typ(t.Type, nil)
+	}
+}
+
+func sel(expr, sele matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*Selector)
+		return err == nil && ok && expr(s.Expression, nil) && sele(s.Selection, nil)
+	}
+}
+
 func call(fun matcher, ddd bool, args ...matcher) matcher {
 	return func(n Node, err error) bool {
 		c, ok := n.(*Call)
@@ -79,10 +93,10 @@ func binOp(op token.Token, left, right matcher) matcher {
 	}
 }
 
-func opName(pkg, name string) matcher {
+func ident(name string) matcher {
 	return func(n Node, err error) bool {
-		s, ok := n.(*OperandName)
-		return err == nil && ok && s.Package == pkg && s.Name == name
+		id, ok := n.(*Identifier)
+		return err == nil && ok && id.Name == name
 	}
 }
 

@@ -33,6 +33,22 @@ func (n *Call) print(level int, out io.Writer) {
 	format(out, level, "\n\t]\n\tDotDotDot: %t\n}", n.DotDotDot)
 }
 
+func (n *TypeAssertion) print(level int, out io.Writer) {
+	format(out, level, "TypeAssertion{\n\tExpression: ")
+	n.Expression.print(level+1, out)
+	format(out, level, "\n\tType: ")
+	n.Type.print(level+1, out)
+	format(out, level, "\n}")
+}
+
+func (n *Selector) print(level int, out io.Writer) {
+	format(out, level, "Selector{\n\tExpression: ")
+	n.Expression.print(level+1, out)
+	format(out, level, "\n\tSelection: ")
+	n.Selection.print(level+1, out)
+	format(out, level, "\n}")
+}
+
 func (n *BinaryOp) print(level int, out io.Writer) {
 	format(out, level, "BinaryOp{\n\tOp: %s\n\tLeft: ", n.Op.String())
 	n.Left.print(level+1, out)
@@ -45,14 +61,6 @@ func (n *UnaryOp) print(level int, out io.Writer) {
 	format(out, level, "UnaryOp{\n\tOp: %s\n\tOperand: ", n.Op.String())
 	n.Operand.print(level+1, out)
 	format(out, level, "\n}")
-}
-
-func (n *OperandName) print(level int, out io.Writer) {
-	if n.Package != "" {
-		format(out, level, "OperandName{ Package: %s, Name: %s }", n.Package, n.Name)
-	} else {
-		format(out, level, "OperandName{ Name: %s }", n.Name)
-	}
 }
 
 func (n *IntegerLiteral) print(level int, out io.Writer) {
@@ -81,6 +89,10 @@ func (n *RuneLiteral) print(level int, out io.Writer) {
 
 func (n *StringLiteral) print(level int, out io.Writer) {
 	format(out, level, "StringLiteral{ Value: %s }", n.Value)
+}
+
+func (n *Identifier) print(level int, out io.Writer) {
+	format(out, level, "Identifier{ Name: %s }", n.Name)
 }
 
 // Format writes a formatted string in the style of fmt.Fprintf to out.

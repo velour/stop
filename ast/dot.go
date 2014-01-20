@@ -34,6 +34,24 @@ func (n *Call) dot(cur int, out io.Writer) int {
 	return arg
 }
 
+func (n *TypeAssertion) dot(cur int, out io.Writer) int {
+	expr := cur + 1
+	sel := n.Expression.dot(expr, out)
+	node(out, cur, "type assertion")
+	arc(out, cur, expr)
+	arc(out, cur, sel)
+	return n.Type.dot(sel, out)
+}
+
+func (n *Selector) dot(cur int, out io.Writer) int {
+	expr := cur + 1
+	sel := n.Expression.dot(expr, out)
+	node(out, cur, "selector")
+	arc(out, cur, expr)
+	arc(out, cur, sel)
+	return n.Selection.dot(sel, out)
+}
+
 func (n *BinaryOp) dot(cur int, out io.Writer) int {
 	left := cur + 1
 	right := n.Left.dot(left, out)
@@ -48,15 +66,6 @@ func (n *UnaryOp) dot(cur int, out io.Writer) int {
 	node(out, cur, n.Op.String())
 	arc(out, cur, kid)
 	return n.Operand.dot(kid, out)
-}
-
-func (n *OperandName) dot(cur int, out io.Writer) int {
-	id := n.Name
-	if n.Package != "" {
-		id = n.Package + "." + n.Name
-	}
-	node(out, cur, id)
-	return cur + 1
 }
 
 func (n *IntegerLiteral) dot(cur int, out io.Writer) int {
@@ -81,6 +90,11 @@ func (n *RuneLiteral) dot(cur int, out io.Writer) int {
 
 func (n *StringLiteral) dot(cur int, out io.Writer) int {
 	node(out, cur, n.Value)
+	return cur + 1
+}
+
+func (n *Identifier) dot(cur int, out io.Writer) int {
+	node(out, cur, n.Name)
 	return cur + 1
 }
 

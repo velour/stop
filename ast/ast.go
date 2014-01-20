@@ -38,6 +38,29 @@ type Expression interface {
 	Loc() token.Location
 }
 
+// A TypeAssertion is an expression node representing a type assertion.
+type TypeAssertion struct {
+	Expression       Expression
+	Type             Node
+	dotLoc, closeLoc token.Location
+}
+
+func (n *TypeAssertion) Start() token.Location { return n.Expression.Start() }
+func (n *TypeAssertion) Loc() token.Location   { return n.dotLoc }
+func (n *TypeAssertion) End() token.Location   { return n.closeLoc }
+
+// Selector is an expression node representing a selector or a
+// qualified identifier.
+type Selector struct {
+	Expression Expression
+	Selection  *Identifier
+	dotLoc     token.Location
+}
+
+func (n *Selector) Start() token.Location { return n.Expression.Start() }
+func (n *Selector) Loc() token.Location   { return n.dotLoc }
+func (n *Selector) End() token.Location   { return n.Selection.End() }
+
 // Call is a function call expression.
 // After parsing but before type checking, a Call can represent
 // either a function call or a type conversion.
@@ -75,11 +98,10 @@ func (u *UnaryOp) Start() token.Location { return u.opLoc }
 func (u *UnaryOp) Loc() token.Location   { return u.opLoc }
 func (u *UnaryOp) End() token.Location   { return u.Operand.End() }
 
-// OperandName is an expression node representing a, possibly
-// qualified,identifier.
-type OperandName struct {
-	Package string
-	Name    string
+// An Identifier is an expression node that represents an
+// un-qualified identifier.
+type Identifier struct {
+	Name string
 	span
 }
 
