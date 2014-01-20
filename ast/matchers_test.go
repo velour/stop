@@ -16,6 +16,9 @@ func nodeString(n Node) string {
 	return string(out.Bytes())
 }
 
+// A matcher function is used for testing the expected structure of ASTs.  The
+// matcher returns true if the tree matches the expected structure of if there
+// is an expected error.
 type matcher func(Node, error) bool
 
 type parserTests []struct {
@@ -44,6 +47,20 @@ func parseErr(reStr string) matcher {
 	re := regexp.MustCompile(reStr)
 	return func(_ Node, err error) bool {
 		return err != nil && re.MatchString(err.Error())
+	}
+}
+
+func unOp(op token.Token, operand matcher) matcher {
+	return func(n Node, err error) bool {
+		u, ok := n.(*UnaryOp)
+		return err == nil && ok && u.Op == op && operand(u.Operand, nil)
+	}
+}
+
+func binOp(op token.Token, left, right matcher) matcher {
+	return func(n Node, err error) bool {
+		b, ok := n.(*BinaryOp)
+		return err == nil && ok && b.Op == op && left(b.Left, nil) && right(b.Right, nil)
 	}
 }
 

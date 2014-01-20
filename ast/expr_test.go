@@ -2,12 +2,54 @@ package ast
 
 import (
 	"testing"
+
+	"bitbucket.org/eaburns/stop/token"
 )
 
 func TestParseOperandName(t *testing.T) {
 	tests := parserTests{
 		{"_abc123", opName("", "_abc123")},
 		{"os.Stderr", opName("os", "Stderr")},
+	}
+	tests.run(t)
+}
+
+func TestParseBinaryExpr(t *testing.T) {
+	a, b, c, d := opName("", "a"), opName("", "b"), opName("", "c"), opName("", "d")
+	tests := parserTests{
+		{`a + b`, binOp(token.Plus, a, b)},
+		{`a + b + c`, binOp(token.Plus, binOp(token.Plus, a, b), c)},
+		{`a + b + c + d`, binOp(token.Plus, binOp(token.Plus, binOp(token.Plus, a, b), c), d)},
+		{`a * b + c`, binOp(token.Plus, binOp(token.Star, a, b), c)},
+		{`a + b * c`, binOp(token.Plus, a, binOp(token.Star, b, c))},
+		{`a + -b`, binOp(token.Plus, a, unOp(token.Minus, b))},
+		{`-a + b`, binOp(token.Plus, unOp(token.Minus, a), b)},
+		{`a || b && c`, binOp(token.OrOr, a, binOp(token.AndAnd, b, c))},
+		{`a && b || c`, binOp(token.OrOr, binOp(token.AndAnd, a, b), c)},
+		{`a && b == c`, binOp(token.AndAnd, a, binOp(token.EqualEqual, b, c))},
+		{`a == b && c`, binOp(token.AndAnd, binOp(token.EqualEqual, a, b), c)},
+		{`a && b != c`, binOp(token.AndAnd, a, binOp(token.BangEqual, b, c))},
+		{`a && b < c`, binOp(token.AndAnd, a, binOp(token.Less, b, c))},
+		{`a && b <= c`, binOp(token.AndAnd, a, binOp(token.LessEqual, b, c))},
+		{`a && b > c`, binOp(token.AndAnd, a, binOp(token.Greater, b, c))},
+		{`a && b >= c`, binOp(token.AndAnd, a, binOp(token.GreaterEqual, b, c))},
+		{`(a + b) * c`, binOp(token.Star, binOp(token.Plus, a, b), c)},
+		{`(a || b) && c`, binOp(token.AndAnd, binOp(token.OrOr, a, b), c)},
+	}
+	tests.run(t)
+
+}
+
+func TestParseUnaryExpr(t *testing.T) {
+	tests := parserTests{
+		{`+a`, unOp(token.Plus, opName("", "a"))},
+		{`-math.b`, unOp(token.Minus, opName("math", "b"))},
+		{`!0`, unOp(token.Bang, intLit("0"))},
+		{`^(a)`, unOp(token.Carrot, opName("", "a"))},
+		{`*5.1`, unOp(token.Star, floatLit("5.1"))},
+		{`&!1`, unOp(token.And, unOp(token.Bang, intLit("1")))},
+		{`<-z`, unOp(token.LessMinus, opName("", "z"))},
+		{`<-!-z`, unOp(token.LessMinus, unOp(token.Bang, unOp(token.Minus, opName("", "z"))))},
 	}
 	tests.run(t)
 }
