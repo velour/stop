@@ -30,7 +30,7 @@ func (n *BinaryOp) print(level int, out io.Writer) {
 }
 
 func (n *UnaryOp) print(level int, out io.Writer) {
-	format(out, level, "UnaryOp{\n\tOp: %s\n\tOperand: ", n.Op.String)
+	format(out, level, "UnaryOp{\n\tOp: %s\n\tOperand: ", n.Op.String())
 	n.Operand.print(level+1, out)
 	format(out, level, "\n}")
 }
