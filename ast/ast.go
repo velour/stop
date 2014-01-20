@@ -38,6 +38,21 @@ type Expression interface {
 	Loc() token.Location
 }
 
+// Call is a function call expression.
+// After parsing but before type checking, a Call can represent
+// either a function call or a type conversion.
+type Call struct {
+	Function  Expression
+	Arguments []Expression
+	// DotDotDot is true if the last argument ended with "...".
+	DotDotDot         bool
+	openLoc, closeLoc token.Location
+}
+
+func (c *Call) Start() token.Location { return c.Function.Start() }
+func (c *Call) Loc() token.Location   { return c.openLoc }
+func (c *Call) End() token.Location   { return c.closeLoc }
+
 // BinaryOp is an expression node representing a binary operator.
 type BinaryOp struct {
 	Op          token.Token

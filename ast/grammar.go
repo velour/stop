@@ -107,7 +107,50 @@ func parseUnaryExpr(p *Parser) Expression {
 			Operand: operand,
 		}
 	}
-	return parseOperand(p)
+	return parsePrimaryExpr(p)
+}
+
+func parsePrimaryExpr(p *Parser) Expression {
+	left := parseOperand(p)
+	for {
+		switch p.tok {
+		case token.OpenBracket:
+			panic("unimplemented")
+		case token.OpenParen:
+			left = parseCall(p, left)
+		case token.Dot:
+			panic("unimplemented")
+		default:
+			return left
+		}
+	}
+}
+
+func parseCall(p *Parser, left Expression) Expression {
+	p.expect(token.OpenParen)
+	c := &Call{Function: left, openLoc: p.lex.Start}
+	p.next()
+	c.Arguments = parseExpressionList(p)
+	if p.tok == token.DotDotDot {
+		c.DotDotDot = true
+		p.next()
+	}
+	p.expect(token.CloseParen)
+	c.closeLoc = p.lex.End
+	p.next()
+	return c
+}
+
+func parseExpressionList(p *Parser) []Expression {
+	var exprs []Expression
+	for {
+		exprs = append(exprs, parseExpression(p))
+		if p.tok != token.Comma {
+			break
+		}
+		p.next()
+	}
+	return exprs
 }
 
 func parseOperand(p *Parser) Expression {

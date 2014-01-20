@@ -46,6 +46,7 @@ func main() {
 		if err = ast.Print(out, root); err != nil {
 			die(err)
 		}
+		out.Flush()
 	}
 }
 

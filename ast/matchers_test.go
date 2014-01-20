@@ -50,6 +50,21 @@ func parseErr(reStr string) matcher {
 	}
 }
 
+func call(fun matcher, ddd bool, args ...matcher) matcher {
+	return func(n Node, err error) bool {
+		c, ok := n.(*Call)
+		if err != nil || !ok || !fun(c.Function, nil) || len(args) != len(c.Arguments) || c.DotDotDot != ddd {
+			return false
+		}
+		for i, a := range c.Arguments {
+			if !args[i](a, nil) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
 func unOp(op token.Token, operand matcher) matcher {
 	return func(n Node, err error) bool {
 		u, ok := n.(*UnaryOp)

@@ -21,6 +21,18 @@ func Print(out io.Writer, n Node) (err error) {
 	return
 }
 
+func (n *Call) print(level int, out io.Writer) {
+	format(out, level, "Call{\n\tFunction: ")
+	n.Function.print(level+1, out)
+	format(out, level, "\n\tArguments: [")
+	indent := "\n" + strings.Repeat("\t", level+2)
+	for _, e := range n.Arguments {
+		io.WriteString(out, indent)
+		e.print(level+2, out)
+	}
+	format(out, level, "\n\t]\n\tDotDotDot: %t\n}", n.DotDotDot)
+}
+
 func (n *BinaryOp) print(level int, out io.Writer) {
 	format(out, level, "BinaryOp{\n\tOp: %s\n\tLeft: ", n.Op.String())
 	n.Left.print(level+1, out)
@@ -36,7 +48,11 @@ func (n *UnaryOp) print(level int, out io.Writer) {
 }
 
 func (n *OperandName) print(level int, out io.Writer) {
-	format(out, level, "OperandName{ Name: %s }", n.Name)
+	if n.Package != "" {
+		format(out, level, "OperandName{ Package: %s, Name: %s }", n.Package, n.Name)
+	} else {
+		format(out, level, "OperandName{ Name: %s }", n.Name)
+	}
 }
 
 func (n *IntegerLiteral) print(level int, out io.Writer) {

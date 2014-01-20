@@ -18,6 +18,22 @@ func Dot(out io.Writer, n Node) (err error) {
 	return
 }
 
+func (n *Call) dot(cur int, out io.Writer) int {
+	fun := cur + 1
+	arg := n.Function.dot(fun, out)
+	arc(out, cur, fun)
+	for _, e := range n.Arguments {
+		arc(out, cur, arg)
+		arg = e.dot(arg, out)
+	}
+	if n.DotDotDot {
+		node(out, cur, "Call...")
+	} else {
+		node(out, cur, "Call")
+	}
+	return arg
+}
+
 func (n *BinaryOp) dot(cur int, out io.Writer) int {
 	left := cur + 1
 	right := n.Left.dot(left, out)

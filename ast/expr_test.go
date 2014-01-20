@@ -6,12 +6,21 @@ import (
 	"bitbucket.org/eaburns/stop/token"
 )
 
-func TestParseOperandName(t *testing.T) {
+func TestPrimaryExpr(t *testing.T) {
+	a, b, c, d := opName("", "a"), opName("", "b"), opName("", "c"), opName("", "d")
 	tests := parserTests{
-		{"_abc123", opName("", "_abc123")},
-		{"os.Stderr", opName("os", "Stderr")},
+		{`5`, intLit("5")}, // operand
+		{`a("bar")`, call(a, false, strLit("bar"))},
+		{`a(b, c, d)`, call(a, false, b, c, d)},
+		{`a(b, c, d...)`, call(a, true, b, c, d)},
+		{`(a*b)(c, d)`, call(binOp(token.Star, a, b), false, c, d)},
+		{`a(b*c-d)`, call(a, false, binOp(token.Minus, binOp(token.Star, b, c), d))},
+		{`a(b*c, d)`, call(a, false, binOp(token.Star, b, c), d)},
+		{`a(b(c), d)`, call(a, false, call(b, false, c), d)},
+		{`math.Atan2(3.14/2, 0.5)`, call(opName("math", "Atan2"), false, binOp(token.Divide, floatLit("3.14"), intLit("2")), floatLit("0.5"))},
 	}
 	tests.run(t)
+
 }
 
 func TestParseBinaryExpr(t *testing.T) {
@@ -37,7 +46,6 @@ func TestParseBinaryExpr(t *testing.T) {
 		{`(a || b) && c`, binOp(token.AndAnd, binOp(token.OrOr, a, b), c)},
 	}
 	tests.run(t)
-
 }
 
 func TestParseUnaryExpr(t *testing.T) {
@@ -50,6 +58,14 @@ func TestParseUnaryExpr(t *testing.T) {
 		{`&!1`, unOp(token.And, unOp(token.Bang, intLit("1")))},
 		{`<-z`, unOp(token.LessMinus, opName("", "z"))},
 		{`<-!-z`, unOp(token.LessMinus, unOp(token.Bang, unOp(token.Minus, opName("", "z"))))},
+	}
+	tests.run(t)
+}
+
+func TestParseOperandName(t *testing.T) {
+	tests := parserTests{
+		{"_abc123", opName("", "_abc123")},
+		{"os.Stderr", opName("os", "Stderr")},
 	}
 	tests.run(t)
 }
