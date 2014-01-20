@@ -132,7 +132,6 @@ func parseOperand(p *Parser) Expression {
 
 	// BUG(eaburns): Composite literal
 	// BUG(eaburns): Function literal
-	// BUG(eaburns): MethodExpr—needs to be merged with the OpenParen case
 
 	case token.OpenParen:
 		p.next()
