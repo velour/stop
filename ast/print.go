@@ -36,7 +36,7 @@ func (n *UnaryOp) print(level int, out io.Writer) {
 }
 
 func (n *OperandName) print(level int, out io.Writer) {
-	format(out, level, "Identifier{ Name: %s }", n.Name)
+	format(out, level, "OperandName{ Name: %s }", n.Name)
 }
 
 func (n *IntegerLiteral) print(level int, out io.Writer) {
