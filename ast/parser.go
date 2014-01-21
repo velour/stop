@@ -11,7 +11,7 @@ import (
 // unexpected in the syntax of the Go source code.
 type SyntaxError struct {
 	// Wanted describes the value that was expected.
-	Wanted fmt.Stringer
+	Wanted string
 	// Got describes the unexpected token.
 	Got fmt.Stringer
 	// Text is the text of the unexpected token.
@@ -25,9 +25,11 @@ func (e *SyntaxError) Error() string {
 		text := strconv.QuoteToASCII(e.Text)
 		return fmt.Sprintf("%s: unexpected rune in input [%s]", e.Start, text[1:len(text)-1])
 	}
-	if e.Got == token.Semicolon {
-		// Text from inserted ; is the text of the previous token.
+	switch e.Got {
+	case token.Semicolon:
 		e.Text = ";"
+	case token.EOF:
+		e.Text = "EOF"
 	}
 	return fmt.Sprintf("%s: expected %s, got %s", e.Start, e.Wanted, e.Text)
 }
@@ -98,7 +100,7 @@ func (p *Parser) next() {
 // token is not tok.
 func (p *Parser) expect(tok token.Token) {
 	if p.tok != tok {
-		panic(p.err(tok))
+		panic(p.err(tok.String()))
 	}
 }
 
@@ -111,20 +113,16 @@ func (s stringStringer) String() string {
 // Error returns a syntax error.  The argument must be either a string
 // or a fmt.Stringer.  The syntax error states that the parse wanted
 // the string value of the argument, but got the current token instead.
-func (p *Parser) err(wanted interface{}) error {
-	w, ok := wanted.(fmt.Stringer)
-	if !ok {
-		str, ok := wanted.(string)
-		if !ok {
-			panic("Parser.error needs a string or fmt.Stringer")
-		}
-		w = stringStringer(str)
-	}
-	return &SyntaxError{
-		Wanted: w,
+func (p *Parser) err(want interface{}, orWant ...interface{}) error {
+	err := &SyntaxError{
+		Wanted: fmt.Sprintf("%s", want),
 		Got:    p.tok,
 		Text:   p.text(),
 		Start:  p.lex.Start,
 		End:    p.lex.End,
 	}
+	for _, w := range orWant {
+		err.Wanted += fmt.Sprintf(" or %s", w)
+	}
+	return err
 }

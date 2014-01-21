@@ -139,17 +139,21 @@ func parseSliceOrIndex(p *Parser, left Expression) Expression {
 
 	e := parseExpression(p)
 
-	if p.tok == token.CloseBracket {
+	switch p.tok {
+	case token.CloseBracket:
 		index := &Index{Expression: left, Index: e, openLoc: openLoc}
 		p.expect(token.CloseBracket)
 		index.closeLoc = p.lex.End
 		p.next()
 		return index
+
+	case token.Colon:
+		sl := parseSliceHighMax(p, left, e)
+		sl.openLoc = openLoc
+		return sl
 	}
 
-	sl := parseSliceHighMax(p, left, e)
-	sl.openLoc = openLoc
-	return sl
+	panic(p.err(token.CloseBracket, token.Colon))
 }
 
 // Parses the remainder of a slice expression, beginning from the
@@ -250,7 +254,8 @@ func parseSelectorOrTypeAssertion(p *Parser, left Expression) Expression {
 	dotLoc := p.lex.Start
 	p.next()
 
-	if p.tok == token.OpenParen { // TypeAssertion
+	switch p.tok {
+	case token.OpenParen:
 		p.next()
 		t := &TypeAssertion{Expression: left, dotLoc: dotLoc}
 		t.Type = parseType(p)
@@ -258,17 +263,20 @@ func parseSelectorOrTypeAssertion(p *Parser, left Expression) Expression {
 		t.closeLoc = p.lex.Start
 		p.next()
 		return t
+
+	case token.Identifier:
+		left = &Selector{
+			Expression: left,
+			Selection:  parseIdentifier(p).(*Identifier),
+			dotLoc:     dotLoc,
+		}
+		if p.tok == token.Dot {
+			return parseSelectorOrTypeAssertion(p, left)
+		}
+		return left
 	}
 
-	left = &Selector{
-		Expression: left,
-		Selection:  parseIdentifier(p).(*Identifier),
-		dotLoc:     dotLoc,
-	}
-	if p.tok == token.Dot {
-		return parseSelectorOrTypeAssertion(p, left)
-	}
-	return left
+	panic(p.err(token.OpenParen, token.Identifier))
 }
 
 func parseIntegerLiteral(p *Parser) Expression {
