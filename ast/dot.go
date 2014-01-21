@@ -22,22 +22,51 @@ func (n *Call) dot(cur int, out io.Writer) int {
 	fun := cur + 1
 	arg := n.Function.dot(fun, out)
 	arc(out, cur, fun)
-	for _, e := range n.Arguments {
-		arc(out, cur, arg)
+	for i, e := range n.Arguments {
+		if n.DotDotDot && i == len(n.Arguments)-1 {
+			arcl(out, cur, arg, "...")
+		} else {
+			arc(out, cur, arg)
+		}
 		arg = e.dot(arg, out)
 	}
-	if n.DotDotDot {
-		node(out, cur, "Call...")
-	} else {
-		node(out, cur, "Call")
-	}
+	node(out, cur, "Call")
 	return arg
+}
+
+func (n *Index) dot(cur int, out io.Writer) int {
+	expr := cur + 1
+	index := n.Expression.dot(expr, out)
+	node(out, cur, "Index")
+	arc(out, cur, expr)
+	arc(out, cur, index)
+	return n.Index.dot(index, out)
+}
+
+func (n *Slice) dot(cur int, out io.Writer) int {
+	expr := cur + 1
+	node(out, cur, "Slice")
+	next := n.Expression.dot(expr, out)
+	arc(out, cur, expr)
+	if n.Low != nil {
+		arcl(out, cur, next, "Low")
+		next = n.Low.dot(next, out)
+	}
+	if n.High != nil {
+		arcl(out, cur, next, "High")
+		next = n.High.dot(next, out)
+	}
+	if n.Max != nil {
+		arcl(out, cur, next, "Max")
+		next = n.Max.dot(next, out)
+	}
+	return next
 }
 
 func (n *TypeAssertion) dot(cur int, out io.Writer) int {
 	expr := cur + 1
 	sel := n.Expression.dot(expr, out)
-	node(out, cur, "type assertion")
+	node(out, cur, "TypeAssertion")
 	arc(out, cur, expr)
 	arc(out, cur, sel)
 	return n.Type.dot(sel, out)
@@ -46,7 +75,7 @@ func (n *TypeAssertion) dot(cur int, out io.Writer) int {
 func (n *Selector) dot(cur int, out io.Writer) int {
 	expr := cur + 1
 	sel := n.Expression.dot(expr, out)
-	node(out, cur, "selector")
+	node(out, cur, "Selector")
 	arc(out, cur, expr)
 	arc(out, cur, sel)
 	return n.Selection.dot(sel, out)
@@ -109,6 +138,14 @@ func node(out io.Writer, cur int, label string) {
 // Arc writes an arc between src and dst to out.
 func arc(out io.Writer, src, dst int) {
 	_, err := fmt.Fprintf(out, "\tn%d -> n%d\n", src, dst)
+	if err != nil {
+		panic(err)
+	}
+}
+
+// Arc writes an arc between src and dst to out.
+func arcl(out io.Writer, src, dst int, label string) {
+	_, err := fmt.Fprintf(out, "\tn%d -> n%d [label=\"%s\"]\n", src, dst, label)
 	if err != nil {
 		panic(err)
 	}

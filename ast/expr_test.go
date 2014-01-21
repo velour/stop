@@ -39,9 +39,26 @@ func TestPrimaryExpr(t *testing.T) {
 		{`a.b.(c)`, tAssert(sel(a, b), c)},
 		{`a.(b).(c)`, tAssert(tAssert(a, b), c)},
 		{`a.(b).(c).d`, sel(tAssert(tAssert(a, b), c), d)},
+
+		// Index
+		{`a[b]`, index(a, b)},
+		{`a[b][c]`, index(index(a, b), c)},
+		{`a[b[c]]`, index(a, index(b, c))},
+		{`a[5`, parseErr("expected")},
+
+		// Slice
+		{`a[:]`, slice(a, nil, nil, nil)},
+		{`a[b:]`, slice(a, b, nil, nil)},
+		{`a[:b]`, slice(a, nil, b, nil)},
+		{`a[b:c:d]`, slice(a, b, c, d)},
+		{`a[:b:c]`, slice(a, nil, b, c)},
+		{`a[:b:]`, parseErr("expected operand")},
+		{`a[::b]`, parseErr("expected operand")},
+		{`a[b[c]:d]`, slice(a, index(b, c), d, nil)},
+		{`a[:b[c]:d]`, slice(a, nil, index(b, c), d)},
+		{`a[:b:c[d]]`, slice(a, nil, b, index(c, d))},
 	}
 	tests.run(t)
-
 }
 
 func TestParseBinaryExpr(t *testing.T) {

@@ -21,6 +21,38 @@ func Print(out io.Writer, n Node) (err error) {
 	return
 }
 
+func (n *Index) print(level int, out io.Writer) {
+	format(out, level, "Index{\n\tExpression: ")
+	n.Expression.print(level+1, out)
+	format(out, level, "\n\tIndex: ")
+	n.Index.print(level+1, out)
+	format(out, level, "\n}")
+}
+
+func (n *Slice) print(level int, out io.Writer) {
+	format(out, level, "Slice{\n\tExpression: ")
+	n.Expression.print(level+1, out)
+	format(out, level, "\n\tLow: ")
+	if n.Low != nil {
+		n.Low.print(level+1, out)
+	} else {
+		io.WriteString(out, "nil")
+	}
+	format(out, level, "\n\tHigh: ")
+	if n.High != nil {
+		n.High.print(level+1, out)
+	} else {
+		io.WriteString(out, "nil")
+	}
+	format(out, level, "\n\tMax: ")
+	if n.Max != nil {
+		n.Max.print(level+1, out)
+	} else {
+		io.WriteString(out, "nil")
+	}
+	format(out, level, "\n}")
+}
+
 func (n *Call) print(level int, out io.Writer) {
 	format(out, level, "Call{\n\tFunction: ")
 	n.Function.print(level+1, out)

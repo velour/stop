@@ -38,6 +38,29 @@ type Expression interface {
 	Loc() token.Location
 }
 
+// An Index is an expression node that represents indexing into an
+// array or a slice.
+type Index struct {
+	Expression        Expression
+	Index             Expression
+	openLoc, closeLoc token.Location
+}
+
+func (n *Index) Start() token.Location { return n.Expression.Start() }
+func (n *Index) Loc() token.Location   { return n.openLoc }
+func (n *Index) End() token.Location   { return n.closeLoc }
+
+// A Slice is an expression node that represents a slice of an array.
+type Slice struct {
+	Expression        Expression
+	Low, High, Max    Expression
+	openLoc, closeLoc token.Location
+}
+
+func (n *Slice) Start() token.Location { return n.Expression.Start() }
+func (n *Slice) Loc() token.Location   { return n.openLoc }
+func (n *Slice) End() token.Location   { return n.closeLoc }
+
 // A TypeAssertion is an expression node representing a type assertion.
 type TypeAssertion struct {
 	Expression       Expression

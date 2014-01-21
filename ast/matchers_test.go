@@ -50,6 +50,23 @@ func parseErr(reStr string) matcher {
 	}
 }
 
+func slice(expr, low, high, max matcher) matcher {
+	return func(n Node, err error) bool {
+		e, ok := n.(*Slice)
+		return err == nil && ok && expr(e.Expression, nil) &&
+			(low == nil && e.Low == nil || low(e.Low, nil)) &&
+			(high == nil && e.High == nil || high(e.High, nil)) &&
+			(max == nil && e.Max == nil || max(e.Max, nil))
+	}
+}
+
+func index(expr, idx matcher) matcher {
+	return func(n Node, err error) bool {
+		e, ok := n.(*Index)
+		return err == nil && ok && expr(e.Expression, nil) && idx(e.Index, nil)
+	}
+}
+
 func tAssert(expr, typ matcher) matcher {
 	return func(n Node, err error) bool {
 		t, ok := n.(*TypeAssertion)

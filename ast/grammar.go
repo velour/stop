@@ -115,7 +115,7 @@ func parsePrimaryExpr(p *Parser) Expression {
 	for {
 		switch p.tok {
 		case token.OpenBracket:
-			panic("unimplemented")
+			left = parseSliceOrIndex(p, left)
 		case token.OpenParen:
 			left = parseCall(p, left)
 		case token.Dot:
@@ -124,6 +124,54 @@ func parsePrimaryExpr(p *Parser) Expression {
 			return left
 		}
 	}
+}
+
+func parseSliceOrIndex(p *Parser, left Expression) Expression {
+	p.expect(token.OpenBracket)
+	openLoc := p.lex.Start
+	p.next()
+
+	if p.tok == token.Colon {
+		sl := parseSliceHighMax(p, left, nil)
+		sl.openLoc = openLoc
+		return sl
+	}
+
+	e := parseExpression(p)
+
+	if p.tok == token.CloseBracket {
+		index := &Index{Expression: left, Index: e, openLoc: openLoc}
+		p.expect(token.CloseBracket)
+		index.closeLoc = p.lex.End
+		p.next()
+		return index
+	}
+
+	sl := parseSliceHighMax(p, left, e)
+	sl.openLoc = openLoc
+	return sl
+}
+
+// Parses the remainder of a slice expression, beginning from the
+// colon after the low term of the expression.  The returned Slice
+// node does not have its openLoc field set; it must be set by the
+// caller.
+func parseSliceHighMax(p *Parser, left, low Expression) *Slice {
+	p.expect(token.Colon)
+	p.next()
+
+	sl := &Slice{Expression: left, Low: low}
+	if p.tok != token.CloseBracket {
+		sl.High = parseExpression(p)
+		if p.tok == token.Colon {
+			p.next()
+			sl.Max = parseExpression(p)
+		}
+	}
+	p.expect(token.CloseBracket)
+	sl.closeLoc = p.lex.Start
+	p.next()
+	return sl
 }
 
 func parseCall(p *Parser, left Expression) Expression {
