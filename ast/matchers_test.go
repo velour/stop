@@ -26,11 +26,32 @@ type parserTests []struct {
 	match matcher
 }
 
-func (tests parserTests) run(t *testing.T) {
+func parseTest(p *Parser, production func(*Parser) Node) (root Node, err error) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			return
+		}
+		switch e := r.(type) {
+		case *SyntaxError:
+			err = e
+		case *MalformedLiteral:
+			err = e
+		default:
+			panic(r)
+		}
+
+	}()
+	root = production(p)
+	return
+}
+
+// Runs a test on the given grammar production parser rule.
+func (tests parserTests) run(t *testing.T, production func(*Parser) Node) {
 	for i, test := range tests {
 		l := token.NewLexer("", test.src)
 		p := NewParser(l)
-		n, err := Parse(p)
+		n, err := parseTest(p, production)
 		if err != nil {
 			if !test.match(nil, err) {
 				t.Errorf("test %d: unexpected error parsing [%s]: %s", i, test.src, err)
@@ -43,10 +64,57 @@ func (tests parserTests) run(t *testing.T) {
 	}
 }
 
+func (tests parserTests) runType(t *testing.T) {
+	tests.run(t, func(p *Parser) Node {
+		return parseType(p)
+	})
+}
+
+func (tests parserTests) runExpr(t *testing.T) {
+	tests.run(t, func(p *Parser) Node {
+		return parseExpression(p)
+	})
+}
+
 func parseErr(reStr string) matcher {
 	re := regexp.MustCompile(reStr)
 	return func(_ Node, err error) bool {
 		return err != nil && re.MatchString(err.Error())
+	}
+}
+
+func mapType(key, typ matcher) matcher {
+	return func(n Node, err error) bool {
+		m, ok := n.(*MapType)
+		return err == nil && ok && key(m.Key, nil) && typ(m.Type, nil)
+	}
+}
+
+func arrayType(size, typ matcher) matcher {
+	return func(n Node, err error) bool {
+		a, ok := n.(*ArrayType)
+		return err == nil && ok && size(a.Size, nil) && typ(a.Type, nil)
+	}
+}
+
+func sliceType(typ matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*SliceType)
+		return err == nil && ok && typ(s.Type, nil)
+	}
+}
+
+func pointer(typ matcher) matcher {
+	return func(n Node, err error) bool {
+		p, ok := n.(*PointerType)
+		return err == nil && ok && typ(p.Type, nil)
+	}
+}
+
+func typeName(pkg, name string) matcher {
+	return func(n Node, err error) bool {
+		t, ok := n.(*TypeName)
+		return err == nil && ok && t.Package == pkg && t.Name == name
 	}
 }
 

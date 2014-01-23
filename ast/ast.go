@@ -28,6 +28,56 @@ type Node interface {
 	dot(cur int, out io.Writer) int
 }
 
+// The Type interface is implemented by nodes that represent types.
+type Type interface {
+	Node
+}
+
+// An MapType is a type node that represents a map from types to types.
+type MapType struct {
+	Key    Type
+	Type   Type
+	mapLoc token.Location
+}
+
+func (n *MapType) Start() token.Location { return n.mapLoc }
+func (n *MapType) End() token.Location   { return n.Type.End() }
+
+// An ArrayType is a type node that represents an array of types.
+type ArrayType struct {
+	Size    Expression
+	Type    Type
+	openLoc token.Location
+}
+
+func (n *ArrayType) Start() token.Location { return n.openLoc }
+func (n *ArrayType) End() token.Location   { return n.Type.End() }
+
+// A SliceType is a type node that represents a slice of types.
+type SliceType struct {
+	Type    Type
+	openLoc token.Location
+}
+
+func (n *SliceType) Start() token.Location { return n.openLoc }
+func (n *SliceType) End() token.Location   { return n.Type.End() }
+
+// A PointerType is a type node that represents a pointer to a type.
+type PointerType struct {
+	Type    Type
+	starLoc token.Location
+}
+
+func (n *PointerType) Start() token.Location { return n.starLoc }
+func (n *PointerType) End() token.Location   { return n.Type.End() }
+
+// A TypeName is a type node that represents a named type.
+type TypeName struct {
+	Package string
+	Name    string
+	span
+}
+
 // The Expression interface is implemented by all nodes that are
 // also expressions.
 type Expression interface {

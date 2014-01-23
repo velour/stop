@@ -18,6 +18,52 @@ func Dot(out io.Writer, n Node) (err error) {
 	return
 }
 
+func (n *MapType) dot(cur int, out io.Writer) int {
+	key := cur + 1
+	node(out, cur, "MapType")
+	arcl(out, cur, key, "Key")
+	typ := n.Key.dot(key, out)
+	arcl(out, cur, typ, "Type")
+	return n.Type.dot(typ, out)
+}
+
+func (n *ArrayType) dot(cur int, out io.Writer) int {
+	size := cur + 1
+	node(out, cur, "ArrayType")
+	arcl(out, cur, size, "Size")
+	typ := n.Size.dot(size, out)
+	arcl(out, cur, typ, "Type")
+	return n.Type.dot(typ, out)
+}
+
+func (n *SliceType) dot(cur int, out io.Writer) int {
+	next := cur + 1
+	node(out, cur, "SliceType")
+	arc(out, cur, next)
+	return n.Type.dot(next, out)
+}
+
+func (n *PointerType) dot(cur int, out io.Writer) int {
+	next := cur + 1
+	node(out, cur, "PointerType")
+	arc(out, cur, next)
+	return n.Type.dot(next, out)
+}
+
+func (n *TypeName) dot(cur int, out io.Writer) int {
+	next := cur + 1
+	node(out, cur, "TypeName")
+	if n.Package != "" {
+		arcl(out, cur, next, "Package")
+		node(out, next, n.Package)
+		next++
+	}
+	arcl(out, cur, next, "Name")
+	node(out, next, n.Name)
+	next++
+	return next
+}
+
 func (n *Call) dot(cur int, out io.Writer) int {
 	fun := cur + 1
 	arg := n.Function.dot(fun, out)

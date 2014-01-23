@@ -21,6 +21,39 @@ func Print(out io.Writer, n Node) (err error) {
 	return
 }
 
+func (n *MapType) print(level int, out io.Writer) {
+	format(out, level, "MapType{\n\tKey: ")
+	n.Key.print(level+1, out)
+	format(out, level, "\n\tType: ")
+	n.Type.print(level+1, out)
+	format(out, level, "\n}")
+}
+
+func (n *ArrayType) print(level int, out io.Writer) {
+	format(out, level, "ArrayType{\n\tSize: ")
+	n.Size.print(level+1, out)
+	format(out, level, "\n\tType: ")
+	n.Type.print(level+1, out)
+	format(out, level, "\n}")
+}
+
+func (n *SliceType) print(level int, out io.Writer) {
+	format(out, level, "SliceType{\n\tType: ")
+	n.Type.print(level+1, out)
+	format(out, level, "\n}")
+}
+
+func (n *PointerType) print(level int, out io.Writer) {
+	format(out, level, "PointerType{\n\tType: ")
+	n.Type.print(level+1, out)
+	format(out, level, "\n}")
+}
+
+func (n *TypeName) print(level int, out io.Writer) {
+	format(out, level, "TypeName{\n\tPackage: %s\n\tName: %s\n}",
+		n.Package, n.Name)
+}
+
 func (n *Index) print(level int, out io.Writer) {
 	format(out, level, "Index{\n\tExpression: ")
 	n.Expression.print(level+1, out)

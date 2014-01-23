@@ -35,10 +35,10 @@ func TestPrimaryExpr(t *testing.T) {
 		{`a(b).c(d)`, call(sel(call(a, false, b), c), false, d)},
 
 		// TypeAssertion
-		{`a.(b)`, tAssert(a, b)},
-		{`a.b.(c)`, tAssert(sel(a, b), c)},
-		{`a.(b).(c)`, tAssert(tAssert(a, b), c)},
-		{`a.(b).(c).d`, sel(tAssert(tAssert(a, b), c), d)},
+		{`a.(b)`, tAssert(a, typeName("", "b"))},
+		{`a.b.(c)`, tAssert(sel(a, b), typeName("", "c"))},
+		{`a.(b).(c)`, tAssert(tAssert(a, typeName("", "b")), typeName("", "c"))},
+		{`a.(b).(c).d`, sel(tAssert(tAssert(a, typeName("", "b")), typeName("", "c")), d)},
 
 		// Index
 		{`a[b]`, index(a, b)},
@@ -62,7 +62,7 @@ func TestPrimaryExpr(t *testing.T) {
 		{`a.`, parseErr("expected.*OpenParen or Identifier")},
 		{`a[4`, parseErr("expected.*CloseBracket or Colon")},
 	}
-	tests.run(t)
+	tests.runExpr(t)
 }
 
 func TestParseBinaryExpr(t *testing.T) {
@@ -86,7 +86,7 @@ func TestParseBinaryExpr(t *testing.T) {
 		{`(a + b) * c`, binOp(token.Star, binOp(token.Plus, a, b), c)},
 		{`(a || b) && c`, binOp(token.AndAnd, binOp(token.OrOr, a, b), c)},
 	}
-	tests.run(t)
+	tests.runExpr(t)
 }
 
 func TestParseUnaryExpr(t *testing.T) {
@@ -100,7 +100,7 @@ func TestParseUnaryExpr(t *testing.T) {
 		{`<-a`, unOp(token.LessMinus, a)},
 		{`<-!-a`, unOp(token.LessMinus, unOp(token.Bang, unOp(token.Minus, a)))},
 	}
-	tests.run(t)
+	tests.runExpr(t)
 }
 
 func TestParseIdentifier(t *testing.T) {
@@ -108,7 +108,7 @@ func TestParseIdentifier(t *testing.T) {
 		{"_abc123", ident("_abc123")},
 		{"_αβξ123", ident("_αβξ123")},
 	}
-	tests.run(t)
+	tests.runExpr(t)
 }
 
 func TestParseIntegerLiteral(t *testing.T) {
@@ -119,7 +119,7 @@ func TestParseIntegerLiteral(t *testing.T) {
 
 		{"08", parseErr("malformed.*integer")},
 	}
-	tests.run(t)
+	tests.runExpr(t)
 }
 
 func TestParseFloatLiteral(t *testing.T) {
@@ -131,7 +131,7 @@ func TestParseFloatLiteral(t *testing.T) {
 		{"1e1", floatLit("10.0")},
 		{"1e-1", floatLit("0.1")},
 	}
-	tests.run(t)
+	tests.runExpr(t)
 }
 
 func TestParseImaginaryLiteral(t *testing.T) {
@@ -144,7 +144,7 @@ func TestParseImaginaryLiteral(t *testing.T) {
 		{"1e1i", imaginaryLit("10.0i")},
 		{"1e-1i", imaginaryLit("0.1i")},
 	}
-	tests.run(t)
+	tests.runExpr(t)
 }
 
 func TestParseStringLiteral(t *testing.T) {
@@ -168,7 +168,7 @@ func TestParseStringLiteral(t *testing.T) {
 		{"\x60\x0D\x60", strLit("")},
 		{"\x60αβξ\x60", strLit("αβξ")},
 	}
-	tests.run(t)
+	tests.runExpr(t)
 }
 
 func TestParseRuneLiteral(t *testing.T) {
@@ -187,5 +187,5 @@ func TestParseRuneLiteral(t *testing.T) {
 		{`'\008'`, parseErr("unexpected")},
 		{`'\U00110000'`, parseErr("malformed")},
 	}
-	tests.run(t)
+	tests.runExpr(t)
 }

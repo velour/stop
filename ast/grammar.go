@@ -73,6 +73,92 @@ func Parse(p *Parser) (root Node, err error) {
 	return
 }
 
+// BUG(eaburns): Types are incomplete.
+func parseType(p *Parser) Type {
+	switch p.tok {
+	case token.Identifier:
+		return parseTypeName(p)
+
+	case token.Star:
+		starLoc := p.lex.Start
+		p.next()
+		return &PointerType{Type: parseType(p), starLoc: starLoc}
+
+	case token.OpenBracket:
+		return parseArrayOrSliceType(p)
+
+	case token.Struct:
+		panic("unimplemented")
+	case token.Func:
+		panic("unimplemented")
+	case token.Interface:
+		panic("unimplemented")
+	case token.Map:
+		return parseMapType(p)
+
+	case token.Chan:
+		panic("unimplemented")
+	case token.LessMinus:
+		panic("unimplemented")
+
+	case token.OpenParen:
+		p.next()
+		t := parseType(p)
+		p.expect(token.CloseParen)
+		p.next()
+		return t
+	}
+
+	panic(p.err(token.Identifier, token.Star, token.OpenBracket,
+		token.Struct, token.Func, token.Interface, token.Map,
+		token.Chan, token.LessMinus, token.OpenParen))
+}
+
+func parseMapType(p *Parser) Type {
+	p.expect(token.Map)
+	m := &MapType{mapLoc: p.lex.Start}
+	p.next()
+	p.expect(token.OpenBracket)
+	p.next()
+	m.Key = parseType(p)
+	p.expect(token.CloseBracket)
+	p.next()
+	m.Type = parseType(p)
+	return m
+}
+
+func parseArrayOrSliceType(p *Parser) Type {
+	p.expect(token.OpenBracket)
+	openLoc := p.lex.Start
+	p.next()
+
+	if p.tok == token.CloseBracket {
+		p.next()
+		sl := &SliceType{Type: parseType(p), openLoc: openLoc}
+		return sl
+	}
+
+	ar := &ArrayType{Size: parseExpression(p), openLoc: openLoc}
+	p.expect(token.CloseBracket)
+	p.next()
+	ar.Type = parseType(p)
+	return ar
+}
+
+func parseTypeName(p *Parser) Type {
+	p.expect(token.Identifier)
+	n := &TypeName{Name: p.text(), span: p.span()}
+	p.next()
+	if p.tok == token.Dot {
+		p.next()
+		p.expect(token.Identifier)
+		n.Package = n.Name
+		n.Name = p.text()
+		p.next()
+	}
+	return n
+}
+
 func parseExpression(p *Parser) Expression {
 	return parseBinaryExpr(p, 1)
 }
@@ -242,11 +328,6 @@ func parseOperand(p *Parser) Expression {
 	default:
 		panic(p.err("operand"))
 	}
-}
-
-func parseType(p *Parser) Node {
-	// BUG(eaburns): Types are more complex than just identifiers.  This is a place holder.
-	return parseIdentifier(p)
 }
 
 func parseSelectorOrTypeAssertion(p *Parser, left Expression) Expression {
