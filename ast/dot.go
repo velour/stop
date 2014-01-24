@@ -18,6 +18,19 @@ func Dot(out io.Writer, n Node) (err error) {
 	return
 }
 
+func (n *ChannelType) dot(cur int, out io.Writer) int {
+	typ := cur + 1
+	name := "chan"
+	if !n.Send {
+		name = "<-chan"
+	} else if !n.Receive {
+		name = "chan<-"
+	}
+	node(out, cur, name)
+	arc(out, cur, typ)
+	return n.Type.dot(typ, out)
+}
+
 func (n *MapType) dot(cur int, out io.Writer) int {
 	key := cur + 1
 	node(out, cur, "MapType")

@@ -95,12 +95,10 @@ func parseType(p *Parser) Type {
 		panic("unimplemented")
 	case token.Map:
 		return parseMapType(p)
-
 	case token.Chan:
-		panic("unimplemented")
+		fallthrough
 	case token.LessMinus:
-		panic("unimplemented")
-
+		return parseChannelType(p)
 	case token.OpenParen:
 		p.next()
 		t := parseType(p)
@@ -112,6 +110,22 @@ func parseType(p *Parser) Type {
 	panic(p.err(token.Identifier, token.Star, token.OpenBracket,
 		token.Struct, token.Func, token.Interface, token.Map,
 		token.Chan, token.LessMinus, token.OpenParen))
+}
+
+func parseChannelType(p *Parser) Type {
+	ch := &ChannelType{Send: true, Receive: true, startLoc: p.lex.Start}
+	if p.tok == token.LessMinus {
+		ch.Send = false
+		p.next()
+	}
+	p.expect(token.Chan)
+	p.next()
+	if ch.Send && p.tok == token.LessMinus {
+		ch.Receive = false
+		p.next()
+	}
+	ch.Type = parseType(p)
+	return ch
 }
 
 func parseMapType(p *Parser) Type {

@@ -21,6 +21,13 @@ func Print(out io.Writer, n Node) (err error) {
 	return
 }
 
+func (n *ChannelType) print(level int, out io.Writer) {
+	format(out, level, "ChannelType{\n\tSend: %t\n\tReceive: %t", n.Send, n.Receive)
+	format(out, level, "\n\tType: ")
+	n.Type.print(level+1, out)
+	format(out, level, "\n}")
+}
+
 func (n *MapType) print(level int, out io.Writer) {
 	format(out, level, "MapType{\n\tKey: ")
 	n.Key.print(level+1, out)

@@ -83,6 +83,27 @@ func parseErr(reStr string) matcher {
 	}
 }
 
+func recvChan(typ matcher) matcher {
+	return func(n Node, err error) bool {
+		c, ok := n.(*ChannelType)
+		return err == nil && ok && typ(c.Type, nil) && !c.Send && c.Receive
+	}
+}
+
+func sendChan(typ matcher) matcher {
+	return func(n Node, err error) bool {
+		c, ok := n.(*ChannelType)
+		return err == nil && ok && typ(c.Type, nil) && c.Send && !c.Receive
+	}
+}
+
+func chanType(typ matcher) matcher {
+	return func(n Node, err error) bool {
+		c, ok := n.(*ChannelType)
+		return err == nil && ok && typ(c.Type, nil) && c.Send && c.Receive
+	}
+}
+
 func mapType(key, typ matcher) matcher {
 	return func(n Node, err error) bool {
 		m, ok := n.(*MapType)

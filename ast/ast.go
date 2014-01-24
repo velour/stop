@@ -33,6 +33,17 @@ type Type interface {
 	Node
 }
 
+// A ChannelType is a type node that represents a send, receive, or
+// a send and receive channel.
+type ChannelType struct {
+	Send, Receive bool
+	Type          Type
+	startLoc      token.Location
+}
+
+func (n *ChannelType) Start() token.Location { return n.startLoc }
+func (n *ChannelType) End() token.Location   { return n.Type.End() }
+
 // An MapType is a type node that represents a map from types to types.
 type MapType struct {
 	Key    Type
