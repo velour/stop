@@ -73,6 +73,20 @@ func Parse(p *Parser) (root Node, err error) {
 	return
 }
 
+// Set of tokens that start a type.
+var typeFirst = map[token.Token]bool{
+	token.Identifier:  true,
+	token.Star:        true,
+	token.OpenBracket: true,
+	token.Struct:      true,
+	token.Func:        true,
+	token.Interface:   true,
+	token.Map:         true,
+	token.Chan:        true,
+	token.LessMinus:   true,
+	token.OpenParen:   true,
+}
+
 // BUG(eaburns): Types are incomplete.
 func parseType(p *Parser) Type {
 	switch p.tok {
@@ -89,16 +103,22 @@ func parseType(p *Parser) Type {
 
 	case token.Struct:
 		panic("unimplemented")
+
 	case token.Func:
-		panic("unimplemented")
+		p.next()
+		return &FunctionType{parseSignature(p)}
+
 	case token.Interface:
 		panic("unimplemented")
+
 	case token.Map:
 		return parseMapType(p)
+
 	case token.Chan:
 		fallthrough
 	case token.LessMinus:
 		return parseChannelType(p)
+
 	case token.OpenParen:
 		p.next()
 		t := parseType(p)
@@ -110,6 +130,186 @@ func parseType(p *Parser) Type {
 	panic(p.err(token.Identifier, token.Star, token.OpenBracket,
 		token.Struct, token.Func, token.Interface, token.Map,
 		token.Chan, token.LessMinus, token.OpenParen))
+}
+
+func parseSignature(p *Parser) Signature {
+	s := Signature{Parameters: parseParameterList(p)}
+	if p.tok == token.OpenParen {
+		results := parseParameterList(p)
+		s.Result = &results
+	} else if typeFirst[p.tok] {
+		s.Result = parseType(p)
+	}
+	return s
+}
+
+// Parsing a parameter list is a bit complex.  The grammar productions
+// in the spec are more permissive than the language actually allows.
+// The text of the spec restricts parameter lists to be either a series of
+// parameter declarations without identifiers and only types, or a
+// series of declarations that all have one or more identifiers.  Instead,
+// we use the grammar below, which only allows one type of list or the
+// other, but not both.  However, this grammar does allow ... types to
+// appear anywhere in the list even though the spec restricts them to
+// be the final type.  This will be checked after parsing, during another
+// pass in order to allow us to give a better error message.
+//
+// ParameterList = "(" ParameterListTail
+// ParameterListTail =
+// 	| “)”
+// 	| Identifier “,” ParameterListTail
+// 	| Identifier “.” Identifier TypeParameterList
+// 	| Identifier Type DeclParameterList
+// 	| NonTypeNameType TypeParameterList
+// 	| “...” Type TypeParameterList
+// TypeParameterList =
+// 	| “)”
+// 	| "," ")"
+// 	| “,” Type TypeParameterList
+// 	| “,” “...” Type TypeParameterList
+// DeclParameterList =
+// 	| ")"
+// 	| "," ")"
+// 	| "," IdentifierList Type DeclParameterList
+// 	| "," IdentifierList "..." Type DeclParameterList
+// IdentifierList =
+// 	| Identifier “,” IdentifierList
+// 	| Identifier
+func parseParameterList(p *Parser) ParameterList {
+	p.expect(token.OpenParen)
+	pl := ParameterList{openLoc: p.lex.Start}
+	p.next()
+	parseParameterListTail(p, &pl, nil)
+	p.expect(token.CloseParen)
+	pl.closeLoc = p.lex.Start
+	p.next()
+	return pl
+}
+
+func parseParameterListTail(p *Parser, pl *ParameterList, idents []Identifier) {
+	switch {
+	case p.tok == token.CloseParen:
+		pl.closeLoc = p.lex.Start
+		pl.Parameters = typeNameDecls(idents)
+		return
+
+	case p.tok == token.Identifier:
+		id := parseIdentifier(p)
+		switch {
+		case p.tok == token.Comma:
+			p.next()
+			fallthrough
+		case p.tok == token.CloseParen:
+			idents = append(idents, *id)
+			parseParameterListTail(p, pl, idents)
+			return
+
+		case p.tok == token.Dot:
+			p.next()
+			p.expect(token.Identifier)
+			t := &TypeName{
+				Package: id.Name,
+				Name:    p.text(),
+				span:    span{start: id.span.start, end: p.lex.End},
+			}
+			p.next()
+			d := ParameterDecl{Type: t}
+			pl.Parameters = append(typeNameDecls(idents), d)
+			parseTypeParameterList(p, pl)
+			return
+
+		default:
+			idents = append(idents, *id)
+			decl := ParameterDecl{Identifiers: idents}
+			if p.tok == token.DotDotDot {
+				decl.DotDotDot = true
+				p.next()
+			}
+			decl.Type = parseType(p)
+			pl.Parameters = []ParameterDecl{decl}
+			parseDeclParameterList(p, pl)
+			return
+		}
+
+	case p.tok == token.DotDotDot:
+		p.next()
+		d := ParameterDecl{Type: parseType(p), DotDotDot: true}
+		pl.Parameters = append(typeNameDecls(idents), d)
+		parseTypeParameterList(p, pl)
+		return
+
+	case typeFirst[p.tok]:
+		d := ParameterDecl{Type: parseType(p)}
+		pl.Parameters = append(typeNameDecls(idents), d)
+		parseTypeParameterList(p, pl)
+		return
+	}
+
+	panic(p.err(")", "...", "identifier", "type"))
+}
+
+func parseTypeParameterList(p *Parser, pl *ParameterList) {
+	if p.tok == token.CloseParen {
+		return
+	}
+	p.expect(token.Comma)
+	p.next()
+
+	// Allow trailing comma.
+	if p.tok == token.CloseParen {
+		return
+	}
+
+	d := ParameterDecl{}
+	if p.tok == token.DotDotDot {
+		d.DotDotDot = true
+		p.next()
+	}
+	d.Type = parseType(p)
+	pl.Parameters = append(pl.Parameters, d)
+	parseTypeParameterList(p, pl)
+	return
+}
+
+func parseDeclParameterList(p *Parser, pl *ParameterList) {
+	if p.tok == token.CloseParen {
+		return
+	}
+
+	p.expect(token.Comma)
+	p.next()
+
+	// Allow trailing comma.
+	if p.tok == token.CloseParen {
+		return
+	}
+
+	d := ParameterDecl{}
+	for {
+		id := parseIdentifier(p)
+		d.Identifiers = append(d.Identifiers, *id)
+
+		if p.tok != token.Comma {
+			break
+		}
+		p.next()
+	}
+	if p.tok == token.DotDotDot {
+		d.DotDotDot = true
+		p.next()
+	}
+	d.Type = parseType(p)
+	pl.Parameters = append(pl.Parameters, d)
+	parseDeclParameterList(p, pl)
+	return
+}
+
+func typeNameDecls(idents []Identifier) []ParameterDecl {
+	decls := make([]ParameterDecl, len(idents))
+	for i, id := range idents {
+		decls[i].Type = &TypeName{Name: id.Name, span: id.span}
+	}
+	return decls
 }
 
 func parseChannelType(p *Parser) Type {
@@ -362,7 +562,7 @@ func parseSelectorOrTypeAssertion(p *Parser, left Expression) Expression {
 	case token.Identifier:
 		left = &Selector{
 			Expression: left,
-			Selection:  parseIdentifier(p).(*Identifier),
+			Selection:  parseIdentifier(p),
 			dotLoc:     dotLoc,
 		}
 		if p.tok == token.Dot {
@@ -448,7 +648,7 @@ func parseStringLiteral(p *Parser) Expression {
 	return l
 }
 
-func parseIdentifier(p *Parser) Expression {
+func parseIdentifier(p *Parser) *Identifier {
 	p.expect(token.Identifier)
 	id := &Identifier{Name: p.text(), span: p.span()}
 	p.next()

@@ -18,6 +18,47 @@ func Dot(out io.Writer, n Node) (err error) {
 	return
 }
 
+func (n *FunctionType) dot(cur int, out io.Writer) int {
+	sig := cur + 1
+	node(out, cur, "FunctionType")
+	arc(out, cur, sig)
+	return n.Signature.dot(sig, out)
+}
+
+func (n *Signature) dot(cur int, out io.Writer) int {
+	params := cur + 1
+	node(out, cur, "Signature")
+	arcl(out, cur, params, "Parameters")
+	res := n.Parameters.dot(params, out)
+	arcl(out, cur, res, "Result")
+	return n.Result.dot(res, out)
+}
+
+func (n *ParameterList) dot(cur int, out io.Writer) int {
+	next := cur + 1
+	node(out, cur, "parameter list")
+	for _, p := range n.Parameters {
+		arc(out, cur, next)
+		next = p.dot(next, out)
+	}
+	return next
+}
+
+func (n *ParameterDecl) dot(cur int, out io.Writer) int {
+	node(out, cur, "parameter decl")
+	next := cur + 1
+	for _, id := range n.Identifiers {
+		arc(out, cur, next)
+		next = id.dot(next, out)
+	}
+	if n.DotDotDot {
+		arcl(out, cur, next, "...Type")
+	} else {
+		arcl(out, cur, next, "Type")
+	}
+	return n.Type.dot(next, out)
+}
+
 func (n *ChannelType) dot(cur int, out io.Writer) int {
 	typ := cur + 1
 	name := "chan"

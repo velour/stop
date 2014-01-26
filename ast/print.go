@@ -21,6 +21,43 @@ func Print(out io.Writer, n Node) (err error) {
 	return
 }
 
+func (n *FunctionType) print(level int, out io.Writer) {
+	format(out, level, "FunctionType{\n\tSignature: ")
+	n.Signature.print(level+1, out)
+	format(out, level, "\n}")
+}
+
+func (n *Signature) print(level int, out io.Writer) {
+	format(out, level, "Signature{\n\tParameters: ")
+	n.Parameters.print(level+1, out)
+	format(out, level, "\n\tResult: ")
+	n.Result.print(level+1, out)
+	format(out, level, "\n}")
+}
+
+func (n *ParameterList) print(level int, out io.Writer) {
+	format(out, level, "ParameterDecl{\n\tParameters: [")
+	indent := "\n" + strings.Repeat("\t", level+2)
+	for _, p := range n.Parameters {
+		io.WriteString(out, indent)
+		p.print(level+2, out)
+	}
+	format(out, level, "\n\t]\n}")
+}
+
+func (n *ParameterDecl) print(level int, out io.Writer) {
+	format(out, level, "ParameterDecl{\n\tType: ")
+	n.Type.print(level+1, out)
+	format(out, level, "\n\tDotDotDot: %t", n.DotDotDot)
+	format(out, level, "\n\tIdentifiers: [")
+	indent := "\n" + strings.Repeat("\t", level+2)
+	for _, id := range n.Identifiers {
+		io.WriteString(out, indent)
+		id.print(level+2, out)
+	}
+	format(out, level, "\n\t]\n}")
+}
+
 func (n *ChannelType) print(level int, out io.Writer) {
 	format(out, level, "ChannelType{\n\tSend: %t\n\tReceive: %t", n.Send, n.Receive)
 	format(out, level, "\n\tType: ")

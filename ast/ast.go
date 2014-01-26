@@ -33,6 +33,47 @@ type Type interface {
 	Node
 }
 
+// A FunctionType is a type node representing a function type.
+type FunctionType struct {
+	Signature
+}
+
+// A Signature is a node representing a parameter list and result types.
+type Signature struct {
+	Parameters ParameterList
+	Result     Node
+}
+
+func (n *Signature) Start() token.Location { return n.Parameters.Start() }
+func (n *Signature) End() token.Location   { return n.Result.End() }
+
+// A ParameterList is a node representing a, possibly empty,
+// parenthesized list of parameters.
+type ParameterList struct {
+	Parameters        []ParameterDecl
+	openLoc, closeLoc token.Location
+}
+
+func (n *ParameterList) Start() token.Location { return n.openLoc }
+func (n *ParameterList) End() token.Location   { return n.closeLoc }
+
+// A ParameterDecl is a node representing the declaration of a set
+// of parameters of a common type.
+type ParameterDecl struct {
+	Type        Type
+	Identifiers []Identifier
+	// DotDotDot is true if the final identifier was followed by a "...".
+	DotDotDot bool
+}
+
+func (n *ParameterDecl) Start() token.Location {
+	if len(n.Identifiers) > 0 {
+		return n.Identifiers[0].Start()
+	}
+	return n.Type.Start()
+}
+func (n *ParameterDecl) End() token.Location { return n.Type.End() }
+
 // A ChannelType is a type node that represents a send, receive, or
 // a send and receive channel.
 type ChannelType struct {
