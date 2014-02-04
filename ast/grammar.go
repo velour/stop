@@ -149,10 +149,7 @@ func parseSignature(p *Parser) Signature {
 // parameter declarations without identifiers and only types, or a
 // series of declarations that all have one or more identifiers.  Instead,
 // we use the grammar below, which only allows one type of list or the
-// other, but not both.  However, this grammar does allow ... types to
-// appear anywhere in the list even though the spec restricts them to
-// be the final type.  This will be checked after parsing, during another
-// pass in order to allow us to give a better error message.
+// other, but not both.
 //
 // ParameterList = "(" ParameterListTail
 // ParameterListTail =
@@ -161,17 +158,17 @@ func parseSignature(p *Parser) Signature {
 // 	| Identifier “.” Identifier TypeParameterList
 // 	| Identifier Type DeclParameterList
 // 	| NonTypeNameType TypeParameterList
-// 	| “...” Type TypeParameterList
+// 	| “...” Type ")"
 // TypeParameterList =
 // 	| “)”
 // 	| "," ")"
 // 	| “,” Type TypeParameterList
-// 	| “,” “...” Type TypeParameterList
+// 	| “,” “...” Type ")"
 // DeclParameterList =
 // 	| ")"
 // 	| "," ")"
 // 	| "," IdentifierList Type DeclParameterList
-// 	| "," IdentifierList "..." Type DeclParameterList
+// 	| "," IdentifierList "..." Type ")"
 // IdentifierList =
 // 	| Identifier “,” IdentifierList
 // 	| Identifier
@@ -220,14 +217,16 @@ func parseParameterListTail(p *Parser, pl *ParameterList, idents []Identifier) {
 
 		default:
 			idents = append(idents, *id)
-			decl := ParameterDecl{Identifiers: idents}
+			d := ParameterDecl{Identifiers: idents}
 			if p.tok == token.DotDotDot {
-				decl.DotDotDot = true
+				d.DotDotDot = true
 				p.next()
 			}
-			decl.Type = parseType(p)
-			pl.Parameters = []ParameterDecl{decl}
-			parseDeclParameterList(p, pl)
+			d.Type = parseType(p)
+			pl.Parameters = []ParameterDecl{d}
+			if !d.DotDotDot {
+				parseDeclParameterList(p, pl)
+			}
 			return
 		}
 
@@ -235,7 +234,6 @@ func parseParameterListTail(p *Parser, pl *ParameterList, idents []Identifier) {
 		p.next()
 		d := ParameterDecl{Type: parseType(p), DotDotDot: true}
 		pl.Parameters = append(typeNameDecls(idents), d)
-		parseTypeParameterList(p, pl)
 		return
 
 	case typeFirst[p.tok]:
@@ -267,7 +265,9 @@ func parseTypeParameterList(p *Parser, pl *ParameterList) {
 	}
 	d.Type = parseType(p)
 	pl.Parameters = append(pl.Parameters, d)
-	parseTypeParameterList(p, pl)
+	if !d.DotDotDot {
+		parseTypeParameterList(p, pl)
+	}
 	return
 }
 
