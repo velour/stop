@@ -18,6 +18,25 @@ func Dot(out io.Writer, n Node) (err error) {
 	return
 }
 
+func (n *InterfaceType) dot(cur int, out io.Writer) int {
+	next := cur + 1
+	node(out, cur, "InterfaceType")
+	for _, m := range n.Methods {
+		arc(out, cur, next)
+		next = m.dot(next, out)
+	}
+	return next
+}
+
+func (n *Method) dot(cur int, out io.Writer) int {
+	name := cur + 1
+	node(out, cur, "Method")
+	arcl(out, cur, name, "Name")
+	sig := n.Name.dot(name, out)
+	arc(out, cur, sig)
+	return n.Signature.dot(sig, out)
+}
+
 func (n *FunctionType) dot(cur int, out io.Writer) int {
 	sig := cur + 1
 	node(out, cur, "FunctionType")

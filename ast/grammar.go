@@ -109,7 +109,7 @@ func parseType(p *Parser) Type {
 		return &FunctionType{parseSignature(p)}
 
 	case token.Interface:
-		panic("unimplemented")
+		return parseInterfaceType(p)
 
 	case token.Map:
 		return parseMapType(p)
@@ -132,13 +132,61 @@ func parseType(p *Parser) Type {
 		token.Chan, token.LessMinus, token.OpenParen))
 }
 
+func parseInterfaceType(p *Parser) *InterfaceType {
+	p.expect(token.Interface)
+	it := &InterfaceType{keywordLoc: p.lex.Start}
+	p.next()
+	p.expect(token.OpenBrace)
+	p.next()
+
+	for p.tok != token.CloseBrace {
+		id := parseIdentifier(p)
+		switch p.tok {
+		case token.OpenParen:
+			it.Methods = append(it.Methods, &Method{
+				Name:      *id,
+				Signature: parseSignature(p),
+			})
+
+		case token.Dot:
+			p.next()
+			p.expect(token.Identifier)
+			it.Methods = append(it.Methods, &TypeName{
+				Package: id.Name,
+				Name:    p.text(),
+				span:    span{start: id.start, end: p.lex.End},
+			})
+			p.next()
+
+		default:
+			it.Methods = append(it.Methods, &TypeName{
+				Name: id.Name,
+				span: id.span,
+			})
+		}
+		if p.tok != token.CloseBrace {
+			p.expect(token.Semicolon)
+			p.next()
+		}
+	}
+
+	p.expect(token.CloseBrace)
+	it.closeLoc = p.lex.Start
+	p.next()
+	return it
+}
+
 func parseSignature(p *Parser) Signature {
 	s := Signature{Parameters: parseParameterList(p)}
 	if p.tok == token.OpenParen {
-		results := parseParameterList(p)
-		s.Result = &results
+		s.Result = parseParameterList(p)
 	} else if typeFirst[p.tok] {
-		s.Result = parseType(p)
+		t := parseType(p)
+		s.Result = ParameterList{
+			Parameters: []ParameterDecl{{Type: t}},
+			openLoc:    t.Start(),
+			closeLoc:   t.End(),
+		}
 	}
 	return s
 }

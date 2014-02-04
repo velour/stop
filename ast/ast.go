@@ -33,6 +33,38 @@ type Type interface {
 	Node
 }
 
+// An InterfaceType is a type node representing an interface type.
+type InterfaceType struct {
+	// Methods is a slice of the methods declarations of this interface.
+	// A method declaration is either a Method, giving the name and
+	// signature of a method, or a TypeName, naming an interface
+	// whose methods are included in this interface too.
+	Methods              []Node
+	keywordLoc, closeLoc token.Location
+}
+
+func (n *InterfaceType) Start() token.Location {
+	return n.keywordLoc
+}
+
+func (n *InterfaceType) End() token.Location {
+	return n.closeLoc
+}
+
+// A Method is a node representing a method name and its signature.
+type Method struct {
+	Name Identifier
+	Signature
+}
+
+func (n *Method) Start() token.Location {
+	return n.Name.Start()
+}
+
+func (n *Method) End() token.Location {
+	return n.Signature.End()
+}
+
 // A FunctionType is a type node representing a function type.
 type FunctionType struct {
 	Signature
@@ -41,7 +73,7 @@ type FunctionType struct {
 // A Signature is a node representing a parameter list and result types.
 type Signature struct {
 	Parameters ParameterList
-	Result     Node
+	Result     ParameterList
 }
 
 func (n *Signature) Start() token.Location { return n.Parameters.Start() }

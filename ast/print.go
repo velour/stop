@@ -21,6 +21,24 @@ func Print(out io.Writer, n Node) (err error) {
 	return
 }
 
+func (n *InterfaceType) print(level int, out io.Writer) {
+	format(out, level, "InterfaceType{\n\tMethods: [")
+	indent := "\n" + strings.Repeat("\t", level+2)
+	for _, m := range n.Methods {
+		io.WriteString(out, indent)
+		m.print(level+2, out)
+	}
+	format(out, level, "\n\t]\n}")
+}
+
+func (n *Method) print(level int, out io.Writer) {
+	format(out, level, "Method{\n\tName: ")
+	n.Name.print(level+1, out)
+	format(out, level, "\n\tSignature: ")
+	n.Signature.print(level+1, out)
+	format(out, level, "\n}")
+}
+
 func (n *FunctionType) print(level int, out io.Writer) {
 	format(out, level, "FunctionType{\n\tSignature: ")
 	n.Signature.print(level+1, out)

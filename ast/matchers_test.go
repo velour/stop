@@ -90,13 +90,32 @@ func parseErr(reStr string) matcher {
 	}
 }
 
+func ifaceType(methods ...matcher) matcher {
+	return func(n Node, err error) bool {
+		i, ok := n.(*InterfaceType)
+		if err != nil || !ok || len(methods) != len(i.Methods) {
+			return false
+		}
+		for i, meth := range i.Methods {
+			if !methods[i](meth, nil) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+func method(name matcher, parm matcher, res matcher) matcher {
+	return func(n Node, err error) bool {
+		m, ok := n.(*Method)
+		return err == nil && ok && name(&m.Name, nil) && parm(&m.Parameters, nil) && res(&m.Result, nil)
+	}
+}
+
 func funcType(parmList matcher, res matcher) matcher {
 	return func(n Node, err error) bool {
 		f, ok := n.(*FunctionType)
-		if err != nil || !ok || (res == nil && f.Result != nil) {
-			return false
-		}
-		if res != nil && (f.Result == nil || !res(f.Result, nil)) {
+		if err != nil || !ok || !res(&f.Result, nil) {
 			return false
 		}
 		return parmList(&f.Parameters, nil)
