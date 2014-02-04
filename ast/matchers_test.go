@@ -90,6 +90,19 @@ func parseErr(reStr string) matcher {
 	}
 }
 
+func funcType(parmList matcher, res matcher) matcher {
+	return func(n Node, err error) bool {
+		f, ok := n.(*FunctionType)
+		if err != nil || !ok || (res == nil && f.Result != nil) {
+			return false
+		}
+		if res != nil && (f.Result == nil || !res(f.Result, nil)) {
+			return false
+		}
+		return parmList(&f.Parameters, nil)
+	}
+}
+
 func parmList(decls ...matcher) matcher {
 	return func(n Node, err error) bool {
 		l, ok := n.(*ParameterList)
