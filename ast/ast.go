@@ -33,6 +33,41 @@ type Type interface {
 	Node
 }
 
+// A StructType is a type node representing a struct type.
+type StructType struct {
+	Fields               []FieldDecl
+	keywordLoc, closeLoc token.Location
+}
+
+func (n *StructType) Start() token.Location {
+	return n.keywordLoc
+}
+
+func (n *StructType) End() token.Location {
+	return n.closeLoc
+}
+
+// A FieldDecl is a node representing a struct field declaration.
+type FieldDecl struct {
+	Identifiers []Identifier
+	Type        Type
+	Tag         *StringLiteral
+}
+
+func (n *FieldDecl) Start() token.Location {
+	if len(n.Identifiers) > 0 {
+		return n.Identifiers[0].Start()
+	}
+	return n.Type.Start()
+}
+
+func (n *FieldDecl) End() token.Location {
+	if n.Tag != nil {
+		return n.Tag.End()
+	}
+	return n.Type.End()
+}
+
 // An InterfaceType is a type node representing an interface type.
 type InterfaceType struct {
 	// Methods is a slice of the methods declarations of this interface.

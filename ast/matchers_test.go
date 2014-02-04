@@ -90,6 +90,46 @@ func parseErr(reStr string) matcher {
 	}
 }
 
+func structType(fields ...matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*StructType)
+		if err != nil || !ok || len(s.Fields) != len(fields) {
+			return false
+		}
+		for i, f := range s.Fields {
+			if !fields[i](&f, nil) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+func fieldDecl(typ matcher, idents ...matcher) matcher {
+	return func(n Node, err error) bool {
+		f, ok := n.(*FieldDecl)
+		if err != nil || !ok || !typ(f.Type, nil) || len(idents) != len(f.Identifiers) {
+			return false
+		}
+		for i, id := range f.Identifiers {
+			if !idents[i](&id, nil) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+func tagFieldDecl(typ matcher, tag matcher, idents ...matcher) matcher {
+	return func(n Node, err error) bool {
+		if !fieldDecl(typ, idents...)(n, err) {
+			return false
+		}
+		t := n.(*FieldDecl).Tag
+		return t != nil && tag(t, nil)
+	}
+}
+
 func ifaceType(methods ...matcher) matcher {
 	return func(n Node, err error) bool {
 		i, ok := n.(*InterfaceType)

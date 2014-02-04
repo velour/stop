@@ -18,6 +18,32 @@ func Dot(out io.Writer, n Node) (err error) {
 	return
 }
 
+func (n *StructType) dot(cur int, out io.Writer) int {
+	next := cur + 1
+	node(out, cur, "StructType")
+	for _, f := range n.Fields {
+		arc(out, cur, next)
+		next = f.dot(next, out)
+	}
+	return next
+}
+
+func (n *FieldDecl) dot(cur int, out io.Writer) int {
+	next := cur + 1
+	node(out, cur, "Field")
+	for _, id := range n.Identifiers {
+		arc(out, cur, next)
+		next = id.dot(next, out)
+	}
+	arcl(out, cur, next, "Type")
+	next = n.Type.dot(next, out)
+	if n.Tag != nil {
+		arcl(out, cur, next, "Tag")
+		next = n.Tag.dot(next, out)
+	}
+	return next
+}
+
 func (n *InterfaceType) dot(cur int, out io.Writer) int {
 	next := cur + 1
 	node(out, cur, "InterfaceType")

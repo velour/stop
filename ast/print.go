@@ -21,6 +21,35 @@ func Print(out io.Writer, n Node) (err error) {
 	return
 }
 
+func (n *StructType) print(level int, out io.Writer) {
+	format(out, level, "StructType{\n\tFields: [")
+	indent := "\n" + strings.Repeat("\t", level+2)
+	for _, f := range n.Fields {
+		io.WriteString(out, indent)
+		f.print(level+2, out)
+	}
+	format(out, level, "\n\t]\n}")
+}
+
+func (n *FieldDecl) print(level int, out io.Writer) {
+	format(out, level, "FieldDecl{\n\tIdentifiers: [")
+	indent := "\n" + strings.Repeat("\t", level+2)
+	for _, i := range n.Identifiers {
+		io.WriteString(out, indent)
+		i.print(level+2, out)
+	}
+	format(out, level, "\n\t]")
+	format(out, level, "\n\tType: ")
+	n.Type.print(level+1, out)
+	format(out, level, "\n\tTag: ")
+	if n.Tag == nil {
+		io.WriteString(out, "nil")
+	} else {
+		n.Tag.print(level+1, out)
+	}
+	format(out, level, "\n}")
+}
+
 func (n *InterfaceType) print(level int, out io.Writer) {
 	format(out, level, "InterfaceType{\n\tMethods: [")
 	indent := "\n" + strings.Repeat("\t", level+2)

@@ -87,7 +87,6 @@ var typeFirst = map[token.Token]bool{
 	token.OpenParen:   true,
 }
 
-// BUG(eaburns): Types are incomplete.
 func parseType(p *Parser) Type {
 	switch p.tok {
 	case token.Identifier:
@@ -102,7 +101,7 @@ func parseType(p *Parser) Type {
 		return parseArrayOrSliceType(p)
 
 	case token.Struct:
-		panic("unimplemented")
+		return parseStructType(p)
 
 	case token.Func:
 		p.next()
@@ -130,6 +129,76 @@ func parseType(p *Parser) Type {
 	panic(p.err(token.Identifier, token.Star, token.OpenBracket,
 		token.Struct, token.Func, token.Interface, token.Map,
 		token.Chan, token.LessMinus, token.OpenParen))
+}
+
+func parseStructType(p *Parser) *StructType {
+	p.expect(token.Struct)
+	st := &StructType{keywordLoc: p.lex.Start}
+	p.next()
+	p.expect(token.OpenBrace)
+	p.next()
+
+	for p.tok != token.CloseBrace {
+		field := parseFieldDecl(p)
+		st.Fields = append(st.Fields, field)
+		if p.tok != token.CloseBrace {
+			p.expect(token.Semicolon)
+			p.next()
+		}
+	}
+
+	p.expect(token.CloseBrace)
+	st.closeLoc = p.lex.Start
+	p.next()
+	return st
+}
+
+func parseFieldDecl(p *Parser) FieldDecl {
+	var id *Identifier
+
+	d := FieldDecl{}
+	if p.tok == token.Star {
+		p.next()
+		d.Type = &PointerType{Type: parseTypeName(p)}
+		goto tag
+	}
+
+	id = parseIdentifier(p)
+	switch p.tok {
+	case token.Dot:
+		p.next()
+		p.expect(token.Identifier)
+		d.Type = &TypeName{
+			Package: id.Name,
+			Name:    p.text(),
+			span:    span{start: id.start, end: p.lex.End},
+		}
+		p.next()
+		goto tag
+
+	case token.StringLiteral:
+		d.Tag = parseStringLiteral(p)
+		fallthrough
+	case token.Semicolon:
+		fallthrough
+	case token.CloseBrace:
+		d.Type = &TypeName{Name: id.Name, span: id.span}
+		return d
+	}
+
+	d.Identifiers = []Identifier{*id}
+	for p.tok == token.Comma {
+		p.next()
+		id := parseIdentifier(p)
+		d.Identifiers = append(d.Identifiers, *id)
+	}
+	d.Type = parseType(p)
+
+tag:
+	if p.tok == token.StringLiteral {
+		d.Tag = parseStringLiteral(p)
+	}
+	return d
 }
 
 func parseInterfaceType(p *Parser) *InterfaceType {
@@ -678,7 +747,7 @@ func parseImaginaryLiteral(p *Parser) Expression {
 	})
 }
 
-func parseStringLiteral(p *Parser) Expression {
+func parseStringLiteral(p *Parser) *StringLiteral {
 	text := p.lex.Text()
 	if len(text) < 2 {
 		panic("bad string literal: " + text)
