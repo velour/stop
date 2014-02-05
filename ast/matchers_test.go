@@ -223,7 +223,10 @@ func mapType(key, typ matcher) matcher {
 func arrayType(size, typ matcher) matcher {
 	return func(n Node, err error) bool {
 		a, ok := n.(*ArrayType)
-		return err == nil && ok && size(a.Size, nil) && typ(a.Type, nil)
+		if err != nil || !ok || (size == nil) != (a.Size == nil) {
+			return false
+		}
+		return (size == nil || size(a.Size, nil)) && typ(a.Type, nil)
 	}
 }
 
@@ -245,6 +248,49 @@ func typeName(pkg, name string) matcher {
 	return func(n Node, err error) bool {
 		t, ok := n.(*TypeName)
 		return err == nil && ok && t.Package == pkg && t.Name == name
+	}
+}
+
+func compLit(typ matcher, elms ...matcher) matcher {
+	return func(n Node, err error) bool {
+		c, ok := n.(*CompositeLiteral)
+		if err != nil || !ok || c.Type == nil || !typ(c.Type, nil) || len(elms) != len(c.Elements) {
+			return false
+		}
+		for i, e := range c.Elements {
+			if !elms[i](&e, nil) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+func litVal(elms ...matcher) matcher {
+	return func(n Node, err error) bool {
+		c, ok := n.(*CompositeLiteral)
+		if err != nil || !ok || c.Type != nil || len(elms) != len(c.Elements) {
+			return false
+		}
+		for i, e := range c.Elements {
+			if !elms[i](&e, nil) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+func elm(key matcher, val matcher) matcher {
+	return func(n Node, err error) bool {
+		e, ok := n.(*Element)
+		if err != nil || !ok {
+			return false
+		}
+		if (key == nil) != (e.Key == nil) {
+			return false
+		}
+		return (key == nil || key(e.Key, nil)) && val(e.Value, nil)
 	}
 }
 

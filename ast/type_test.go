@@ -229,6 +229,10 @@ func TestArrayType(t *testing.T) {
 		{`[4](a)`, arrayType(intLit("4"), typeName("", "a"))},
 		{`[4][]a`, arrayType(intLit("4"), sliceType(typeName("", "a")))},
 		{`[4][42*z]a`, arrayType(intLit("4"), arrayType(binOp(token.Star, intLit("42"), ident("z")), typeName("", "a")))},
+
+		// [...]Type notation is only allowed in composite literals,
+		// not types in general
+		{`[...]int`, parseErr("expected.*got \\.\\.\\.")},
 	}
 	tests.runType(t)
 }

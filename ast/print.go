@@ -122,7 +122,11 @@ func (n *MapType) print(level int, out io.Writer) {
 
 func (n *ArrayType) print(level int, out io.Writer) {
 	format(out, level, "ArrayType{\n\tSize: ")
-	n.Size.print(level+1, out)
+	if n.Size == nil {
+		io.WriteString(out, "nil")
+	} else {
+		n.Size.print(level+1, out)
+	}
 	format(out, level, "\n\tType: ")
 	n.Type.print(level+1, out)
 	format(out, level, "\n}")
@@ -143,6 +147,34 @@ func (n *PointerType) print(level int, out io.Writer) {
 func (n *TypeName) print(level int, out io.Writer) {
 	format(out, level, "TypeName{\n\tPackage: %s\n\tName: %s\n}",
 		n.Package, n.Name)
+}
+
+func (n *CompositeLiteral) print(level int, out io.Writer) {
+	format(out, level, "CompositeLiteral{\n\tType: ")
+	if n.Type == nil {
+		io.WriteString(out, "nil")
+	} else {
+		n.Type.print(level+1, out)
+	}
+	format(out, level, "\n\tElements: [")
+	indent := "\n" + strings.Repeat("\t", level+2)
+	for _, e := range n.Elements {
+		io.WriteString(out, indent)
+		e.print(level+2, out)
+	}
+	format(out, level, "\n\t]\n}")
+}
+
+func (n *Element) print(level int, out io.Writer) {
+	format(out, level, "Element{\n\tKey: ")
+	if n.Key == nil {
+		io.WriteString(out, "nil")
+	} else {
+		n.Key.print(level+1, out)
+	}
+	format(out, level, "\n\tValue: ")
+	n.Value.print(level+1, out)
+	format(out, level, "\n}")
 }
 
 func (n *Index) print(level int, out io.Writer) {

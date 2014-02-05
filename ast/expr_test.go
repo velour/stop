@@ -11,6 +11,38 @@ var (
 	a, b, c, d = ident("a"), ident("b"), ident("c"), ident("d")
 )
 
+func TestCompositeLiteral(t *testing.T) {
+	tests := parserTests{
+		{`struct{ a int }{ a: 4 }`, compLit(
+			structType(fieldDecl(typeName("", "int"), a)),
+			elm(a, intLit("4")))},
+		{`struct{ a, b int }{ a: 4, b: 5}`, compLit(
+			structType(fieldDecl(typeName("", "int"), a, b)),
+			elm(a, intLit("4")),
+			elm(b, intLit("5")))},
+
+		{`struct{ a []int }{ a: { 4, 5 } }`, compLit(
+			structType(fieldDecl(sliceType(typeName("", "int")), a)),
+			elm(a, litVal(elm(nil, intLit("4")), elm(nil, intLit("5")))))},
+
+		{`[][]int{ {4, 5} }`, compLit(
+			sliceType(sliceType(typeName("", "int"))),
+			elm(nil, litVal(elm(nil, intLit("4")), elm(nil, intLit("5")))))},
+
+		{`[...]int{ 4, 5 }`, compLit(
+			arrayType(nil, typeName("", "int")),
+			elm(nil, intLit("4")),
+			elm(nil, intLit("5")))},
+
+		// Trailing ,
+		{`struct{ a, b int }{ a: 4, b: 5,}`, compLit(
+			structType(fieldDecl(typeName("", "int"), a, b)),
+			elm(a, intLit("4")),
+			elm(b, intLit("5")))},
+	}
+	tests.runExpr(t)
+}
+
 func TestPrimaryExpr(t *testing.T) {
 	tests := parserTests{
 		// Operand

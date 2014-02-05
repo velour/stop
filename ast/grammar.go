@@ -73,7 +73,7 @@ func Parse(p *Parser) (root Node, err error) {
 	return
 }
 
-// Set of tokens that start a type.
+// TypeFirst is the set of tokens that can start a type.
 var typeFirst = map[token.Token]bool{
 	token.Identifier:  true,
 	token.Star:        true,
@@ -98,7 +98,7 @@ func parseType(p *Parser) Type {
 		return &PointerType{Type: parseType(p), starLoc: starLoc}
 
 	case token.OpenBracket:
-		return parseArrayOrSliceType(p)
+		return parseArrayOrSliceType(p, false)
 
 	case token.Struct:
 		return parseStructType(p)
@@ -458,7 +458,9 @@ func parseMapType(p *Parser) Type {
 	return m
 }
 
-func parseArrayOrSliceType(p *Parser) Type {
+// Parses an array or slice type.  If dotDotDot is true then it will accept an
+// array with a size specified a "..." token, otherwise it will require a size.
+func parseArrayOrSliceType(p *Parser, dotDotDot bool) Type {
 	p.expect(token.OpenBracket)
 	openLoc := p.lex.Start
 	p.next()
@@ -468,8 +470,12 @@ func parseArrayOrSliceType(p *Parser) Type {
 		sl := &SliceType{Type: parseType(p), openLoc: openLoc}
 		return sl
 	}
-
-	ar := &ArrayType{Size: parseExpression(p), openLoc: openLoc}
+	ar := &ArrayType{openLoc: openLoc}
+	if dotDotDot && p.tok == token.DotDotDot {
+		p.next()
+	} else {
+		ar.Size = parseExpression(p)
+	}
 	p.expect(token.CloseBracket)
 	p.next()
 	ar.Type = parseType(p)
@@ -646,7 +652,16 @@ func parseOperand(p *Parser) Expression {
 	case token.StringLiteral:
 		return parseStringLiteral(p)
 
-	// BUG(eaburns): Composite literal
+	case token.Struct:
+		fallthrough
+	case token.Map:
+		fallthrough
+	case token.OpenBracket:
+		// BUG(eaburns): token.Identifier can also start a composite literal,
+		// but we already handle that above.  We will have to deal with it
+		// there, much like type assertions.
+		return parseCompositeLiteral(p)
+
 	// BUG(eaburns): Function literal
 
 	case token.OpenParen:
@@ -659,6 +674,58 @@ func parseOperand(p *Parser) Expression {
 	default:
 		panic(p.err("operand"))
 	}
+}
+
+func parseCompositeLiteral(p *Parser) Expression {
+	var typ Type
+	if p.tok == token.OpenBracket {
+		typ = parseArrayOrSliceType(p, true)
+	} else {
+		typ = parseType(p)
+	}
+	lit := parseLiteralValue(p)
+	lit.Type = typ
+	return lit
+}
+
+func parseLiteralValue(p *Parser) *CompositeLiteral {
+	p.expect(token.OpenBrace)
+	v := &CompositeLiteral{openLoc: p.lex.Start}
+	p.next()
+
+	for p.tok != token.CloseBrace {
+		e := parseElement(p)
+		v.Elements = append(v.Elements, e)
+		if p.tok != token.Comma {
+			break
+		}
+		p.next()
+	}
+
+	p.expect(token.CloseBrace)
+	v.closeLoc = p.lex.Start
+	p.next()
+	return v
+}
+
+func parseElement(p *Parser) Element {
+	if p.tok == token.OpenBrace {
+		return Element{Value: parseLiteralValue(p)}
+	}
+
+	expr := parseExpression(p)
+	if p.tok != token.Colon {
+		return Element{Value: expr}
+	}
+
+	p.next()
+	elm := Element{Key: expr}
+	if p.tok == token.OpenBrace {
+		elm.Value = parseLiteralValue(p)
+	} else {
+		elm.Value = parseExpression(p)
+	}
+	return elm
 }
 
 func parseSelectorOrTypeAssertion(p *Parser, left Expression) Expression {

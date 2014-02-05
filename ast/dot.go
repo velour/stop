@@ -127,12 +127,14 @@ func (n *MapType) dot(cur int, out io.Writer) int {
 }
 
 func (n *ArrayType) dot(cur int, out io.Writer) int {
-	size := cur + 1
+	next := cur + 1
 	node(out, cur, "ArrayType")
-	arcl(out, cur, size, "Size")
-	typ := n.Size.dot(size, out)
-	arcl(out, cur, typ, "Type")
-	return n.Type.dot(typ, out)
+	if n.Size != nil {
+		arcl(out, cur, next, "Size")
+		next = n.Size.dot(next, out)
+	}
+	arcl(out, cur, next, "Type")
+	return n.Type.dot(next, out)
 }
 
 func (n *SliceType) dot(cur int, out io.Writer) int {
@@ -161,6 +163,31 @@ func (n *TypeName) dot(cur int, out io.Writer) int {
 	node(out, next, n.Name)
 	next++
 	return next
+}
+
+func (n *CompositeLiteral) dot(cur int, out io.Writer) int {
+	next := cur + 1
+	node(out, cur, "CompositeLiteral")
+	if n.Type != nil {
+		arcl(out, cur, next, "Type")
+		next = n.Type.dot(next, out)
+	}
+	for _, e := range n.Elements {
+		arc(out, cur, next)
+		next = e.dot(next, out)
+	}
+	return next
+}
+
+func (n *Element) dot(cur int, out io.Writer) int {
+	next := cur + 1
+	node(out, cur, "Element")
+	if n.Key != nil {
+		arcl(out, cur, next, "Key")
+		next = n.Key.dot(next, out)
+	}
+	arcl(out, cur, next, "Value")
+	return n.Value.dot(next, out)
 }
 
 func (n *Call) dot(cur int, out io.Writer) int {

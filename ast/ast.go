@@ -164,6 +164,8 @@ func (n *MapType) End() token.Location   { return n.Type.End() }
 
 // An ArrayType is a type node that represents an array of types.
 type ArrayType struct {
+	// If size==nil then this is an array type for a composite literal
+	// with the size specified using [...]Type notation.
 	Size    Expression
 	Type    Type
 	openLoc token.Location
@@ -205,6 +207,48 @@ type Expression interface {
 	// For example, the location of the operator of a binary
 	// expression may be used.  Loc is used for error reporting.
 	Loc() token.Location
+}
+
+// A CompositeLiteral is an expression node that represents a
+// composite literal.
+type CompositeLiteral struct {
+	// Type may be nil.
+	Type              Type
+	Elements          []Element
+	openLoc, closeLoc token.Location
+}
+
+func (n *CompositeLiteral) Start() token.Location {
+	if n.Type != nil {
+		return n.openLoc
+	}
+	return n.Type.Start()
+}
+
+func (n *CompositeLiteral) Loc() token.Location {
+	return n.Start()
+}
+
+func (n *CompositeLiteral) End() token.Location {
+	return n.closeLoc
+}
+
+// An Element is a node representing the key-value mapping
+// of a single element of a composite literal.
+type Element struct {
+	Key   Expression
+	Value Expression
+}
+
+func (n *Element) Start() token.Location {
+	if n.Key != nil {
+		return n.Key.Start()
+	}
+	return n.Value.Start()
+}
+
+func (n *Element) End() token.Location {
+	return n.Value.End()
 }
 
 // An Index is an expression node that represents indexing into an
