@@ -3,6 +3,7 @@ package ast
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/velour/stop/token"
 )
@@ -59,6 +60,10 @@ func (e *MalformedLiteral) Error() string {
 type Parser struct {
 	lex *token.Lexer
 	tok token.Token
+
+	// Cmnts is a slice of all comments that are preceeding the
+	// current token without an intervening blank line.
+	cmnts []string
 }
 
 // NewParser returns a new parser that parses from the given token.Lexer.
@@ -88,10 +93,41 @@ func (p *Parser) text() string {
 	return string([]byte(p.lex.Text()))
 }
 
+// Comments returns a new slice containing the comments
+// preceeding the current token without an intervening blank line.
+// If there are no comments the nil is returned.
+func (p *Parser) comments() []string {
+	if len(p.cmnts) == 0 {
+		return nil
+	}
+	c := make([]string, len(p.cmnts))
+	copy(c, p.cmnts)
+	return c
+}
+
 // Advances to the next non-whitespace, non-comment token.
 func (p *Parser) next() {
 	p.tok = p.lex.Next()
-	for p.tok == token.Whitespace || p.tok == token.Comment {
+	cline := -1
+	for {
+		if cline < p.lex.Start.Line-1 {
+			p.cmnts = p.cmnts[:0]
+		}
+		if p.tok != token.Whitespace && p.tok != token.Comment {
+			break
+		}
+		if p.tok == token.Comment {
+			text := p.text()
+			cline = p.lex.End.Line
+			if strings.HasPrefix(text, "//") {
+				// Line comments end on the line following their
+				// text, so subtract one.
+				cline--
+				// Strip the newline.
+				text = text[:len(text)-1]
+			}
+			p.cmnts = append(p.cmnts, text)
+		}
 		p.tok = p.lex.Next()
 	}
 }
