@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"testing"
 
-	"bitbucket.org/eaburns/stop/token"
+	"github.com/velour/stop/token"
 )
 
 // NodeString returns a human-readable string representation of the AST node.

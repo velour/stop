@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"bitbucket.org/eaburns/stop/token"
+	"github.com/velour/stop/token"
 )
 
 // A SyntaxError is an error that describes a parse failure: something

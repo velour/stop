@@ -9,9 +9,9 @@ import (
 	"os/exec"
 	"strings"
 
-	"bitbucket.org/eaburns/stop/ast"
-	"bitbucket.org/eaburns/stop/token"
 	"github.com/mccoyst/pipeline"
+	"github.com/velour/stop/ast"
+	"github.com/velour/stop/token"
 )
 
 var (

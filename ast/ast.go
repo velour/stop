@@ -4,7 +4,7 @@ import (
 	"io"
 	"math/big"
 
-	"bitbucket.org/eaburns/stop/token"
+	"github.com/velour/stop/token"
 )
 
 // The Node interface is implemented by all nodes.

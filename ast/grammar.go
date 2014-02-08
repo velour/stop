@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"bitbucket.org/eaburns/stop/token"
+	"github.com/velour/stop/token"
 )
 
 var (

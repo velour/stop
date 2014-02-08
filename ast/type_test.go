@@ -3,7 +3,7 @@ package ast
 import (
 	"testing"
 
-	"bitbucket.org/eaburns/stop/token"
+	"github.com/velour/stop/token"
 )
 
 func TestType(t *testing.T) {
