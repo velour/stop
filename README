@@ -1,0 +1,7 @@
+This is not the package that you are looking for. This package is
+solely for my own amusement. Instead, you should be looking at the gc
+or gccgo compilers. If you just want compiler pieces, you should use
+the wonderful lexer, parser, type checker, and static single
+assignment packages in the Go standard library and go.exp
+repositories. Those packages are battle tested and probably more
+efficient and better designed than this one. Use them.
