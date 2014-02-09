@@ -79,11 +79,61 @@ func parseDeclarations(p *Parser) Declarations {
 	case token.Type:
 		return parseTypeDecl(p)
 	case token.Const:
-		panic("unimplemented")
+		return parseConstDecl(p)
 	case token.Var:
 		panic("unimplemented")
 	}
 	panic(p.err("type", "const", "var"))
+}
+
+func parseConstDecl(p *Parser) Declarations {
+	var decls Declarations
+	p.expect(token.Const)
+	cmnts := p.comments()
+	p.next()
+
+	if p.tok != token.OpenParen {
+		cs := parseConstSpec(p)
+		cs.comments = cmnts
+		return append(decls, cs)
+	}
+	p.next()
+
+	for p.tok != token.CloseParen {
+		decls = append(decls, parseConstSpec(p))
+		if p.tok == token.Semicolon {
+			p.next()
+		}
+	}
+	p.next()
+	return decls
+}
+
+func parseConstSpec(p *Parser) *ConstSpec {
+	cs := &ConstSpec{
+		comments: p.comments(),
+		Names:    parseIdentifierList(p),
+	}
+	if typeFirst[p.tok] {
+		cs.Type = parseType(p)
+	}
+	if p.tok == token.Equal {
+		p.next()
+		cs.Values = parseExpressionList(p)
+	}
+	return cs
+}
+
+func parseIdentifierList(p *Parser) []Identifier {
+	var ids []Identifier
+	for {
+		ids = append(ids, *parseIdentifier(p))
+		if p.tok != token.Comma {
+			break
+		}
+		p.next()
+	}
+	return ids
 }
 
 func parseTypeDecl(p *Parser) Declarations {

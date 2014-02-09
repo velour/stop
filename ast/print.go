@@ -31,6 +31,29 @@ func (n Declarations) print(level int, out io.Writer) {
 	format(out, level, "\n]")
 }
 
+func (n *ConstSpec) print(level int, out io.Writer) {
+	format(out, level, "ConstSpec{\n\tComments: [")
+	indent := "\n" + strings.Repeat("\t", level+2)
+	for _, c := range n.Comments() {
+		io.WriteString(out, indent+c)
+	}
+	format(out, level, "\n\tType: ")
+	if n.Type == nil {
+		io.WriteString(out, "nil")
+	} else {
+		n.Type.print(level+1, out)
+	}
+	format(out, level, "\n\t]\n\tNames: [")
+	for _, n := range n.Names {
+		n.print(level+1, out)
+	}
+	format(out, level, "\n\t]\n\tValues: [")
+	for _, v := range n.Values {
+		v.print(level+1, out)
+	}
+	format(out, level, "\n\t]\n}")
+}
+
 func (n *TypeSpec) print(level int, out io.Writer) {
 	format(out, level, "TypeSpec{\n\tComments: [")
 	indent := "\n" + strings.Repeat("\t", level+2)

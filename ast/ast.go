@@ -56,6 +56,25 @@ func (n Declarations) End() token.Location {
 	return n[len(n)-1].End()
 }
 
+// A ConstSpec is a declaration node representing the declaration of
+// a series of constants.
+type ConstSpec struct {
+	comments
+	// Type is the type of the spec or nil if the type should be inferred
+	// from the values.
+	Type   Type
+	Names  []Identifier
+	Values []Expression
+}
+
+func (n *ConstSpec) Start() token.Location {
+	return n.Names[0].Start()
+}
+
+func (n *ConstSpec) End() token.Location {
+	return n.Values[len(n.Values)-1].End()
+}
+
 // A TypeSpec is a declaration node representing the declaration of
 // a single type.
 type TypeSpec struct {
@@ -69,7 +88,7 @@ func (n *TypeSpec) Start() token.Location {
 }
 
 func (n *TypeSpec) End() token.Location {
-	return n.Type.Start()
+	return n.Type.End()
 }
 
 // The Type interface is implemented by nodes that represent types.

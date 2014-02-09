@@ -28,6 +28,29 @@ func (n Declarations) dot(cur int, out io.Writer) int {
 	return next
 }
 
+func (n *ConstSpec) dot(cur int, out io.Writer) int {
+	next := cur + 1
+	node(out, cur, "ConstSpec")
+	for _, c := range n.Comments() {
+		arc(out, cur, next)
+		node(out, next, c)
+		next++
+	}
+	if n.Type != nil {
+		arcl(out, cur, next, "Type")
+		next = n.Type.dot(next, out)
+	}
+	for _, n := range n.Names {
+		arcl(out, cur, next, "Name")
+		next = n.dot(next, out)
+	}
+	for _, e := range n.Values {
+		arcl(out, cur, next, "Value")
+		next = e.dot(next, out)
+	}
+	return next
+}
+
 func (n *TypeSpec) dot(cur int, out io.Writer) int {
 	next := cur + 1
 	node(out, cur, "TypeSpec")

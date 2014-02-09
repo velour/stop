@@ -21,6 +21,10 @@ func nodeString(n Node) string {
 // is an expected error.
 type matcher func(Node, error) bool
 
+func ms(ms ...matcher) []matcher {
+	return ms
+}
+
 // Returns true if both the node and matcher are nil, or if they are
 // both non-nil and the matcher matches the node.
 func nilOr(n Node, m matcher) bool {
@@ -110,6 +114,26 @@ func decls(decls ...matcher) matcher {
 		}
 		for i, d := range ds {
 			if !decls[i](d, nil) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+func cnst(names []matcher, typ matcher, vals ...matcher) matcher {
+	return func (n Node, err error) bool {
+		cs, ok := n.(*ConstSpec)
+		if err != nil || !ok || !nilOr(cs.Type, typ) || len(names) != len(cs.Names) || len(vals) != len(cs.Values) {
+			return false
+		}
+		for i, n := range cs.Names {
+			if !names[i](&n, nil) {
+				return false
+			}
+		}
+		for i, v := range cs.Values {
+			if !vals[i](v, nil) {
 				return false
 			}
 		}
