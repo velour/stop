@@ -28,6 +28,50 @@ type Node interface {
 	dot(cur int, out io.Writer) int
 }
 
+// A Declaration is a node representing a declaration.
+type Declaration interface {
+	Node
+
+	// Comments returns the comments appearing before this
+	// declaration without an intervening blank line.
+	Comments() []string
+}
+
+// A Comments implements the Comments method of the Declaration
+// and Statements interfaces.
+type comments []string
+
+func (c comments) Comments() []string {
+	return []string(c)
+}
+
+// A Declarations is node representing a non-empty list of declarations.
+type Declarations []Declaration
+
+func (n Declarations) Start() token.Location {
+	return n[0].Start()
+}
+
+func (n Declarations) End() token.Location {
+	return n[len(n)-1].End()
+}
+
+// A TypeSpec is a declaration node representing the declaration of
+// a single type.
+type TypeSpec struct {
+	comments
+	Name Identifier
+	Type Type
+}
+
+func (n *TypeSpec) Start() token.Location {
+	return n.Name.Start()
+}
+
+func (n *TypeSpec) End() token.Location {
+	return n.Type.Start()
+}
+
 // The Type interface is implemented by nodes that represent types.
 type Type interface {
 	Node

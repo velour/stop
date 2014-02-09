@@ -21,6 +21,29 @@ func Print(out io.Writer, n Node) (err error) {
 	return
 }
 
+func (n Declarations) print(level int, out io.Writer) {
+	format(out, level, "Declarations [")
+	indent := "\n" + strings.Repeat("\t", level+2)
+	for _, s := range n {
+		io.WriteString(out, indent)
+		s.print(level+2, out)
+	}
+	format(out, level, "\n]")
+}
+
+func (n *TypeSpec) print(level int, out io.Writer) {
+	format(out, level, "TypeSpec{\n\tComments: [")
+	indent := "\n" + strings.Repeat("\t", level+2)
+	for _, c := range n.Comments() {
+		io.WriteString(out, indent+c)
+	}
+	format(out, level, "\n\t]\n\tName: ")
+	n.Name.print(level+1, out)
+	format(out, level, "\n\tType: ")
+	n.Type.print(level+1, out)
+	format(out, level, "\n}")
+}
+
 func (n *StructType) print(level int, out io.Writer) {
 	format(out, level, "StructType{\n\tFields: [")
 	indent := "\n" + strings.Repeat("\t", level+2)

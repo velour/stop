@@ -69,8 +69,52 @@ func Parse(p *Parser) (root Node, err error) {
 		}
 
 	}()
-	root = parseExpression(p)
+	//	root = parseExpression(p)
+	root = parseDeclarations(p)
 	return
+}
+
+func parseDeclarations(p *Parser) Declarations {
+	switch p.tok {
+	case token.Type:
+		return parseTypeDecl(p)
+	case token.Const:
+		panic("unimplemented")
+	case token.Var:
+		panic("unimplemented")
+	}
+	panic(p.err("type", "const", "var"))
+}
+
+func parseTypeDecl(p *Parser) Declarations {
+	var decls Declarations
+	p.expect(token.Type)
+	cmnts := p.comments()
+	p.next()
+
+	if p.tok != token.OpenParen {
+		ts := parseTypeSpec(p)
+		ts.comments = cmnts
+		return append(decls, ts)
+	}
+	p.next()
+
+	for p.tok != token.CloseParen {
+		decls = append(decls, parseTypeSpec(p))
+		if p.tok == token.Semicolon {
+			p.next()
+		}
+	}
+	p.next()
+	return decls
+}
+
+func parseTypeSpec(p *Parser) *TypeSpec {
+	return &TypeSpec{
+			comments: p.comments(),
+			Name:     *parseIdentifier(p),
+			Type:     parseType(p),
+		}
 }
 
 // TypeFirst is the set of tokens that can start a type.

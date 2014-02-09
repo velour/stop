@@ -83,10 +83,38 @@ func (tests parserTests) runParamList(t *testing.T) {
 	})
 }
 
+func (tests parserTests) runDeclarations(t *testing.T) {
+	tests.run(t, func(p *Parser) Node {
+		return parseDeclarations(p)
+	})
+}
+
 func parseErr(reStr string) matcher {
 	re := regexp.MustCompile(reStr)
 	return func(_ Node, err error) bool {
 		return err != nil && re.MatchString(err.Error())
+	}
+}
+
+func decls(decls ...matcher) matcher {
+	return func(n Node, err error) bool {
+		ds, ok := n.(Declarations)
+		if err != nil || !ok || len(ds) != len(decls) {
+			return false
+		}
+		for i, d := range ds {
+			if !decls[i](d, nil) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+func typ(name matcher, typ matcher) matcher {
+	return func(n Node, err error) bool {
+		t, ok := n.(*TypeSpec)
+		return err == nil && ok && name(&t.Name, nil) && typ(t.Type, nil)
 	}
 }
 

@@ -18,6 +18,30 @@ func Dot(out io.Writer, n Node) (err error) {
 	return
 }
 
+func (n Declarations) dot(cur int, out io.Writer) int {
+	next := cur + 1
+	node(out, cur, "Declarations")
+	for _, s := range n {
+		arc(out, cur, next)
+		next = s.dot(next, out)
+	}
+	return next
+}
+
+func (n *TypeSpec) dot(cur int, out io.Writer) int {
+	next := cur + 1
+	node(out, cur, "TypeSpec")
+	for _, c := range n.Comments() {
+		arc(out, cur, next)
+		node(out, next, c)
+		next++
+	}
+	arcl(out, cur, next, "Name")
+	next = n.Name.dot(next, out)
+	arcl(out, cur, next, "Type")
+	return n.Type.dot(next, out)
+}
+
 func (n *StructType) dot(cur int, out io.Writer) int {
 	next := cur + 1
 	node(out, cur, "StructType")
