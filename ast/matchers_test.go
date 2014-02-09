@@ -21,6 +21,19 @@ func nodeString(n Node) string {
 // is an expected error.
 type matcher func(Node, error) bool
 
+// Returns true if both the node and matcher are nil, or if they are
+// both non-nil and the matcher matches the node.
+func nilOr(n Node, m matcher) bool {
+	return (n == nil && m == nil) || (n != nil && m != nil && m(n, nil))
+}
+
+func parseErr(reStr string) matcher {
+	re := regexp.MustCompile(reStr)
+	return func(_ Node, err error) bool {
+		return err != nil && re.MatchString(err.Error())
+	}
+}
+
 type parserTests []struct {
 	src   string
 	match matcher
@@ -87,13 +100,6 @@ func (tests parserTests) runDeclarations(t *testing.T) {
 	tests.run(t, func(p *Parser) Node {
 		return parseDeclarations(p)
 	})
-}
-
-func parseErr(reStr string) matcher {
-	re := regexp.MustCompile(reStr)
-	return func(_ Node, err error) bool {
-		return err != nil && re.MatchString(err.Error())
-	}
 }
 
 func decls(decls ...matcher) matcher {
@@ -251,10 +257,7 @@ func mapType(key, typ matcher) matcher {
 func arrayType(size, typ matcher) matcher {
 	return func(n Node, err error) bool {
 		a, ok := n.(*ArrayType)
-		if err != nil || !ok || (size == nil) != (a.Size == nil) {
-			return false
-		}
-		return (size == nil || size(a.Size, nil)) && typ(a.Type, nil)
+		return err == nil && ok && nilOr(a.Size, size) && typ(a.Type, nil)
 	}
 }
 
@@ -282,7 +285,7 @@ func typeName(pkg, name string) matcher {
 func compLit(typ matcher, elms ...matcher) matcher {
 	return func(n Node, err error) bool {
 		c, ok := n.(*CompositeLiteral)
-		if err != nil || !ok || c.Type == nil || !typ(c.Type, nil) || len(elms) != len(c.Elements) {
+		if err != nil || !ok || !nilOr(c.Type, typ) || len(elms) != len(c.Elements) {
 			return false
 		}
 		for i, e := range c.Elements {
@@ -312,13 +315,7 @@ func litVal(elms ...matcher) matcher {
 func elm(key matcher, val matcher) matcher {
 	return func(n Node, err error) bool {
 		e, ok := n.(*Element)
-		if err != nil || !ok {
-			return false
-		}
-		if (key == nil) != (e.Key == nil) {
-			return false
-		}
-		return (key == nil || key(e.Key, nil)) && val(e.Value, nil)
+		return err == nil && ok && nilOr(e.Key, key) && val(e.Value, nil)
 	}
 }
 
@@ -326,9 +323,9 @@ func slice(expr, low, high, max matcher) matcher {
 	return func(n Node, err error) bool {
 		e, ok := n.(*Slice)
 		return err == nil && ok && expr(e.Expression, nil) &&
-			(low == nil && e.Low == nil || low(e.Low, nil)) &&
-			(high == nil && e.High == nil || high(e.High, nil)) &&
-			(max == nil && e.Max == nil || max(e.Max, nil))
+			nilOr(e.Low, low) &&
+			nilOr(e.High, high) &&
+			nilOr(e.Max, max)
 	}
 }
 
