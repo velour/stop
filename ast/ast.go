@@ -75,6 +75,25 @@ func (n *ConstSpec) End() token.Location {
 	return n.Values[len(n.Values)-1].End()
 }
 
+// A VarSpec is a declaration node representing the declaration of
+// a series of variables.
+type VarSpec struct {
+	comments
+	// Type is the type of the spec or nil if the type should be inferred
+	// from the values.
+	Type   Type
+	Names  []Identifier
+	Values []Expression
+}
+
+func (n *VarSpec) Start() token.Location {
+	return n.Names[0].Start()
+}
+
+func (n *VarSpec) End() token.Location {
+	return n.Values[len(n.Values)-1].End()
+}
+
 // A TypeSpec is a declaration node representing the declaration of
 // a single type.
 type TypeSpec struct {

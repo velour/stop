@@ -81,9 +81,49 @@ func parseDeclarations(p *Parser) Declarations {
 	case token.Const:
 		return parseConstDecl(p)
 	case token.Var:
-		panic("unimplemented")
+		return parseVarDecl(p)
 	}
 	panic(p.err("type", "const", "var"))
+}
+
+func parseVarDecl(p *Parser) Declarations {
+	var decls Declarations
+	p.expect(token.Var)
+	cmnts := p.comments()
+	p.next()
+
+	if p.tok != token.OpenParen {
+		cs := parseVarSpec(p)
+		cs.comments = cmnts
+		return append(decls, cs)
+	}
+	p.next()
+
+	for p.tok != token.CloseParen {
+		decls = append(decls, parseVarSpec(p))
+		if p.tok == token.Semicolon {
+			p.next()
+		}
+	}
+	p.next()
+	return decls
+}
+
+func parseVarSpec(p *Parser) *VarSpec {
+	vs := &VarSpec{
+		comments: p.comments(),
+		Names:    parseIdentifierList(p),
+	}
+	if typeFirst[p.tok] {
+		vs.Type = parseType(p)
+		if p.tok != token.Equal {
+			return vs
+		}
+	}
+	p.expect(token.Equal)
+	p.next()
+	vs.Values = parseExpressionList(p)
+	return vs
 }
 
 func parseConstDecl(p *Parser) Declarations {
@@ -161,10 +201,10 @@ func parseTypeDecl(p *Parser) Declarations {
 
 func parseTypeSpec(p *Parser) *TypeSpec {
 	return &TypeSpec{
-			comments: p.comments(),
-			Name:     *parseIdentifier(p),
-			Type:     parseType(p),
-		}
+		comments: p.comments(),
+		Name:     *parseIdentifier(p),
+		Type:     parseType(p),
+	}
 }
 
 // TypeFirst is the set of tokens that can start a type.

@@ -121,8 +121,28 @@ func decls(decls ...matcher) matcher {
 	}
 }
 
+func vars(names []matcher, typ matcher, vals ...matcher) matcher {
+	return func(n Node, err error) bool {
+		vs, ok := n.(*VarSpec)
+		if err != nil || !ok || !nilOr(vs.Type, typ) || len(names) != len(vs.Names) || len(vals) != len(vs.Values) {
+			return false
+		}
+		for i, n := range vs.Names {
+			if !names[i](&n, nil) {
+				return false
+			}
+		}
+		for i, v := range vs.Values {
+			if !vals[i](v, nil) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
 func cnst(names []matcher, typ matcher, vals ...matcher) matcher {
-	return func (n Node, err error) bool {
+	return func(n Node, err error) bool {
 		cs, ok := n.(*ConstSpec)
 		if err != nil || !ok || !nilOr(cs.Type, typ) || len(names) != len(cs.Names) || len(vals) != len(cs.Values) {
 			return false
