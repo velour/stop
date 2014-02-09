@@ -37,7 +37,7 @@ func (n *VarSpec) print(level int, out io.Writer) {
 	for _, c := range n.Comments() {
 		io.WriteString(out, indent+c)
 	}
-	format(out, level, "\n\tType: ")
+	format(out, level, "\n\t]\n\tType: ")
 	if n.Type == nil {
 		io.WriteString(out, "nil")
 	} else {
@@ -45,10 +45,12 @@ func (n *VarSpec) print(level int, out io.Writer) {
 	}
 	format(out, level, "\n\t]\n\tNames: [")
 	for _, n := range n.Names {
+		io.WriteString(out, indent)
 		n.print(level+1, out)
 	}
 	format(out, level, "\n\t]\n\tValues: [")
 	for _, v := range n.Values {
+		io.WriteString(out, indent)
 		v.print(level+1, out)
 	}
 	format(out, level, "\n\t]\n}")
@@ -60,7 +62,7 @@ func (n *ConstSpec) print(level int, out io.Writer) {
 	for _, c := range n.Comments() {
 		io.WriteString(out, indent+c)
 	}
-	format(out, level, "\n\tType: ")
+	format(out, level, "\n\t]\n\tType: ")
 	if n.Type == nil {
 		io.WriteString(out, "nil")
 	} else {
@@ -68,10 +70,12 @@ func (n *ConstSpec) print(level int, out io.Writer) {
 	}
 	format(out, level, "\n\t]\n\tNames: [")
 	for _, n := range n.Names {
+		io.WriteString(out, indent)
 		n.print(level+1, out)
 	}
 	format(out, level, "\n\t]\n\tValues: [")
 	for _, v := range n.Values {
+		io.WriteString(out, indent)
 		v.print(level+1, out)
 	}
 	format(out, level, "\n\t]\n}")
