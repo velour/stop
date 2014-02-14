@@ -4,6 +4,7 @@ import (
 	"io"
 	"math/big"
 
+	"github.com/eaburns/pp"
 	"github.com/velour/stop/token"
 )
 
@@ -16,11 +17,6 @@ type Node interface {
 	// End returns the end location of the final token that induced
 	// this node.
 	End() token.Location
-
-	// Print writes a human-readable representation of the node
-	// and the subtree beneath it to out.  If an error occurs then
-	// it is panicked.
-	print(level int, out io.Writer)
 
 	// Dot writes the node and the subtree beneath it to a writer
 	// in the dot language of graphviz.  If an error occurs then it
@@ -455,4 +451,10 @@ type RuneLiteral struct {
 type StringLiteral struct {
 	Value string
 	span
+}
+
+// Print writes a human-readable representation of an abstract
+// syntax tree to an io.Writer.
+func Print(out io.Writer, n Node) error {
+	return pp.Print(out, n)
 }

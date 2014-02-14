@@ -12,7 +12,7 @@ import (
 // NodeString returns a human-readable string representation of the AST node.
 func nodeString(n Node) string {
 	out := bytes.NewBuffer(nil)
-	n.print(0, out)
+	Print(out, n)
 	return string(out.Bytes())
 }
 

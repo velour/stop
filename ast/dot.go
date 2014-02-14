@@ -3,8 +3,20 @@ package ast
 import (
 	"fmt"
 	"io"
+	"math/big"
 	"strconv"
+	"strings"
 )
+
+// RecoverError recovers a panick.  If the recovered value implements
+// the error interface then it is assigned to the pointee of err.
+func recoverError(err *error) {
+	if r := recover(); r == nil {
+		return
+	} else if e, ok := r.(error); ok {
+		*err = e
+	}
+}
 
 // Dot writes an abstract syntax tree to an io.Writer using the dot
 // language of graphviz.
@@ -345,7 +357,6 @@ func (n *IntegerLiteral) dot(cur int, out io.Writer) int {
 }
 
 func (n *FloatLiteral) dot(cur int, out io.Writer) int {
-	node(out, cur, n.printString())
 	return cur + 1
 }
 
@@ -391,4 +402,27 @@ func arcl(out io.Writer, src, dst int, label string) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func (n *FloatLiteral) printString() string {
+	return ratPrintString(n.Value)
+}
+
+func (n *ImaginaryLiteral) printString() string {
+	return ratPrintString(n.Value) + "i"
+}
+
+// PrintFloatPrecision is the number of digits of precision to use when
+// printing floating point values.  Trailing zeroes are trimmed, so
+// using a large value won't necessarily lead to extremely large strings.
+const printFloatPrecision = 20
+
+// RatPrintString returns a printable string representation of a big.Rat.
+func ratPrintString(rat *big.Rat) string {
+	s := rat.FloatString(printFloatPrecision)
+	s = strings.TrimRight(s, "0")
+	if len(s) > 0 && s[len(s)-1] == '.' {
+		s += "0"
+	}
+	return s
 }
