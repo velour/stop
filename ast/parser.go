@@ -132,7 +132,7 @@ func (p *Parser) next() {
 	}
 }
 
-// Expect panicks with an unexpected token error if the current parser
+// Expect panics with an unexpected token error if the current parser
 // token is not tok.
 func (p *Parser) expect(tok token.Token) {
 	if p.tok != tok {

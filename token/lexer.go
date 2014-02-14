@@ -212,7 +212,7 @@ func (l *Lexer) rune() (r rune) {
 
 // Replace replaces the most-recently-read rune into the input
 // stream.  If no runes were read since the last call to Next then
-// in panicks; nothing can be replaced.
+// it panics; nothing can be replaced.
 func (l *Lexer) replace() {
 	if l.n == 0 {
 		panic("nothing to replace")
