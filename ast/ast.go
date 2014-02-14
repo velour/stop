@@ -17,11 +17,6 @@ type Node interface {
 	// End returns the end location of the final token that induced
 	// this node.
 	End() token.Location
-
-	// Dot writes the node and the subtree beneath it to a writer
-	// in the dot language of graphviz.  If an error occurs then it
-	// is panicked.
-	dot(cur int, out io.Writer) int
 }
 
 // A Declaration is a node representing a declaration.
@@ -457,4 +452,10 @@ type StringLiteral struct {
 // syntax tree to an io.Writer.
 func Print(out io.Writer, n Node) error {
 	return pp.Print(out, n)
+}
+
+// Dot writes an abstract syntax tree to an io.Writer using the dot
+// language of graphviz.
+func Dot(out io.Writer, n Node) error {
+	return pp.Dot(out, n)
 }

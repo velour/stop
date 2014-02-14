@@ -3,7 +3,9 @@ package ast
 import (
 	"bytes"
 	"fmt"
+	"math/big"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/velour/stop/token"
@@ -467,4 +469,27 @@ func runeLit(ru rune) matcher {
 		r, ok := n.(*RuneLiteral)
 		return err == nil && ok && r.Value == ru
 	}
+}
+
+func (n *FloatLiteral) printString() string {
+	return ratPrintString(n.Value)
+}
+
+func (n *ImaginaryLiteral) printString() string {
+	return ratPrintString(n.Value) + "i"
+}
+
+// PrintFloatPrecision is the number of digits of precision to use when
+// printing floating point values.  Trailing zeroes are trimmed, so
+// using a large value won't necessarily lead to extremely large strings.
+const printFloatPrecision = 20
+
+// RatPrintString returns a printable string representation of a big.Rat.
+func ratPrintString(rat *big.Rat) string {
+	s := rat.FloatString(printFloatPrecision)
+	s = strings.TrimRight(s, "0")
+	if len(s) > 0 && s[len(s)-1] == '.' {
+		s += "0"
+	}
+	return s
 }
