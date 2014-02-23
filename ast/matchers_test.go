@@ -110,7 +110,7 @@ func (tests parserTests) runDeclarations(t *testing.T) {
 
 func (tests parserTests) runStatements(t *testing.T) {
 	tests.run(t, func(p *Parser) Node {
-		return parseSimpleStatement(p, true)
+		return parseStatement(p)
 	})
 }
 

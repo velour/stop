@@ -81,9 +81,33 @@ func parseStatement(p *Parser) Statement {
 			comments:     p.comments(),
 			Declarations: parseDeclarations(p),
 		}
+
+	case token.Go:
+		panic("unimplemented")
+	case token.Return:
+		panic("unimplemented")
+	case token.Break:
+		panic("unimplemented")
+	case token.Continue:
+		panic("unimplemented")
+	case token.Goto:
+		panic("unimplemented")
+	case token.Fallthrough:
+		panic("unimplemented")
+	case token.OpenBrace:
+		panic("unimplemented")
+	case token.If:
+		panic("unimplemented")
+	case token.Switch:
+		panic("unimplemented")
+	case token.Select:
+		panic("unimplemented")
+	case token.For:
+		panic("unimplemented")
+	case token.Defer:
+		panic("unimplemented")
 	}
-	// BUG(eaburns): Finish this.
-	panic("unimplemented")
+	return parseSimpleStatement(p, true)
 }
 
 // AssignOps is a slice of all assignment operatiors.
