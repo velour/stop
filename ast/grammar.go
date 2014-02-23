@@ -74,6 +74,150 @@ func Parse(p *Parser) (root Node, err error) {
 	return
 }
 
+func parseStatement(p *Parser) Statement {
+	switch p.tok {
+	case token.Type, token.Const, token.Var:
+		return &DeclStatement{
+			comments:     p.comments(),
+			Declarations: parseDeclarations(p),
+		}
+	}
+	// BUG(eaburns): Finish this.
+	panic("unimplemented")
+}
+
+// AssignOps is a slice of all assignment operatiors.
+var assignOps = []token.Token{
+	token.Equal,
+	token.PlusEqual,
+	token.MinusEqual,
+	token.OrEqual,
+	token.CarrotEqual,
+	token.StarEqual,
+	token.DivideEqual,
+	token.PercentEqual,
+	token.LessLessEqual,
+	token.GreaterGreaterEqual,
+	token.AndEqual,
+	token.AndCarrotEqual,
+}
+
+// AssignOp is the set of assignment operators.
+var assignOp = func() map[token.Token]bool {
+	ops := make(map[token.Token]bool)
+	for _, op := range assignOps {
+		ops[op] = true
+	}
+	return ops
+}()
+
+// Returns the current token if it is an assignment operator, otherwise
+// panics with a syntax error.
+func expectAssign(p *Parser) token.Token {
+	if assignOp[p.tok] {
+		return p.tok
+	}
+	ops := make([]interface{}, len(assignOps)-1)
+	for i, op := range assignOps[1:] {
+		ops[i] = op
+	}
+	panic(p.err(assignOps[0], ops...))
+}
+
+func parseSimpleStatement(p *Parser, allowLabel bool) Statement {
+	cmnts := p.comments()
+	if !expressionFirst[p.tok] {
+		// Empty statement
+		return nil
+	}
+	expr := parseExpression(p)
+	id, isID := expr.(*Identifier)
+	switch {
+	case p.tok == token.LessMinus:
+		p.next()
+		return &SendStatement{
+			comments:   cmnts,
+			Channel:    expr,
+			Expression: parseExpression(p),
+		}
+
+	case p.tok == token.MinusMinus || p.tok == token.PlusPlus:
+		op, opEnd := p.tok, p.lex.End
+		p.next()
+		return &IncDecStatement{
+			comments:   cmnts,
+			Expression: expr,
+			Op:         op,
+			opEnd:      opEnd,
+		}
+
+	case assignOp[p.tok]:
+		op := p.tok
+		p.next()
+		return &Assignment{
+			comments: cmnts,
+			Op:       op,
+			Left:     []Expression{expr},
+			Right:    parseExpressionList(p),
+		}
+
+	case p.tok == token.Comma:
+		p.next()
+		exprs := []Expression{expr}
+		exprs = append(exprs, parseExpressionList(p)...)
+
+		var ids []Identifier
+		for _, e := range exprs {
+			if id, ok := e.(*Identifier); ok {
+				ids = append(ids, *id)
+			} else {
+				break
+			}
+		}
+		// If all the expressions were identifiers then we could have
+		// a short variable declaration.  Otherwise, it's an assignment.
+		if len(ids) == len(exprs) && p.tok == token.ColonEqual {
+			p.next()
+			return &ShortVarDecl{
+				comments: cmnts,
+				Left:     ids,
+				Right:    parseExpressionList(p),
+			}
+		}
+
+		op := expectAssign(p)
+		p.next()
+		return &Assignment{
+			comments: cmnts,
+			Op:       op,
+			Left:     exprs,
+			Right:    parseExpressionList(p),
+		}
+
+	case isID && p.tok == token.ColonEqual:
+		p.next()
+		return &ShortVarDecl{
+			comments: cmnts,
+			Left:     []Identifier{*id},
+			Right:    parseExpressionList(p),
+		}
+
+	case allowLabel && isID && p.tok == token.Colon:
+		p.next()
+		return &LabeledStatement{
+			comments:  cmnts,
+			Label:     *id,
+			Statement: parseStatement(p),
+		}
+
+	default:
+		return &ExpressionStatement{
+			comments:   cmnts,
+			Expression: expr,
+		}
+	}
+}
+
 func parseDeclarations(p *Parser) Declarations {
 	switch p.tok {
 	case token.Type:
@@ -628,6 +772,37 @@ func parseTypeName(p *Parser) Type {
 		p.next()
 	}
 	return n
+}
+
+// ExpressionFirst is the set of tokens that may begin an expression.
+var expressionFirst = map[token.Token]bool{
+	// Unary Op
+	token.Plus:      true,
+	token.Minus:     true,
+	token.Bang:      true,
+	token.Carrot:    true,
+	token.Star:      true,
+	token.And:       true,
+	token.LessMinus: true,
+
+	// Type First
+	token.Identifier: true,
+	//	token.Star:        true,
+	token.OpenBracket: true,
+	token.Struct:      true,
+	token.Func:        true,
+	token.Interface:   true,
+	token.Map:         true,
+	token.Chan:        true,
+	//	token.LessMinus:   true,
+	token.OpenParen: true,
+
+	// Literals
+	token.IntegerLiteral:   true,
+	token.FloatLiteral:     true,
+	token.ImaginaryLiteral: true,
+	token.RuneLiteral:      true,
+	token.StringLiteral:    true,
 }
 
 func parseExpression(p *Parser) Expression {

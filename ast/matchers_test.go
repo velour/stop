@@ -108,6 +108,108 @@ func (tests parserTests) runDeclarations(t *testing.T) {
 	})
 }
 
+func (tests parserTests) runStatements(t *testing.T) {
+	tests.run(t, func(p *Parser) Node {
+		return parseSimpleStatement(p, true)
+	})
+}
+
+func labeled(l matcher, st matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*LabeledStatement)
+		return err == nil && ok && l(&s.Label, nil) && st(s.Statement, nil)
+	}
+}
+
+func decl(ds ...matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*DeclStatement)
+		if err != nil || !ok || len(ds) != len(s.Declarations) {
+			return false
+		}
+		for i, d := range ds {
+			if !d(s.Declarations[i], nil) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+func shortDecl(left []matcher, right ...matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*ShortVarDecl)
+		if err != nil || !ok || len(left) != len(s.Left) || len(right) != len(s.Right) {
+			return false
+		}
+		for i, l := range left {
+			if !l(&s.Left[i], nil) {
+				return false
+			}
+		}
+		for i, r := range right {
+			if !r(s.Right[i], nil) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+func assign(op token.Token, left []matcher, right ...matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*Assignment)
+		if err != nil || !ok || len(left) != len(s.Left) || len(right) != len(s.Right) || op != s.Op {
+			return false
+		}
+		for i, l := range left {
+			if !l(s.Left[i], nil) {
+				return false
+			}
+		}
+		for i, r := range right {
+			if !r(s.Right[i], nil) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+func expr(ex matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*ExpressionStatement)
+		return err == nil && ok && ex(s.Expression, nil)
+	}
+}
+
+func decr(ex matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*IncDecStatement)
+		return err == nil && ok && s.Op == token.MinusMinus && ex(s.Expression, nil)
+	}
+}
+
+func incr(ex matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*IncDecStatement)
+		return err == nil && ok && s.Op == token.PlusPlus && ex(s.Expression, nil)
+	}
+}
+
+func send(ch, ex matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*SendStatement)
+		return err == nil && ok && ch(s.Channel, nil) && ex(s.Expression, nil)
+	}
+}
+
+func empty() matcher {
+	return func(n Node, err error) bool {
+		return err == nil && n == nil
+	}
+}
+
 func decls(decls ...matcher) matcher {
 	return func(n Node, err error) bool {
 		ds, ok := n.(Declarations)

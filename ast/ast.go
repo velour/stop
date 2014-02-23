@@ -19,6 +19,121 @@ type Node interface {
 	End() token.Location
 }
 
+// A Statement is a node representing a statement.
+type Statement interface {
+	Node
+
+	// Comments returns the comments appearing before this
+	// declaration without an intervening blank line.
+	Comments() []string
+}
+
+// A LabeledStatement is a Statement node representing a statement
+// that is preceeded by a label.
+type LabeledStatement struct {
+	comments
+	Label     Identifier
+	Statement Statement
+}
+
+func (n *LabeledStatement) Start() token.Location {
+	return n.Label.Start()
+}
+
+func (n *LabeledStatement) End() token.Location {
+	return n.Statement.End()
+}
+
+// A DeclStatement is a Statement node representing a series of declarations.
+type DeclStatement struct {
+	comments
+	Declarations
+}
+
+// A ShortVarDecl is a Statement node representing the declaration of
+// a series of variables.
+type ShortVarDecl struct {
+	comments
+	Left  []Identifier
+	Right []Expression
+}
+
+func (n *ShortVarDecl) Start() token.Location {
+	return n.Left[0].Start()
+}
+
+func (n *ShortVarDecl) End() token.Location {
+	return n.Right[len(n.Right)-1].End()
+}
+
+// An Assingment is a Statement node representing an assignment of
+// a sequence of expressions.
+type Assignment struct {
+	comments
+	// Op is the assignment operation.
+	Op    token.Token
+	Left  []Expression
+	Right []Expression
+}
+
+func (n *Assignment) Start() token.Location {
+	return n.Left[0].Start()
+}
+
+func (n *Assignment) End() token.Location {
+	return n.Right[len(n.Right)-1].End()
+}
+
+// An ExpressionStatement is a statement node representing an
+// expression evaluation
+type ExpressionStatement struct {
+	comments
+	Expression Expression
+}
+
+func (n *ExpressionStatement) Start() token.Location {
+	return n.Expression.Start()
+}
+
+func (n *ExpressionStatement) End() token.Location {
+	return n.Expression.End()
+}
+
+// An IncDecStatement is a statement node representing either an
+// increment or a decrement operation.
+type IncDecStatement struct {
+	comments
+	Expression Expression
+	// Op is either token.PlusPlus or token.MinusMinus, representing
+	// either increment or decrement respectively.
+	Op    token.Token
+	opEnd token.Location
+}
+
+func (n *IncDecStatement) Start() token.Location {
+	return n.Expression.Start()
+}
+
+func (n *IncDecStatement) End() token.Location {
+	return n.opEnd
+}
+
+// A SendStatement is a statement node representing the sending of
+// an expression on a channel.
+type SendStatement struct {
+	comments
+	Channel    Expression
+	Expression Expression
+}
+
+func (n *SendStatement) Start() token.Location {
+	return n.Channel.Start()
+}
+
+func (n *SendStatement) End() token.Location {
+	return n.Expression.End()
+}
+
 // A Declaration is a node representing a declaration.
 type Declaration interface {
 	Node
