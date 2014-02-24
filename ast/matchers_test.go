@@ -121,6 +121,42 @@ func labeled(l matcher, st matcher) matcher {
 	}
 }
 
+func deferStmt(e matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*DeferStmt)
+		return err == nil && ok && e(s.Expression, nil)
+	}
+}
+
+func goStmt(e matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*GoStmt)
+		return err == nil && ok && e(s.Expression, nil)
+	}
+}
+
+func fallthroughStmt() matcher {
+	return func(n Node, err error) bool {
+		_, ok := n.(*FallthroughStmt)
+		return err == nil && ok
+	}
+}
+
+func returnStmt(es ...matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*ReturnStmt)
+		if err != nil || !ok || len(es) != len(s.Expressions) {
+			return false
+		}
+		for i, e := range es {
+			if !e(s.Expressions[i], nil) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
 func continueStmt(l matcher) matcher {
 	return func(n Node, err error) bool {
 		s, ok := n.(*ContinueStmt)

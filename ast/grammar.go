@@ -83,9 +83,11 @@ func parseStatement(p *Parser) Statement {
 		}
 
 	case token.Go:
-		panic("unimplemented")
+		return parseGo(p)
+
 	case token.Return:
-		panic("unimplemented")
+		return parseReturn(p)
+
 	case token.Break:
 		return parseBreak(p)
 
@@ -96,7 +98,14 @@ func parseStatement(p *Parser) Statement {
 		return parseGoto(p)
 
 	case token.Fallthrough:
-		panic("unimplemented")
+		c, s, e := p.comments(), p.lex.Start, p.lex.End
+		p.next()
+		return &FallthroughStmt{
+			comments: c,
+			startLoc: s,
+			endLoc: e,
+		}
+
 	case token.OpenBrace:
 		panic("unimplemented")
 	case token.If:
@@ -108,9 +117,48 @@ func parseStatement(p *Parser) Statement {
 	case token.For:
 		panic("unimplemented")
 	case token.Defer:
-		panic("unimplemented")
+		return parseDefer(p)
 	}
 	return parseSimpleStatement(p, true)
+}
+
+func parseGo(p *Parser) Statement {
+	p.expect(token.Go)
+	c, s := p.comments(), p.lex.Start
+	p.next()
+	return &GoStmt{
+		comments: c,
+		startLoc: s,
+		Expression: parseExpression(p),
+	}
+}
+
+func parseDefer(p *Parser) Statement {
+	p.expect(token.Defer)
+	c, s := p.comments(), p.lex.Start
+	p.next()
+	return &DeferStmt{
+		comments: c,
+		startLoc: s,
+		Expression: parseExpression(p),
+	}
+}
+
+func parseReturn(p *Parser) Statement {
+	p.expect(token.Return)
+	c, s, e := p.comments(), p.lex.Start, p.lex.End
+	p.next()
+	var exprs []Expression
+	if expressionFirst[p.tok] {
+		exprs = parseExpressionList(p)
+		e = exprs[len(exprs)-1].End()
+	}
+	return &ReturnStmt{
+		comments: c,
+		startLoc: s,
+		endLoc: e,
+		Expressions: exprs,
+	}
 }
 
 func parseGoto(p *Parser) Statement {
@@ -982,10 +1030,12 @@ func parseCall(p *Parser, left Expression) Expression {
 	p.expect(token.OpenParen)
 	c := &Call{Function: left, openLoc: p.lex.Start}
 	p.next()
-	c.Arguments = parseExpressionList(p)
-	if p.tok == token.DotDotDot {
-		c.DotDotDot = true
-		p.next()
+	if p.tok != token.CloseParen {
+		c.Arguments = parseExpressionList(p)
+		if p.tok == token.DotDotDot {
+			c.DotDotDot = true
+			p.next()
+		}
 	}
 	p.expect(token.CloseParen)
 	c.closeLoc = p.lex.End

@@ -28,7 +28,66 @@ type Statement interface {
 	Comments() []string
 }
 
-// A ContinueStmt is a statement node represent a continue
+// A DeferStmt is a statement node representing a defer statement.
+type DeferStmt struct {
+	comments
+	startLoc token.Location
+	Expression Expression
+}
+
+func (n *DeferStmt) Start() token.Location {
+	return n.startLoc
+}
+
+func (n *DeferStmt) End() token.Location {
+	return n.Expression.End()
+}
+
+// A GoStmt is a statement node representing a go statement.
+type GoStmt struct {
+	comments
+	startLoc token.Location
+	Expression Expression
+}
+
+func (n *GoStmt) Start() token.Location {
+	return n.startLoc
+}
+
+func (n *GoStmt) End() token.Location {
+	return n.Expression.End()
+}
+
+// A ReturnStmt is a statement node representing a return.
+type ReturnStmt struct {
+	comments
+	startLoc, endLoc token.Location
+	Expressions []Expression
+}
+
+func (n *ReturnStmt) Start() token.Location {
+	return n.startLoc
+}
+
+func (n *ReturnStmt) End() token.Location {
+	return n.endLoc
+}
+
+// A FallthroughStmt is a statement node representing a fallthrough.
+type FallthroughStmt struct {
+	comments
+	startLoc, endLoc token.Location
+}
+
+func (n *FallthroughStmt) Start() token.Location {
+	return n.startLoc
+}
+
+func (n *FallthroughStmt) End() token.Location {
+	return n.endLoc
+}
+
+// A ContinueStmt is a statement node representing a continue
 // statement with on optional label.
 type ContinueStmt struct {
 	comments

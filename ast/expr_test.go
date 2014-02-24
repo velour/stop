@@ -49,6 +49,7 @@ func TestPrimaryExpr(t *testing.T) {
 		{`5`, intLit("5")},
 
 		// Call
+		{`a()`, call(a, false)},
 		{`a("bar")`, call(a, false, strLit("bar"))},
 		{`a(b, c, d)`, call(a, false, b, c, d)},
 		{`a(b, c, d...)`, call(a, true, b, c, d)},
