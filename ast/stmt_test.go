@@ -10,6 +10,7 @@ func TestStatements(t *testing.T) {
 	tests := parserTests{
 		{``, empty()},
 		{`;`, empty()},
+		{`fallthrough`, fallthroughStmt()},
 		{`goto a`, gotoStmt(a)},
 		{`break`, breakStmt(nil)},
 		{`break a`, breakStmt(a)},
