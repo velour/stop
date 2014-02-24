@@ -6,7 +6,7 @@ import (
 	"github.com/velour/stop/token"
 )
 
-func TestGotoStatements(t *testing.T) {
+func TestGotoStmts(t *testing.T) {
 	tests := parserTests{
 		{`goto a`, gotoStmt(a)},
 		{`break`, breakStmt(nil)},
@@ -25,7 +25,7 @@ func TestEmptyStatement(t *testing.T) {
 	tests.runStatements(t)
 }
 
-func TestDeclStatement(t *testing.T) {
+func TestDeclarationStmt(t *testing.T) {
 	tests := parserTests{
 		{`const a = 5`, decl(cnst(ms(a), nil, intLit("5")))},
 		{`const a int = 5`, decl(cnst(ms(a), typeName("", "int"), intLit("5")))},
@@ -40,7 +40,7 @@ func TestDeclStatement(t *testing.T) {
 	tests.runStatements(t)
 }
 
-func TestLabeledStatement(t *testing.T) {
+func TestLabeledStmt(t *testing.T) {
 	tests := parserTests{
 		{`here: a = b`, labeled(ident("here"), assign(token.Equal, ms(a), b))},
 		{`here: there: a := b`, labeled(ident("here"), labeled(ident("there"), shortDecl(ms(a), b)))},
@@ -85,7 +85,7 @@ func TestAssignment(t *testing.T) {
 	tests.runStatements(t)
 }
 
-func TestExpressionStatement(t *testing.T) {
+func TestExpressionStmt(t *testing.T) {
 	tests := parserTests{
 		{`a`, expr(a)},
 		{`b`, expr(b)},
@@ -95,7 +95,7 @@ func TestExpressionStatement(t *testing.T) {
 	tests.runStatements(t)
 }
 
-func TestIncDecStatement(t *testing.T) {
+func TestIncDecStmt(t *testing.T) {
 	tests := parserTests{
 		{`a++`, incr(a)},
 		{`b--`, decr(b)},
@@ -104,7 +104,7 @@ func TestIncDecStatement(t *testing.T) {
 	tests.runStatements(t)
 }
 
-func TestSendStatement(t *testing.T) {
+func TestSendStmt(t *testing.T) {
 	tests := parserTests{
 		{`a <- b`, send(a, b)},
 		{`a <- 5`, send(a, intLit("5"))},

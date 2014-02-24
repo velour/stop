@@ -77,7 +77,7 @@ func Parse(p *Parser) (root Node, err error) {
 func parseStatement(p *Parser) Statement {
 	switch p.tok {
 	case token.Type, token.Const, token.Var:
-		return &DeclStatement{
+		return &DeclarationStmt{
 			comments:     p.comments(),
 			Declarations: parseDeclarations(p),
 		}
@@ -117,7 +117,7 @@ func parseGoto(p *Parser) Statement {
 	p.expect(token.Goto)
 	c, s := p.comments(), p.lex.Start
 	p.next()
-	return &GotoStatement{
+	return &GotoStmt{
 		comments: c,
 		startLoc: s,
 		Label:    *parseIdentifier(p),
@@ -132,7 +132,7 @@ func parseContinue(p *Parser) Statement {
 	if p.tok == token.Identifier {
 		l = parseIdentifier(p)
 	}
-	return &ContinueStatement{
+	return &ContinueStmt{
 		comments: c,
 		startLoc: s,
 		Label:    l,
@@ -147,7 +147,7 @@ func parseBreak(p *Parser) Statement {
 	if p.tok == token.Identifier {
 		l = parseIdentifier(p)
 	}
-	return &BreakStatement{
+	return &BreakStmt{
 		comments: c,
 		startLoc: s,
 		Label:    l,
@@ -203,7 +203,7 @@ func parseSimpleStatement(p *Parser, allowLabel bool) Statement {
 	switch {
 	case p.tok == token.LessMinus:
 		p.next()
-		return &SendStatement{
+		return &SendStmt{
 			comments:   cmnts,
 			Channel:    expr,
 			Expression: parseExpression(p),
@@ -212,7 +212,7 @@ func parseSimpleStatement(p *Parser, allowLabel bool) Statement {
 	case p.tok == token.MinusMinus || p.tok == token.PlusPlus:
 		op, opEnd := p.tok, p.lex.End
 		p.next()
-		return &IncDecStatement{
+		return &IncDecStmt{
 			comments:   cmnts,
 			Expression: expr,
 			Op:         op,
@@ -272,14 +272,14 @@ func parseSimpleStatement(p *Parser, allowLabel bool) Statement {
 
 	case allowLabel && isID && p.tok == token.Colon:
 		p.next()
-		return &LabeledStatement{
+		return &LabeledStmt{
 			comments:  cmnts,
 			Label:     *id,
 			Statement: parseStatement(p),
 		}
 
 	default:
-		return &ExpressionStatement{
+		return &ExpressionStmt{
 			comments:   cmnts,
 			Expression: expr,
 		}

@@ -28,78 +28,78 @@ type Statement interface {
 	Comments() []string
 }
 
-// A ContinueStatement is a Statement node represent a continue
+// A ContinueStmt is a statement node represent a continue
 // statement with on optional label.
-type ContinueStatement struct {
+type ContinueStmt struct {
 	comments
 	startLoc token.Location
 	// Label is nil if no label was specified.
 	Label *Identifier
 }
 
-func (n *ContinueStatement) Start() token.Location {
+func (n *ContinueStmt) Start() token.Location {
 	return n.startLoc
 }
 
-func (n *ContinueStatement) End() token.Location {
+func (n *ContinueStmt) End() token.Location {
 	return n.Label.End()
 }
 
-// A BreakStatement is a Statement node represent a break statement
+// A BreakStmt is a statement node represent a break statement
 // with on optional label.
-type BreakStatement struct {
+type BreakStmt struct {
 	comments
 	startLoc token.Location
 	// Label is nil if no label was specified.
 	Label *Identifier
 }
 
-func (n *BreakStatement) Start() token.Location {
+func (n *BreakStmt) Start() token.Location {
 	return n.startLoc
 }
 
-func (n *BreakStatement) End() token.Location {
+func (n *BreakStmt) End() token.Location {
 	return n.Label.End()
 }
 
-// A GotoStatement is a Statement node representing a goto.
-type GotoStatement struct {
+// A GotoStmt is a statement node representing a goto.
+type GotoStmt struct {
 	comments
 	startLoc token.Location
 	Label    Identifier
 }
 
-func (n *GotoStatement) Start() token.Location {
+func (n *GotoStmt) Start() token.Location {
 	return n.startLoc
 }
 
-func (n *GotoStatement) End() token.Location {
+func (n *GotoStmt) End() token.Location {
 	return n.Label.End()
 }
 
-// A LabeledStatement is a Statement node representing a statement
+// A LabeledStmt is a statement node representing a statement
 // that is preceeded by a label.
-type LabeledStatement struct {
+type LabeledStmt struct {
 	comments
 	Label     Identifier
 	Statement Statement
 }
 
-func (n *LabeledStatement) Start() token.Location {
+func (n *LabeledStmt) Start() token.Location {
 	return n.Label.Start()
 }
 
-func (n *LabeledStatement) End() token.Location {
+func (n *LabeledStmt) End() token.Location {
 	return n.Statement.End()
 }
 
-// A DeclStatement is a Statement node representing a series of declarations.
-type DeclStatement struct {
+// A DeclarationStmt is a statement node representing a series of declarations.
+type DeclarationStmt struct {
 	comments
 	Declarations
 }
 
-// A ShortVarDecl is a Statement node representing the declaration of
+// A ShortVarDecl is a statement node representing the declaration of
 // a series of variables.
 type ShortVarDecl struct {
 	comments
@@ -115,7 +115,7 @@ func (n *ShortVarDecl) End() token.Location {
 	return n.Right[len(n.Right)-1].End()
 }
 
-// An Assingment is a Statement node representing an assignment of
+// An Assingment is a statement node representing an assignment of
 // a sequence of expressions.
 type Assignment struct {
 	comments
@@ -133,24 +133,24 @@ func (n *Assignment) End() token.Location {
 	return n.Right[len(n.Right)-1].End()
 }
 
-// An ExpressionStatement is a statement node representing an
+// An ExpressionStmt is a statement node representing an
 // expression evaluation
-type ExpressionStatement struct {
+type ExpressionStmt struct {
 	comments
 	Expression Expression
 }
 
-func (n *ExpressionStatement) Start() token.Location {
+func (n *ExpressionStmt) Start() token.Location {
 	return n.Expression.Start()
 }
 
-func (n *ExpressionStatement) End() token.Location {
+func (n *ExpressionStmt) End() token.Location {
 	return n.Expression.End()
 }
 
-// An IncDecStatement is a statement node representing either an
+// An IncDecStmt is a statement node representing either an
 // increment or a decrement operation.
-type IncDecStatement struct {
+type IncDecStmt struct {
 	comments
 	Expression Expression
 	// Op is either token.PlusPlus or token.MinusMinus, representing
@@ -159,27 +159,27 @@ type IncDecStatement struct {
 	opEnd token.Location
 }
 
-func (n *IncDecStatement) Start() token.Location {
+func (n *IncDecStmt) Start() token.Location {
 	return n.Expression.Start()
 }
 
-func (n *IncDecStatement) End() token.Location {
+func (n *IncDecStmt) End() token.Location {
 	return n.opEnd
 }
 
-// A SendStatement is a statement node representing the sending of
+// A SendStmt is a statement node representing the sending of
 // an expression on a channel.
-type SendStatement struct {
+type SendStmt struct {
 	comments
 	Channel    Expression
 	Expression Expression
 }
 
-func (n *SendStatement) Start() token.Location {
+func (n *SendStmt) Start() token.Location {
 	return n.Channel.Start()
 }
 
-func (n *SendStatement) End() token.Location {
+func (n *SendStmt) End() token.Location {
 	return n.Expression.End()
 }
 

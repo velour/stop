@@ -116,35 +116,35 @@ func (tests parserTests) runStatements(t *testing.T) {
 
 func labeled(l matcher, st matcher) matcher {
 	return func(n Node, err error) bool {
-		s, ok := n.(*LabeledStatement)
+		s, ok := n.(*LabeledStmt)
 		return err == nil && ok && l(&s.Label, nil) && st(s.Statement, nil)
 	}
 }
 
 func continueStmt(l matcher) matcher {
 	return func(n Node, err error) bool {
-		s, ok := n.(*ContinueStatement)
+		s, ok := n.(*ContinueStmt)
 		return err == nil && ok && (s.Label == nil && l == nil || s.Label != nil && l != nil && l(s.Label, nil))
 	}
 }
 
 func breakStmt(l matcher) matcher {
 	return func(n Node, err error) bool {
-		s, ok := n.(*BreakStatement)
+		s, ok := n.(*BreakStmt)
 		return err == nil && ok && (s.Label == nil && l == nil || s.Label != nil && l != nil && l(s.Label, nil))
 	}
 }
 
 func gotoStmt(l matcher) matcher {
 	return func(n Node, err error) bool {
-		s, ok := n.(*GotoStatement)
+		s, ok := n.(*GotoStmt)
 		return err == nil && ok && l(&s.Label, nil)
 	}
 }
 
 func decl(ds ...matcher) matcher {
 	return func(n Node, err error) bool {
-		s, ok := n.(*DeclStatement)
+		s, ok := n.(*DeclarationStmt)
 		if err != nil || !ok || len(ds) != len(s.Declarations) {
 			return false
 		}
@@ -199,28 +199,28 @@ func assign(op token.Token, left []matcher, right ...matcher) matcher {
 
 func expr(ex matcher) matcher {
 	return func(n Node, err error) bool {
-		s, ok := n.(*ExpressionStatement)
+		s, ok := n.(*ExpressionStmt)
 		return err == nil && ok && ex(s.Expression, nil)
 	}
 }
 
 func decr(ex matcher) matcher {
 	return func(n Node, err error) bool {
-		s, ok := n.(*IncDecStatement)
+		s, ok := n.(*IncDecStmt)
 		return err == nil && ok && s.Op == token.MinusMinus && ex(s.Expression, nil)
 	}
 }
 
 func incr(ex matcher) matcher {
 	return func(n Node, err error) bool {
-		s, ok := n.(*IncDecStatement)
+		s, ok := n.(*IncDecStmt)
 		return err == nil && ok && s.Op == token.PlusPlus && ex(s.Expression, nil)
 	}
 }
 
 func send(ch, ex matcher) matcher {
 	return func(n Node, err error) bool {
-		s, ok := n.(*SendStatement)
+		s, ok := n.(*SendStmt)
 		return err == nil && ok && ch(s.Channel, nil) && ex(s.Expression, nil)
 	}
 }
