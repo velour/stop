@@ -15,8 +15,8 @@ func TestStatements(t *testing.T) {
 		{`continue a`, continueStmt(a)},
 		{`return`, returnStmt()},
 		{`return a, b, c`, returnStmt(a, b, c)},
-		{`go a()`, goStmt(call(a, false)) },
-		{`defer a()`, deferStmt(call(a, false)) },
+		{`go a()`, goStmt(call(a, false))},
+		{`defer a()`, deferStmt(call(a, false))},
 	}
 	tests.runStatements(t)
 }

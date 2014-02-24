@@ -103,7 +103,7 @@ func parseStatement(p *Parser) Statement {
 		return &FallthroughStmt{
 			comments: c,
 			startLoc: s,
-			endLoc: e,
+			endLoc:   e,
 		}
 
 	case token.OpenBrace:
@@ -127,8 +127,8 @@ func parseGo(p *Parser) Statement {
 	c, s := p.comments(), p.lex.Start
 	p.next()
 	return &GoStmt{
-		comments: c,
-		startLoc: s,
+		comments:   c,
+		startLoc:   s,
 		Expression: parseExpression(p),
 	}
 }
@@ -138,8 +138,8 @@ func parseDefer(p *Parser) Statement {
 	c, s := p.comments(), p.lex.Start
 	p.next()
 	return &DeferStmt{
-		comments: c,
-		startLoc: s,
+		comments:   c,
+		startLoc:   s,
 		Expression: parseExpression(p),
 	}
 }
@@ -154,9 +154,9 @@ func parseReturn(p *Parser) Statement {
 		e = exprs[len(exprs)-1].End()
 	}
 	return &ReturnStmt{
-		comments: c,
-		startLoc: s,
-		endLoc: e,
+		comments:    c,
+		startLoc:    s,
+		endLoc:      e,
 		Expressions: exprs,
 	}
 }

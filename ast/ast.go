@@ -31,7 +31,7 @@ type Statement interface {
 // A DeferStmt is a statement node representing a defer statement.
 type DeferStmt struct {
 	comments
-	startLoc token.Location
+	startLoc   token.Location
 	Expression Expression
 }
 
@@ -46,7 +46,7 @@ func (n *DeferStmt) End() token.Location {
 // A GoStmt is a statement node representing a go statement.
 type GoStmt struct {
 	comments
-	startLoc token.Location
+	startLoc   token.Location
 	Expression Expression
 }
 
@@ -62,7 +62,7 @@ func (n *GoStmt) End() token.Location {
 type ReturnStmt struct {
 	comments
 	startLoc, endLoc token.Location
-	Expressions []Expression
+	Expressions      []Expression
 }
 
 func (n *ReturnStmt) Start() token.Location {
