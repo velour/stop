@@ -28,6 +28,21 @@ type Statement interface {
 	Comments() []string
 }
 
+// A BlockStmt is a statement node representing block of statements.
+type BlockStmt struct {
+	comments
+	startLoc, endLoc token.Location
+	Statements       []Statement
+}
+
+func (n *BlockStmt) Start() token.Location {
+	return n.startLoc
+}
+
+func (n *BlockStmt) End() token.Location {
+	return n.endLoc
+}
+
 // A DeferStmt is a statement node representing a defer statement.
 type DeferStmt struct {
 	comments

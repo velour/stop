@@ -8,6 +8,8 @@ import (
 
 func TestStatements(t *testing.T) {
 	tests := parserTests{
+		{``, empty()},
+		{`;`, empty()},
 		{`goto a`, gotoStmt(a)},
 		{`break`, breakStmt(nil)},
 		{`break a`, breakStmt(a)},
@@ -21,10 +23,16 @@ func TestStatements(t *testing.T) {
 	tests.runStatements(t)
 }
 
-func TestEmptyStatement(t *testing.T) {
+func TestBlock(t *testing.T) {
 	tests := parserTests{
-		{``, empty()},
-		{`;`, empty()},
+		{`{}`, block()},
+		{`{{{}}}`, block(block(block()))},
+		{`{ a = b; c = d; }`, block(assign(token.Equal, ms(a), b), assign(token.Equal, ms(c), d))},
+		{`{ a = b; c = d }`, block(assign(token.Equal, ms(a), b), assign(token.Equal, ms(c), d))},
+		{`{
+			a = b
+			c = d
+		}`, block(assign(token.Equal, ms(a), b), assign(token.Equal, ms(c), d))},
 	}
 	tests.runStatements(t)
 }

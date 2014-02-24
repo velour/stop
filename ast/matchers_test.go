@@ -121,6 +121,21 @@ func labeled(l matcher, st matcher) matcher {
 	}
 }
 
+func block(stmts ...matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*BlockStmt)
+		if err != nil || !ok || len(stmts) != len(s.Statements) {
+			return false
+		}
+		for i, stmt := range stmts {
+			if !stmt(s.Statements[i], nil) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
 func deferStmt(e matcher) matcher {
 	return func(n Node, err error) bool {
 		s, ok := n.(*DeferStmt)

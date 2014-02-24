@@ -107,7 +107,8 @@ func parseStatement(p *Parser) Statement {
 		}
 
 	case token.OpenBrace:
-		panic("unimplemented")
+		return parseBlock(p)
+
 	case token.If:
 		panic("unimplemented")
 	case token.Switch:
@@ -120,6 +121,28 @@ func parseStatement(p *Parser) Statement {
 		return parseDefer(p)
 	}
 	return parseSimpleStatement(p, true)
+}
+
+func parseBlock(p *Parser) Statement {
+	p.expect(token.OpenBrace)
+	c, s := p.comments(), p.lex.Start
+	p.next()
+	var stmts []Statement
+	for p.tok != token.CloseBrace {
+		stmts = append(stmts, parseStatement(p))
+		if p.tok == token.Semicolon {
+			p.next()
+		}
+	}
+	p.expect(token.CloseBrace)
+	e := p.lex.End
+	p.next()
+	return &BlockStmt{
+		comments:   c,
+		startLoc:   s,
+		endLoc:     e,
+		Statements: stmts,
+	}
 }
 
 func parseGo(p *Parser) Statement {
