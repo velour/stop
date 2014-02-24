@@ -6,6 +6,14 @@ import (
 	"github.com/velour/stop/token"
 )
 
+func TestEmptyStatement(t *testing.T) {
+	tests := parserTests{
+		{``, empty()},
+		{`;`, empty()},
+	}
+	tests.runStatements(t)
+}
+
 func TestDeclStatement(t *testing.T) {
 	tests := parserTests{
 		{`const a = 5`, decl(cnst(ms(a), nil, intLit("5")))},
