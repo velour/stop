@@ -6,6 +6,17 @@ import (
 	"github.com/velour/stop/token"
 )
 
+func TestGotoStatements(t *testing.T) {
+	tests := parserTests{
+		{`goto a`, gotoStmt(a)},
+		{`break`, breakStmt(nil)},
+		{`break a`, breakStmt(a)},
+		{`continue`, continueStmt(nil)},
+		{`continue a`, continueStmt(a)},
+	}
+	tests.runStatements(t)
+}
+
 func TestEmptyStatement(t *testing.T) {
 	tests := parserTests{
 		{``, empty()},

@@ -121,6 +121,27 @@ func labeled(l matcher, st matcher) matcher {
 	}
 }
 
+func continueStmt(l matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*ContinueStatement)
+		return err == nil && ok && (s.Label == nil && l == nil || s.Label != nil && l != nil && l(s.Label, nil))
+	}
+}
+
+func breakStmt(l matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*BreakStatement)
+		return err == nil && ok && (s.Label == nil && l == nil || s.Label != nil && l != nil && l(s.Label, nil))
+	}
+}
+
+func gotoStmt(l matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*GotoStatement)
+		return err == nil && ok && l(&s.Label, nil)
+	}
+}
+
 func decl(ds ...matcher) matcher {
 	return func(n Node, err error) bool {
 		s, ok := n.(*DeclStatement)

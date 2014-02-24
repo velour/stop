@@ -28,6 +28,55 @@ type Statement interface {
 	Comments() []string
 }
 
+// A ContinueStatement is a Statement node represent a continue
+// statement with on optional label.
+type ContinueStatement struct {
+	comments
+	startLoc token.Location
+	// Label is nil if no label was specified.
+	Label *Identifier
+}
+
+func (n *ContinueStatement) Start() token.Location {
+	return n.startLoc
+}
+
+func (n *ContinueStatement) End() token.Location {
+	return n.Label.End()
+}
+
+// A BreakStatement is a Statement node represent a break statement
+// with on optional label.
+type BreakStatement struct {
+	comments
+	startLoc token.Location
+	// Label is nil if no label was specified.
+	Label *Identifier
+}
+
+func (n *BreakStatement) Start() token.Location {
+	return n.startLoc
+}
+
+func (n *BreakStatement) End() token.Location {
+	return n.Label.End()
+}
+
+// A GotoStatement is a Statement node representing a goto.
+type GotoStatement struct {
+	comments
+	startLoc token.Location
+	Label    Identifier
+}
+
+func (n *GotoStatement) Start() token.Location {
+	return n.startLoc
+}
+
+func (n *GotoStatement) End() token.Location {
+	return n.Label.End()
+}
+
 // A LabeledStatement is a Statement node representing a statement
 // that is preceeded by a label.
 type LabeledStatement struct {

@@ -87,11 +87,14 @@ func parseStatement(p *Parser) Statement {
 	case token.Return:
 		panic("unimplemented")
 	case token.Break:
-		panic("unimplemented")
+		return parseBreak(p)
+
 	case token.Continue:
-		panic("unimplemented")
+		return parseContinue(p)
+
 	case token.Goto:
-		panic("unimplemented")
+		return parseGoto(p)
+
 	case token.Fallthrough:
 		panic("unimplemented")
 	case token.OpenBrace:
@@ -108,6 +111,47 @@ func parseStatement(p *Parser) Statement {
 		panic("unimplemented")
 	}
 	return parseSimpleStatement(p, true)
+}
+
+func parseGoto(p *Parser) Statement {
+	p.expect(token.Goto)
+	c, s := p.comments(), p.lex.Start
+	p.next()
+	return &GotoStatement{
+		comments: c,
+		startLoc: s,
+		Label:    *parseIdentifier(p),
+	}
+}
+
+func parseContinue(p *Parser) Statement {
+	p.expect(token.Continue)
+	c, s := p.comments(), p.lex.Start
+	p.next()
+	var l *Identifier
+	if p.tok == token.Identifier {
+		l = parseIdentifier(p)
+	}
+	return &ContinueStatement{
+		comments: c,
+		startLoc: s,
+		Label:    l,
+	}
+}
+
+func parseBreak(p *Parser) Statement {
+	p.expect(token.Break)
+	c, s := p.comments(), p.lex.Start
+	p.next()
+	var l *Identifier
+	if p.tok == token.Identifier {
+		l = parseIdentifier(p)
+	}
+	return &BreakStatement{
+		comments: c,
+		startLoc: s,
+		Label:    l,
+	}
 }
 
 // AssignOps is a slice of all assignment operatiors.
