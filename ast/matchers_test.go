@@ -30,7 +30,7 @@ func ms(ms ...matcher) []matcher {
 // Returns true if both the node and matcher are nil, or if they are
 // both non-nil and the matcher matches the node.
 func nilOr(n Node, m matcher) bool {
-	return (n == nil && m == nil) || (n != nil && m != nil && m(n, nil))
+	return n == nil && m == nil || n != nil && m != nil && m(n, nil)
 }
 
 func parseErr(reStr string) matcher {
@@ -112,6 +112,13 @@ func (tests parserTests) runStatements(t *testing.T) {
 	tests.run(t, func(p *Parser) Node {
 		return parseStatement(p)
 	})
+}
+
+func ifStmt(st matcher, cond matcher, blk matcher, els matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*IfStmt)
+		return err == nil && ok && nilOr(s.Statement, st) && cond(s.Condition, nil) && blk(&s.Block, nil) && nilOr(s.Else, els)
+	}
 }
 
 func labeled(l matcher, st matcher) matcher {

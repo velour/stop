@@ -28,6 +28,31 @@ type Statement interface {
 	Comments() []string
 }
 
+// An IfStmt is a statement node representing an if statement.
+type IfStmt struct {
+	comments
+	startLoc token.Location
+	// Statement is a simple statement evaluated before the condition.
+	Statement Statement
+	Condition Expression
+	// Block is a block statement, evaluated if the condition is true.
+	Block BlockStmt
+	// Else is an optional (may be nil) if or block statement, evaluated
+	// if the condition is false.
+	Else Statement
+}
+
+func (n *IfStmt) Start() token.Location {
+	return n.startLoc
+}
+
+func (n *IfStmt) End() token.Location {
+	if n.Else != nil {
+		return n.Else.End()
+	}
+	return n.Block.End()
+}
+
 // A BlockStmt is a statement node representing block of statements.
 type BlockStmt struct {
 	comments
@@ -189,7 +214,7 @@ func (n *ShortVarDecl) End() token.Location {
 	return n.Right[len(n.Right)-1].End()
 }
 
-// An Assingment is a statement node representing an assignment of
+// An Assignment is a statement node representing an assignment of
 // a sequence of expressions.
 type Assignment struct {
 	comments

@@ -110,7 +110,8 @@ func parseStatement(p *Parser) Statement {
 		return parseBlock(p)
 
 	case token.If:
-		panic("unimplemented")
+		return parseIf(p)
+
 	case token.Switch:
 		panic("unimplemented")
 	case token.Select:
@@ -120,10 +121,38 @@ func parseStatement(p *Parser) Statement {
 	case token.Defer:
 		return parseDefer(p)
 	}
-	return parseSimpleStatement(p, true)
+	return parseSimpleStmt(p, true)
 }
 
-func parseBlock(p *Parser) Statement {
+func parseIf(p *Parser) Statement {
+	ifst := &IfStmt{comments: p.comments(), startLoc: p.lex.Start}
+	p.expect(token.If)
+	p.next()
+
+	stmt := parseSimpleStmt(p, false)
+	if expr, ok := stmt.(*ExpressionStmt); ok && p.tok == token.OpenBrace {
+		ifst.Condition = expr.Expression
+		ifst.Block = *parseBlock(p)
+	} else {
+		p.expect(token.Semicolon)
+		p.next()
+		ifst.Statement = stmt
+		ifst.Condition = parseExpression(p)
+		ifst.Block = *parseBlock(p)
+	}
+	if p.tok != token.Else {
+		return ifst
+	}
+	p.next()
+	if p.tok == token.If {
+		ifst.Else = parseIf(p)
+		return ifst
+	}
+	ifst.Else = parseBlock(p)
+	return ifst
+}
+
+func parseBlock(p *Parser) *BlockStmt {
 	p.expect(token.OpenBrace)
 	c, s := p.comments(), p.lex.Start
 	p.next()
@@ -263,7 +292,7 @@ func expectAssign(p *Parser) token.Token {
 	panic(p.err(assignOps[0], ops...))
 }
 
-func parseSimpleStatement(p *Parser, allowLabel bool) Statement {
+func parseSimpleStmt(p *Parser, allowLabel bool) Statement {
 	cmnts := p.comments()
 	if !expressionFirst[p.tok] {
 		// Empty statement

@@ -24,6 +24,27 @@ func TestStatements(t *testing.T) {
 	tests.runStatements(t)
 }
 
+func TestIf(t *testing.T) {
+	tests := parserTests{
+		{`if a { b }`, ifStmt(nil, a, block(expr(b)), nil)},
+		{`if a; b { c }`, ifStmt(expr(a), b, block(expr(c)), nil)},
+		{`if a; b { c } else { d }`, ifStmt(expr(a), b, block(expr(c)), block(expr(d)))},
+		{
+			`if a; b { c } else if d { 1 }`,
+			ifStmt(expr(a), b, block(expr(c)),
+				ifStmt(nil, d, block(expr(intLit("1"))), nil)),
+		},
+		{
+			`if a { 1 } else if b { 2 } else if c { 3 } else { 4 }`,
+			ifStmt(nil, a, block(expr(intLit("1"))),
+				ifStmt(nil, b, block(expr(intLit("2"))),
+					ifStmt(nil, c, block(expr(intLit("3"))),
+						block(expr(intLit("4")))))),
+		},
+	}
+	tests.runStatements(t)
+}
+
 func TestBlock(t *testing.T) {
 	tests := parserTests{
 		{`{}`, block()},
