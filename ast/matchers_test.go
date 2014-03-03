@@ -114,6 +114,20 @@ func (tests parserTests) runStatements(t *testing.T) {
 	})
 }
 
+func forRange(rng matcher, blk matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*ForStmt)
+		return err == nil && ok && s.Init == nil && s.Condition == nil && s.Post == nil && rng(s.Range, nil) && blk(&s.Block, nil)
+	}
+}
+
+func forLoop(init matcher, cond matcher, post matcher, blk matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*ForStmt)
+		return err == nil && ok && s.Range == nil && nilOr(s.Init, init) && nilOr(s.Condition, cond) && nilOr(s.Post, post) && blk(&s.Block, nil)
+	}
+}
+
 func ifStmt(st matcher, cond matcher, blk matcher, els matcher) matcher {
 	return func(n Node, err error) bool {
 		s, ok := n.(*IfStmt)

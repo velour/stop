@@ -117,11 +117,48 @@ func parseStatement(p *Parser) Statement {
 	case token.Select:
 		panic("unimplemented")
 	case token.For:
-		panic("unimplemented")
+		return parseFor(p)
+
 	case token.Defer:
 		return parseDefer(p)
 	}
-	return parseSimpleStmt(p, true)
+	return parseSimpleStmt(p, allowLabel)
+}
+
+// A rangeClause is either an Assignment or a ShortVarDecl statement
+// repressenting a range clause in a range-style for loop.
+type rangeClause struct {
+	Statement
+}
+
+func parseFor(p *Parser) Statement {
+	f := &ForStmt{comments: p.comments(), startLoc: p.lex.Start}
+	p.expect(token.For)
+	p.next()
+
+	if p.tok == token.OpenBrace {
+		f.Block = *parseBlock(p)
+		return f
+	}
+
+	stmt := parseSimpleStmt(p, allowRange)
+	if r, ok := stmt.(rangeClause); ok {
+		f.Range = r.Statement
+	} else if ex, ok := stmt.(*ExpressionStmt); ok && p.tok == token.OpenBrace {
+		f.Condition = ex.Expression
+	} else {
+		f.Init = stmt
+		p.expect(token.Semicolon)
+		p.next()
+		if p.tok != token.Semicolon {
+			f.Condition = parseExpression(p)
+		}
+		p.expect(token.Semicolon)
+		p.next()
+		f.Post = parseSimpleStmt(p, 0)
+	}
+	f.Block = *parseBlock(p)
+	return f
 }
 
 func parseIf(p *Parser) Statement {
@@ -129,7 +166,7 @@ func parseIf(p *Parser) Statement {
 	p.expect(token.If)
 	p.next()
 
-	stmt := parseSimpleStmt(p, false)
+	stmt := parseSimpleStmt(p, 0)
 	if expr, ok := stmt.(*ExpressionStmt); ok && p.tok == token.OpenBrace {
 		ifst.Condition = expr.Expression
 		ifst.Block = *parseBlock(p)
@@ -292,12 +329,42 @@ func expectAssign(p *Parser) token.Token {
 	panic(p.err(assignOps[0], ops...))
 }
 
-func parseSimpleStmt(p *Parser, allowLabel bool) Statement {
+// SimpOpts are some options for simple statement parsing.
+// They allow for non-simple statements.
+type simpOpts int
+
+const (
+	// AllowLabel allows parseSimpleStmt to return label statements.
+	allowLabel simpOpts = 1<<iota + 1
+	// AllowRange allows parseSimpleStmt to return RangeClauses
+	// for either assingment or short variable declarations.
+	allowRange
+)
+
+// BUG(eaburns): This is ugly and handles too many cases.
+func parseSimpleStmt(p *Parser, opts simpOpts) (st Statement) {
 	cmnts := p.comments()
 	if !expressionFirst[p.tok] {
 		// Empty statement
 		return nil
 	}
+
+	// Wrap assignments and short variable declarations in a rangeClause
+	// on return, if range clauses are allowed and their right-hand-side
+	// was preceeded by a range token.
+	isRange := false
+	defer func() {
+		if !isRange {
+			return
+		}
+		_, a := st.(*Assignment)
+		_, d := st.(*ShortVarDecl)
+		if !a && !d {
+			panic("bad range")
+		}
+		st = rangeClause{st}
+	}()
+
 	expr := parseExpression(p)
 	id, isID := expr.(*Identifier)
 	switch {
@@ -322,6 +389,10 @@ func parseSimpleStmt(p *Parser, allowLabel bool) Statement {
 	case assignOp[p.tok]:
 		op := p.tok
 		p.next()
+		if opts&allowRange > 0 && op == token.Equal && p.tok == token.Range {
+			p.next()
+			isRange = true
+		}
 		return &Assignment{
 			comments: cmnts,
 			Op:       op,
@@ -346,6 +417,10 @@ func parseSimpleStmt(p *Parser, allowLabel bool) Statement {
 		// a short variable declaration.  Otherwise, it's an assignment.
 		if len(ids) == len(exprs) && p.tok == token.ColonEqual {
 			p.next()
+			if opts&allowRange > 0 && p.tok == token.Range {
+				p.next()
+				isRange = true
+			}
 			return &ShortVarDecl{
 				comments: cmnts,
 				Left:     ids,
@@ -355,6 +430,10 @@ func parseSimpleStmt(p *Parser, allowLabel bool) Statement {
 
 		op := expectAssign(p)
 		p.next()
+		if opts&allowRange > 0 && op == token.Equal && p.tok == token.Range {
+			p.next()
+			isRange = true
+		}
 		return &Assignment{
 			comments: cmnts,
 			Op:       op,
@@ -364,13 +443,17 @@ func parseSimpleStmt(p *Parser, allowLabel bool) Statement {
 
 	case isID && p.tok == token.ColonEqual:
 		p.next()
+		if opts&allowRange > 0 && p.tok == token.Range {
+			p.next()
+			isRange = true
+		}
 		return &ShortVarDecl{
 			comments: cmnts,
 			Left:     []Identifier{*id},
 			Right:    parseExpressionList(p),
 		}
 
-	case allowLabel && isID && p.tok == token.Colon:
+	case opts&allowLabel > 0 && isID && p.tok == token.Colon:
 		p.next()
 		return &LabeledStmt{
 			comments:  cmnts,

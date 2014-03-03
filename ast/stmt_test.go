@@ -24,6 +24,70 @@ func TestStatements(t *testing.T) {
 	tests.runStatements(t)
 }
 
+func TestFor(t *testing.T) {
+	tests := parserTests{
+		{`for { a }`, forLoop(nil, nil, nil, block(expr(a)))},
+		{`for a { b }`, forLoop(nil, a, nil, block(expr(b)))},
+		{
+			`for a := 1; b; a++ { c }`,
+			forLoop(shortDecl(ms(a), intLit("1")),
+				b,
+				incr(a),
+				block(expr(c))),
+		},
+		{
+			`for ; b; a++ { c }`,
+			forLoop(nil,
+				b,
+				incr(a),
+				block(expr(c))),
+		},
+		{
+			`for a := 1; ; a++ { c }`,
+			forLoop(shortDecl(ms(a), intLit("1")),
+				nil,
+				incr(a),
+				block(expr(c))),
+		},
+		{
+			`for a := 1; b;  { c }`,
+			forLoop(shortDecl(ms(a), intLit("1")),
+				b,
+				nil,
+				block(expr(c))),
+		},
+		{`for ; ;  { c }`, forLoop(nil, nil, nil, block(expr(c)))},
+		{
+			`for a, b, c *= 1, 2, 3; true; a++ { d }`,
+			forLoop(assign(token.StarEqual, ms(a, b, c), intLit("1"), intLit("2"), intLit("3")),
+				ident("true"),
+				incr(a),
+				block(expr(d))),
+		},
+		{
+			`for a := range b { c }`,
+			forRange(shortDecl(ms(a), b), block(expr(c))),
+		},
+		{
+			`for a, b := range c { d }`,
+			forRange(shortDecl(ms(a, b), c), block(expr(d))),
+		},
+		{
+			`for a = range b { c }`,
+			forRange(assign(token.Equal, ms(a), b), block(expr(c))),
+		},
+		{
+			`for a, b = range c { d }`,
+			forRange(assign(token.Equal, ms(a, b), c), block(expr(d))),
+		},
+
+		// Range is unexpected with any assign op other that =.
+		{`for a *= range b { c }`, parseErr("range")},
+		{`for a, b *= range c { d }`, parseErr("range")},
+	}
+	tests.runStatements(t)
+}
+
 func TestIf(t *testing.T) {
 	tests := parserTests{
 		{`if a { b }`, ifStmt(nil, a, block(expr(b)), nil)},

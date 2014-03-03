@@ -28,6 +28,37 @@ type Statement interface {
 	Comments() []string
 }
 
+// A ForStmt is a statement node representing a for loop.
+type ForStmt struct {
+	comments
+	startLoc token.Location
+
+	// Block is the body of the for loop.
+	Block BlockStmt
+
+	// Range is an Assignment or a ShortVardecl representing a
+	// range clause, or nil for non-range loops.
+	Range Statement
+
+	// Init is evaluated before non-range loops.  It is nil for both
+	// range-style for loops and for loops with no initialization.
+	Init Statement
+	// Condition is the condition for a non-range loop, or nil for
+	// either a range-style for loop or a conditionless for loop.
+	Condition Expression
+	// Post is evaluated after non-range loops.  It is nil for both
+	// range-style for loops and for loops with no post statement.
+	Post Statement
+}
+
+func (n *ForStmt) Start() token.Location {
+	return n.startLoc
+}
+
+func (n *ForStmt) End() token.Location {
+	return n.Block.End()
+}
+
 // An IfStmt is a statement node representing an if statement.
 type IfStmt struct {
 	comments
