@@ -8,46 +8,6 @@ import (
 	"github.com/velour/stop/token"
 )
 
-var (
-	// Binary op precedence for precedence climbing algorithm.
-	// http://www.engr.mun.ca/~theo/Misc/exp_parsing.htm
-	//
-	// BUG(eaburns): Define tokens.NTokens and change
-	// map[token.Token]Whatever to [nTokens]Whatever.
-	precedence = map[token.Token]int{
-		token.OrOr:           1,
-		token.AndAnd:         2,
-		token.EqualEqual:     3,
-		token.BangEqual:      3,
-		token.Less:           3,
-		token.LessEqual:      3,
-		token.Greater:        3,
-		token.GreaterEqual:   3,
-		token.Plus:           4,
-		token.Minus:          4,
-		token.Or:             4,
-		token.Carrot:         4,
-		token.Star:           5,
-		token.Divide:         5,
-		token.Percent:        5,
-		token.LessLess:       5,
-		token.GreaterGreater: 5,
-		token.And:            5,
-		token.AndCarrot:      5,
-	}
-
-	// Set of unary operators.
-	unary = map[token.Token]bool{
-		token.Plus:      true,
-		token.Minus:     true,
-		token.Bang:      true,
-		token.Carrot:    true,
-		token.Star:      true,
-		token.And:       true,
-		token.LessMinus: true,
-	}
-)
-
 // Parse returns the root of an abstract syntax tree for the Go language
 // or an error if one is encountered.
 //
@@ -1025,36 +985,76 @@ func parseTypeName(p *Parser) Type {
 	return n
 }
 
-// ExpressionFirst is the set of tokens that may begin an expression.
-var expressionFirst = map[token.Token]bool{
-	// Unary Op
-	token.Plus:      true,
-	token.Minus:     true,
-	token.Bang:      true,
-	token.Carrot:    true,
-	token.Star:      true,
-	token.And:       true,
-	token.LessMinus: true,
+var (
+	// ExpressionFirst is the set of tokens that may begin an expression.
+	expressionFirst = map[token.Token]bool{
+		// Unary Op
+		token.Plus:      true,
+		token.Minus:     true,
+		token.Bang:      true,
+		token.Carrot:    true,
+		token.Star:      true,
+		token.And:       true,
+		token.LessMinus: true,
 
-	// Type First
-	token.Identifier: true,
-	//	token.Star:        true,
-	token.OpenBracket: true,
-	token.Struct:      true,
-	token.Func:        true,
-	token.Interface:   true,
-	token.Map:         true,
-	token.Chan:        true,
-	//	token.LessMinus:   true,
-	token.OpenParen: true,
+		// Type First
+		token.Identifier: true,
+		//	token.Star:        true,
+		token.OpenBracket: true,
+		token.Struct:      true,
+		token.Func:        true,
+		token.Interface:   true,
+		token.Map:         true,
+		token.Chan:        true,
+		//	token.LessMinus:   true,
+		token.OpenParen: true,
 
-	// Literals
-	token.IntegerLiteral:   true,
-	token.FloatLiteral:     true,
-	token.ImaginaryLiteral: true,
-	token.RuneLiteral:      true,
-	token.StringLiteral:    true,
-}
+		// Literals
+		token.IntegerLiteral:   true,
+		token.FloatLiteral:     true,
+		token.ImaginaryLiteral: true,
+		token.RuneLiteral:      true,
+		token.StringLiteral:    true,
+	}
+
+	// Binary op precedence for precedence climbing algorithm.
+	// http://www.engr.mun.ca/~theo/Misc/exp_parsing.htm
+	//
+	// BUG(eaburns): Define tokens.NTokens and change
+	// map[token.Token]Whatever to [nTokens]Whatever.
+	precedence = map[token.Token]int{
+		token.OrOr:           1,
+		token.AndAnd:         2,
+		token.EqualEqual:     3,
+		token.BangEqual:      3,
+		token.Less:           3,
+		token.LessEqual:      3,
+		token.Greater:        3,
+		token.GreaterEqual:   3,
+		token.Plus:           4,
+		token.Minus:          4,
+		token.Or:             4,
+		token.Carrot:         4,
+		token.Star:           5,
+		token.Divide:         5,
+		token.Percent:        5,
+		token.LessLess:       5,
+		token.GreaterGreater: 5,
+		token.And:            5,
+		token.AndCarrot:      5,
+	}
+
+	// Set of unary operators.
+	unary = map[token.Token]bool{
+		token.Plus:      true,
+		token.Minus:     true,
+		token.Bang:      true,
+		token.Carrot:    true,
+		token.Star:      true,
+		token.And:       true,
+		token.LessMinus: true,
+	}
+)
 
 func parseExpression(p *Parser) Expression {
 	return parseBinaryExpr(p, 1)
