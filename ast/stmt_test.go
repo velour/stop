@@ -84,6 +84,12 @@ func TestFor(t *testing.T) {
 		// Range is unexpected with any assign op other that =.
 		{`for a *= range b { c }`, parseErr("range")},
 		{`for a, b *= range c { d }`, parseErr("range")},
+
+		// Only a single expression allow on LHS of a range.
+		{`for a := range b, c { d }`, parseErr("")},
+		{`for a, b := range c, d { 1 }`, parseErr("")},
+		{`for a = range b, c { d }`, parseErr("")},
+		{`for a, b = range c, d { 1 }`, parseErr("")},
 	}
 	tests.runStatements(t)
 }

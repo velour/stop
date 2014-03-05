@@ -301,30 +301,13 @@ const (
 	allowRange
 )
 
-// BUG(eaburns): This is ugly and handles too many cases.
 func parseSimpleStmt(p *Parser, opts simpOpts) (st Statement) {
 	cmnts := p.comments()
 	if !expressionFirst[p.tok] {
 		// Empty statement
 		return nil
 	}
-
-	// Wrap assignments and short variable declarations in a rangeClause
-	// on return, if range clauses are allowed and their right-hand-side
-	// was preceeded by a range token.
-	isRange := false
-	defer func() {
-		if !isRange {
-			return
-		}
-		_, a := st.(*Assignment)
-		_, d := st.(*ShortVarDecl)
-		if !a && !d {
-			panic("bad range")
-		}
-		st = rangeClause{st}
-	}()
-
+	rng := opts&allowRange > 0
 	expr := parseExpression(p)
 	id, isID := expr.(*Identifier)
 	switch {
@@ -347,18 +330,7 @@ func parseSimpleStmt(p *Parser, opts simpOpts) (st Statement) {
 		}
 
 	case assignOp[p.tok]:
-		op := p.tok
-		p.next()
-		if opts&allowRange > 0 && op == token.Equal && p.tok == token.Range {
-			p.next()
-			isRange = true
-		}
-		return &Assignment{
-			comments: cmnts,
-			Op:       op,
-			Left:     []Expression{expr},
-			Right:    parseExpressionList(p),
-		}
+		return parseAssignmentTail(p, cmnts, []Expression{expr}, rng)
 
 	case p.tok == token.Comma:
 		p.next()
@@ -376,42 +348,12 @@ func parseSimpleStmt(p *Parser, opts simpOpts) (st Statement) {
 		// If all the expressions were identifiers then we could have
 		// a short variable declaration.  Otherwise, it's an assignment.
 		if len(ids) == len(exprs) && p.tok == token.ColonEqual {
-			p.next()
-			if opts&allowRange > 0 && p.tok == token.Range {
-				p.next()
-				isRange = true
-			}
-			return &ShortVarDecl{
-				comments: cmnts,
-				Left:     ids,
-				Right:    parseExpressionList(p),
-			}
+			return parseShortVarDeclTail(p, cmnts, ids, rng)
 		}
-
-		op := expectAssign(p)
-		p.next()
-		if opts&allowRange > 0 && op == token.Equal && p.tok == token.Range {
-			p.next()
-			isRange = true
-		}
-		return &Assignment{
-			comments: cmnts,
-			Op:       op,
-			Left:     exprs,
-			Right:    parseExpressionList(p),
-		}
+		return parseAssignmentTail(p, cmnts, exprs, rng)
 
 	case isID && p.tok == token.ColonEqual:
-		p.next()
-		if opts&allowRange > 0 && p.tok == token.Range {
-			p.next()
-			isRange = true
-		}
-		return &ShortVarDecl{
-			comments: cmnts,
-			Left:     []Identifier{*id},
-			Right:    parseExpressionList(p),
-		}
+		return parseShortVarDeclTail(p, cmnts, []Identifier{*id}, rng)
 
 	case opts&allowLabel > 0 && isID && p.tok == token.Colon:
 		p.next()
@@ -426,6 +368,50 @@ func parseSimpleStmt(p *Parser, opts simpOpts) (st Statement) {
 			comments:   cmnts,
 			Expression: expr,
 		}
+	}
+}
+
+// Parses a short variable declaration beginning with the := operator.  If
+// allowRange is true, then a rangeClause is returned if the range
+// keyword appears after the := operator.
+func parseShortVarDeclTail(p *Parser, cmnts comments, ids []Identifier, allowRange bool) Statement {
+	p.expect(token.ColonEqual)
+	p.next()
+	if allowRange && p.tok == token.Range {
+		p.next()
+		return rangeClause{&ShortVarDecl{
+			comments: cmnts,
+			Left:     ids,
+			Right:    []Expression{parseExpression(p)},
+		}}
+	}
+	return &ShortVarDecl{
+		comments: cmnts,
+		Left:     ids,
+		Right:    parseExpressionList(p),
+	}
+}
+
+// Parses an assignment statement beginning with the assignment
+// operator.  If allowRange is true, then a rangeClause is returned
+// if the range keyword appears after the assignment operator.
+func parseAssignmentTail(p *Parser, cmnts comments, exprs []Expression, allowRange bool) Statement {
+	op := expectAssign(p)
+	p.next()
+	if allowRange && op == token.Equal && p.tok == token.Range {
+		p.next()
+		return rangeClause{&Assignment{
+			comments: cmnts,
+			Op:       op,
+			Left:     exprs,
+			Right:    []Expression{parseExpression(p)},
+		}}
+	}
+	return &Assignment{
+		comments: cmnts,
+		Op:       op,
+		Left:     exprs,
+		Right:    parseExpressionList(p),
 	}
 }
 
