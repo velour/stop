@@ -114,17 +114,75 @@ func (tests parserTests) runStatements(t *testing.T) {
 	})
 }
 
+type caseMatcher struct {
+	guards []matcher
+	stmts  []matcher
+}
+
+func exprSwitch(init matcher, expr matcher, cases ...caseMatcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*ExprSwitch)
+		if !ok || !nilOr(s.Initialization, init) || !nilOr(s.Expression, expr) || len(cases) != len(s.Cases) {
+			return false
+		}
+		for i, c := range cases {
+			if len(c.guards) != len(s.Cases[i].Expressions) || len(c.stmts) != len(s.Cases[i].Statements) {
+				return false
+			}
+			for j, m := range c.guards {
+				if !m(s.Cases[i].Expressions[j], nil) {
+					return false
+				}
+			}
+			for j, m := range c.stmts {
+				if !m(s.Cases[i].Statements[j], nil) {
+					return false
+				}
+			}
+		}
+		return true
+	}
+}
+
+func typeSwitch(init matcher, decl matcher, expr matcher, cases ...caseMatcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*TypeSwitch)
+		if !ok || !nilOr(s.Initialization, init) || !expr(s.Expression, nil) || len(cases) != len(s.Cases) {
+			return false
+		}
+		if (s.Declaration == nil) != (decl == nil) || (decl != nil && !decl(s.Declaration, nil)) {
+			return false
+		}
+		for i, c := range cases {
+			if len(c.guards) != len(s.Cases[i].Types) || len(c.stmts) != len(s.Cases[i].Statements) {
+				return false
+			}
+			for j, m := range c.guards {
+				if !m(s.Cases[i].Types[j], nil) {
+					return false
+				}
+			}
+			for j, m := range c.stmts {
+				if !m(s.Cases[i].Statements[j], nil) {
+					return false
+				}
+			}
+		}
+		return true
+	}
+}
+
 func forRange(rng matcher, blk matcher) matcher {
 	return func(n Node, err error) bool {
 		s, ok := n.(*ForStmt)
-		return err == nil && ok && s.Init == nil && s.Condition == nil && s.Post == nil && rng(s.Range, nil) && blk(&s.Block, nil)
+		return err == nil && ok && s.Initialization == nil && s.Condition == nil && s.Post == nil && rng(s.Range, nil) && blk(&s.Block, nil)
 	}
 }
 
 func forLoop(init matcher, cond matcher, post matcher, blk matcher) matcher {
 	return func(n Node, err error) bool {
 		s, ok := n.(*ForStmt)
-		return err == nil && ok && s.Range == nil && nilOr(s.Init, init) && nilOr(s.Condition, cond) && nilOr(s.Post, post) && blk(&s.Block, nil)
+		return err == nil && ok && s.Range == nil && nilOr(s.Initialization, init) && nilOr(s.Condition, cond) && nilOr(s.Post, post) && blk(&s.Block, nil)
 	}
 }
 

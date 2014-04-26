@@ -73,9 +73,11 @@ func parseStatement(p *Parser) Statement {
 		return parseIf(p)
 
 	case token.Switch:
-		panic("unimplemented")
+		return parseSwitch(p)
+
 	case token.Select:
 		panic("unimplemented")
+
 	case token.For:
 		return parseFor(p)
 
@@ -83,6 +85,159 @@ func parseStatement(p *Parser) Statement {
 		return parseDefer(p)
 	}
 	return parseSimpleStmt(p, labelOK)
+}
+
+func parseSwitch(p *Parser) Statement {
+	p.expect(token.Switch)
+	loc := p.lex.Start
+	cmnts := p.comments()
+	p.next()
+
+	stmt := parseSimpleStmt(p, guardOK)
+	if expr, id := guardStatement(stmt); expr != nil {
+		return parseTypeSwitchBlock(p, loc, cmnts, nil, expr, id)
+	}
+	if expr, ok := stmt.(*ExpressionStmt); ok && p.tok == token.OpenBrace {
+		return parseExprSwitchBlock(p, loc, cmnts, nil, expr.Expression)
+	}
+	if p.tok == token.OpenBrace {
+		return parseExprSwitchBlock(p, loc, cmnts, nil, nil)
+	}
+
+	p.expect(token.Semicolon)
+	p.next()
+
+	expr := parseExpressionOpts(p, true)
+	if id, ok := expr.(*Identifier); ok && p.tok == token.ColonEqual {
+		// Must be a type switch with a declaration.
+		p.next()
+		ta, ok := parsePrimaryExpr(p, true).(*TypeAssertion)
+		if !ok || ta.Type != nil {
+			panic(p.err("type switch guard"))
+		}
+		return parseTypeSwitchBlock(p, loc, cmnts, stmt, ta.Expression, id)
+	}
+	if ta, ok := expr.(*TypeAssertion); ok && ta.Type == nil {
+		return parseTypeSwitchBlock(p, loc, cmnts, stmt, ta.Expression, nil)
+	}
+
+	return parseExprSwitchBlock(p, loc, cmnts, stmt, expr)
+}
+
+// Returns the expression for a type switch guard or nil if the statement is not
+// a type switch guard.  If the statement is a type switch guard that includes
+// a short variable declaration, the identifier from the declaration is returned
+// as the second value.
+func guardStatement(stmt Statement) (Expression, *Identifier) {
+	switch s := stmt.(type) {
+	case *ShortVarDecl:
+		if len(s.Right) != 1 {
+			break
+		}
+		if ta, ok := s.Right[0].(*TypeAssertion); ok && ta.Type == nil {
+			if len(s.Left) != 1 {
+				panic("too many identifiers in a type switch guard")
+			}
+			return ta.Expression, &s.Left[0]
+		}
+		break
+
+	case *ExpressionStmt:
+		if ta, ok := s.Expression.(*TypeAssertion); ok && ta.Type == nil {
+			return ta.Expression, nil
+		}
+	}
+	return nil, nil
+}
+
+func parseExprSwitchBlock(p *Parser, loc token.Location, cmnts comments,
+	init Statement, expr Expression) *ExprSwitch {
+	p.expect(token.OpenBrace)
+	p.next()
+
+	sw := &ExprSwitch{
+		comments:       cmnts,
+		startLoc:       loc,
+		Initialization: init,
+		Expression:     expr,
+	}
+	for p.tok == token.Case || p.tok == token.Default {
+		sw.Cases = append(sw.Cases, parseExprCase(p))
+	}
+	p.expect(token.CloseBrace)
+	p.next()
+	return sw
+}
+
+func parseExprCase(p *Parser) (c ExprCase) {
+	if p.tok != token.Default && p.tok != token.Case {
+		panic(p.err(token.Default, token.Case))
+	}
+	def := p.tok == token.Default
+	p.next()
+	if !def {
+		c.Expressions = parseExpressionList(p)
+	}
+	p.expect(token.Colon)
+	p.next()
+	c.Statements = parseCaseStatements(p)
+	return c
+}
+
+func parseTypeSwitchBlock(p *Parser, loc token.Location, cmnts comments,
+	init Statement, expr Expression, id *Identifier) *TypeSwitch {
+	p.expect(token.OpenBrace)
+	p.next()
+
+	sw := &TypeSwitch{
+		comments:       cmnts,
+		startLoc:       loc,
+		Initialization: init,
+		Declaration:    id,
+		Expression:     expr,
+	}
+	for p.tok == token.Case || p.tok == token.Default {
+		sw.Cases = append(sw.Cases, parseTypeCase(p))
+	}
+	p.expect(token.CloseBrace)
+	p.next()
+	return sw
+}
+
+func parseTypeCase(p *Parser) (c TypeCase) {
+	if p.tok != token.Default && p.tok != token.Case {
+		panic(p.err(token.Default, token.Case))
+	}
+	def := p.tok == token.Default
+	p.next()
+	if !def {
+		c.Types = parseTypeList(p)
+	}
+	p.expect(token.Colon)
+	p.next()
+	c.Statements = parseCaseStatements(p)
+	return c
+}
+
+func parseTypeList(p *Parser) []Type {
+	types := []Type{parseType(p)}
+	for p.tok == token.Comma {
+		p.next()
+		types = append(types, parseType(p))
+	}
+	return types
+}
+
+func parseCaseStatements(p *Parser) []Statement {
+	var stmts []Statement
+	for p.tok != token.Case && p.tok != token.Default && p.tok != token.CloseBrace {
+		stmts = append(stmts, parseStatement(p))
+		if p.tok != token.Case && p.tok != token.Default && p.tok != token.CloseBrace {
+			p.expect(token.Semicolon)
+			p.next()
+		}
+	}
+	return stmts
 }
 
 // A rangeClause is either an Assignment or a ShortVarDecl statement
@@ -107,7 +262,7 @@ func parseFor(p *Parser) Statement {
 	} else if ex, ok := stmt.(*ExpressionStmt); ok && p.tok == token.OpenBrace {
 		f.Condition = ex.Expression
 	} else {
-		f.Init = stmt
+		f.Initialization = stmt
 		p.expect(token.Semicolon)
 		p.next()
 		if p.tok != token.Semicolon {
@@ -311,7 +466,7 @@ func parseSimpleStmt(p *Parser, opts options) (st Statement) {
 		// Empty statement
 		return nil
 	}
-	expr := parseExpression(p)
+	expr := parseExpressionOpts(p, opts == guardOK)
 	id, isID := expr.(*Identifier)
 	switch {
 	case p.tok == token.LessMinus:

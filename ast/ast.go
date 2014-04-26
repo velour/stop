@@ -22,10 +22,66 @@ type Node interface {
 // A Statement is a node representing a statement.
 type Statement interface {
 	Node
-
 	// Comments returns the comments appearing before this
 	// declaration without an intervening blank line.
 	Comments() []string
+}
+
+// An ExprSwitch represents an expression switch statement.
+type ExprSwitch struct {
+	comments
+	startLoc, endLoc token.Location
+	// Initialization is nil if there is no initialization for the switch.
+	Initialization Statement
+	// Expression is nil if there is no expression for the switch.
+	Expression Expression
+	Cases      []ExprCase
+}
+
+func (n *ExprSwitch) Start() token.Location {
+	return n.startLoc
+}
+
+func (n *ExprSwitch) End() token.Location {
+	return n.endLoc
+}
+
+// An ExprCase represents a case label for an expression switch statement.
+type ExprCase struct {
+	// The default case is represented by len(Expressions)==0.
+	Expressions []Expression
+	Statements  []Statement
+}
+
+// A TypeSwitch represents a type switch statement.
+type TypeSwitch struct {
+	comments
+	startLoc, endLoc token.Location
+	// Initialization is nil if there is no initialization for the switch.
+	Initialization Statement
+	// Declaration is the identifier declared in a type switch with a
+	// short variable declaration and nil for a type switch without
+	// a declaration.
+	Declaration *Identifier
+	// Expression is the expression for which the type is being
+	// switched.
+	Expression Expression
+	Cases      []TypeCase
+}
+
+func (n *TypeSwitch) Start() token.Location {
+	return n.startLoc
+}
+
+func (n *TypeSwitch) End() token.Location {
+	return n.endLoc
+}
+
+// A TypeCase represents a case label in a type switch statement.
+type TypeCase struct {
+	// The default case is represented by len(Types)==0.
+	Types      []Type
+	Statements []Statement
 }
 
 // A ForStmt is a statement node representing a for loop.
@@ -36,13 +92,13 @@ type ForStmt struct {
 	// Block is the body of the for loop.
 	Block BlockStmt
 
-	// Range is an Assignment or a ShortVardecl representing a
+	// Range is an Assignment or a ShortVarDecl representing a
 	// range clause, or nil for non-range loops.
 	Range Statement
 
-	// Init is evaluated before non-range loops.  It is nil for both
+	// Initialization is evaluated before non-range loops.  It is nil for both
 	// range-style for loops and for loops with no initialization.
-	Init Statement
+	Initialization Statement
 	// Condition is the condition for a non-range loop, or nil for
 	// either a range-style for loop or a conditionless for loop.
 	Condition Expression

@@ -27,6 +27,132 @@ func TestStatements(t *testing.T) {
 	tests.runStatements(t)
 }
 
+func TestSwitch(t *testing.T) {
+	tests := parserTests{
+		{`switch {}`, exprSwitch(nil, nil)},
+		{`switch a {}`, exprSwitch(nil, a)},
+		{`switch ; a {}`, exprSwitch(nil, a)},
+		{`switch a(b, c) {}`, exprSwitch(nil, call(a, false, b, c))},
+		{`switch a(); b {}`, exprSwitch(expr(call(a, false)), b)},
+		{`switch a = b; c {}`, exprSwitch(assign(token.Equal, ms(a), b), c)},
+		{`switch a := b; c {}`, exprSwitch(shortDecl(ms(a), b), c)},
+		{`switch a, b := b, a; c {}`, exprSwitch(shortDecl(ms(a, b), b, a), c)},
+		{`switch a, b := b, a; a(b, c) {}`, exprSwitch(shortDecl(ms(a, b), b, a), call(a, false, b, c))},
+
+		{
+			`switch { case a: b() }`,
+			exprSwitch(nil, nil, caseMatcher{
+				guards: ms(a),
+				stmts:  ms(expr(call(b, false))),
+			}),
+		},
+		{
+			`switch { case a, 5: b() }`,
+			exprSwitch(nil, nil, caseMatcher{
+				guards: ms(a, intLit("5")),
+				stmts:  ms(expr(call(b, false))),
+			}),
+		},
+		{
+			`switch { default: a() }`,
+			exprSwitch(nil, nil, caseMatcher{
+				guards: ms(),
+				stmts:  ms(expr(call(a, false))),
+			}),
+		},
+		{
+			`switch { 
+				case a, 5:
+					b()
+					c = d
+				case true, false:
+					d()
+					fallthrough
+				default:
+					return 42
+			}`,
+			exprSwitch(nil, nil,
+				caseMatcher{
+					guards: ms(a, intLit("5")),
+					stmts:  ms(expr(call(b, false)), assign(token.Equal, ms(c), d)),
+				},
+				caseMatcher{
+					guards: ms(ident("true"), ident("false")),
+					stmts:  ms(expr(call(d, false)), fallthroughStmt()),
+				},
+				caseMatcher{
+					guards: ms(),
+					stmts:  ms(returnStmt(intLit("42"))),
+				},
+			),
+		},
+
+		{`switch a.(type) {}`, typeSwitch(nil, nil, a)},
+		{`switch ; a.(type) {}`, typeSwitch(nil, nil, a)},
+		{`switch a.b.(type) {}`, typeSwitch(nil, nil, sel(a, b))},
+		{`switch a(b).(type) {}`, typeSwitch(nil, nil, call(a, false, b))},
+		{`switch a.(b).(type) {}`, typeSwitch(nil, nil, tAssert(a, typeName("", "b")))},
+		{`switch a := b.(type) {}`, typeSwitch(nil, a, b)},
+		{`switch a(); b := c.(type) {}`, typeSwitch(expr(call(a, false)), b, c)},
+
+		{
+			`switch a.(type) { case int: b() }`,
+			typeSwitch(nil, nil, a, caseMatcher{
+				guards: ms(typeName("", "int")),
+				stmts:  ms(expr(call(b, false))),
+			}),
+		},
+		{
+			`switch a.(type) { case int, float64: b() }`,
+			typeSwitch(nil, nil, a, caseMatcher{
+				guards: ms(typeName("", "int"), typeName("", "float64")),
+				stmts:  ms(expr(call(b, false))),
+			}),
+		},
+		{
+			`switch a.(type) { default: b() }`,
+			typeSwitch(nil, nil, a, caseMatcher{
+				guards: ms(),
+				stmts:  ms(expr(call(b, false))),
+			}),
+		},
+		{
+			`switch a.(type) { 
+				case int, float64:
+					b()
+					c = d
+				case interface{}:
+					d()
+					fallthrough
+				default:
+					return 42
+			}`,
+			typeSwitch(nil, nil, a,
+				caseMatcher{
+					guards: ms(typeName("", "int"), typeName("", "float64")),
+					stmts:  ms(expr(call(b, false)), assign(token.Equal, ms(c), d)),
+				},
+				caseMatcher{
+					guards: ms(ifaceType()),
+					stmts:  ms(expr(call(d, false)), fallthroughStmt()),
+				},
+				caseMatcher{
+					guards: ms(),
+					stmts:  ms(returnStmt(intLit("42"))),
+				},
+			),
+		},
+
+		// Bad type switches.
+		{`switch a.(type); b.(type) {}`, parseErr("")},
+		{`switch a, b := c.(type) {}`, parseErr("")},
+		{`switch a := b, c.(type) {}`, parseErr("")},
+		{`switch a := b.(type), c {}`, parseErr("")},
+		{`switch a = b.(type) {}`, parseErr("")},
+	}
+	tests.runStatements(t)
+}
+
 func TestFor(t *testing.T) {
 	tests := parserTests{
 		{`for { a }`, forLoop(nil, nil, nil, block(expr(a)))},
