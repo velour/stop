@@ -169,6 +169,9 @@ func TestShortVarDecl(t *testing.T) {
 		// a trailing := left for the next parse call.
 		//{`a.b := 1`, parseErr("expected")},
 		{`a, b.c := 1, 2`, parseErr("expected")},
+		{`a := b.(type)`, parseErr("type")},
+		{`a, b := c.(type), 5`, parseErr("type")},
+		{`a, b := 5, c.(type)`, parseErr("type")},
 	}
 	tests.runStatements(t)
 }

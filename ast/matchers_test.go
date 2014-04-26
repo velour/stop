@@ -580,7 +580,7 @@ func index(expr, idx matcher) matcher {
 func tAssert(expr, typ matcher) matcher {
 	return func(n Node, err error) bool {
 		t, ok := n.(*TypeAssertion)
-		return err == nil && ok && expr(t.Expression, nil) && typ(t.Type, nil)
+		return err == nil && ok && expr(t.Expression, nil) && nilOr(t.Type, typ)
 	}
 }
 

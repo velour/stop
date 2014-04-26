@@ -43,6 +43,36 @@ func TestCompositeLiteral(t *testing.T) {
 	tests.runExpr(t)
 }
 
+func TestTypeSwitchGuard(t *testing.T) {
+	okTests := parserTests{
+		{`a.(type)`, tAssert(a, nil)},
+		{`a.(b).(type)`, tAssert(tAssert(a, typeName("", "b")), nil)},
+		{`a.b.(type)`, tAssert(sel(a, b), nil)},
+		{`a[5].(type)`, tAssert(index(a, intLit("5")), nil)},
+
+		// A type switch guard cannot be an operand.
+		{`-a.(type)`, parseErr("")},
+		{`5 * a.(type)`, parseErr("")},
+
+		// This is OK.  It parses the type switch guard, leaving the *
+		// as the next token.
+		{`a.(type) * 5`, tAssert(a, nil)},
+	}
+	okTests.run(t, func(p *Parser) Node {
+		return parseExpressionOpts(p, true)
+	})
+
+	// Check that type switch guards aren't allowed by the
+	// standard expression parser.
+	notOKTests := parserTests{
+		{`a.(type)`, parseErr("type")},
+		{`-a.(type)`, parseErr("type")},
+		{`5 * a.(type)`, parseErr("type")},
+		{`a.(type) * 5`, parseErr("type")},
+	}
+	notOKTests.runExpr(t)
+}
+
 func TestPrimaryExpr(t *testing.T) {
 	tests := parserTests{
 		// Operand
@@ -94,6 +124,11 @@ func TestPrimaryExpr(t *testing.T) {
 		{`a[5`, parseErr("expected")},
 		{`a.`, parseErr("expected.*OpenParen or Identifier")},
 		{`a[4`, parseErr("expected.*CloseBracket or Colon")},
+
+		// Disallow type switch guards outside of a type switch.
+		{`a.(type)`, parseErr("type")},
+		{`a.(foo).(type)`, parseErr("type")},
+		{`a.b.(type)`, parseErr("type")},
 	}
 	tests.runExpr(t)
 }

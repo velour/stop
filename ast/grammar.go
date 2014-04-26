@@ -300,6 +300,9 @@ const (
 	// RangeOK allows parseSimpleStmt to return RangeClauses
 	// for either assingment or short variable declarations.
 	rangeOK
+	// guardOK allows for a type switch guard in short variable
+	// declarations.
+	guardOK
 )
 
 func parseSimpleStmt(p *Parser, opts options) (st Statement) {
@@ -349,13 +352,18 @@ func parseSimpleStmt(p *Parser, opts options) (st Statement) {
 		// If all the expressions were identifiers then we could have
 		// a short variable declaration.  Otherwise, it's an assignment.
 		if len(ids) == len(exprs) && p.tok == token.ColonEqual {
-			return parseShortVarDeclTail(p, cmnts, ids, opts == rangeOK)
+			// A type switch guard is only allowed if there is a single
+			// identifier on the left hand side.
+			if opts == guardOK {
+				opts = none
+			}
+			return parseShortVarDeclTail(p, cmnts, ids, opts)
 		}
 		return parseAssignmentTail(p, cmnts, exprs, opts == rangeOK)
 
 	case isID && p.tok == token.ColonEqual:
 		ids := []Identifier{*id}
-		return parseShortVarDeclTail(p, cmnts, ids, opts == rangeOK)
+		return parseShortVarDeclTail(p, cmnts, ids, opts)
 
 	case opts == labelOK && isID && p.tok == token.Colon:
 		p.next()
@@ -376,10 +384,10 @@ func parseSimpleStmt(p *Parser, opts options) (st Statement) {
 // Parses a short variable declaration beginning with the := operator.  If
 // allowRange is true, then a rangeClause is returned if the range
 // keyword appears after the := operator.
-func parseShortVarDeclTail(p *Parser, cmnts comments, ids []Identifier, rangeOK bool) Statement {
+func parseShortVarDeclTail(p *Parser, cmnts comments, ids []Identifier, opts options) Statement {
 	p.expect(token.ColonEqual)
 	p.next()
-	if rangeOK && p.tok == token.Range {
+	if opts == rangeOK && p.tok == token.Range {
 		p.next()
 		return rangeClause{&ShortVarDecl{
 			comments: cmnts,
@@ -387,10 +395,16 @@ func parseShortVarDeclTail(p *Parser, cmnts comments, ids []Identifier, rangeOK 
 			Right:    []Expression{parseExpression(p)},
 		}}
 	}
+	var right []Expression
+	if opts == guardOK {
+		right = parseExpressionListOrTypeGuard(p)
+	} else {
+		right = parseExpressionList(p)
+	}
 	return &ShortVarDecl{
 		comments: cmnts,
 		Left:     ids,
-		Right:    parseExpressionList(p),
+		Right:    right,
 	}
 }
 
@@ -1045,11 +1059,23 @@ var (
 )
 
 func parseExpression(p *Parser) Expression {
-	return parseBinaryExpr(p, 1)
+	return parseExpressionOpts(p, false)
 }
 
-func parseBinaryExpr(p *Parser, prec int) Expression {
-	left := parseUnaryExpr(p)
+func parseExpressionOpts(p *Parser, typeSwitch bool) Expression {
+	return parseBinaryExpr(p, 1, typeSwitch)
+}
+
+func parseBinaryExpr(p *Parser, prec int, typeSwitch bool) Expression {
+	left := parseUnaryExpr(p, typeSwitch)
+	if ta, ok := left.(*TypeAssertion); ok && ta.Type == nil {
+		if !typeSwitch {
+			panic("parsed a disallowed type switch guard")
+		}
+		// This is a type guard, it cannot be the left operand of a
+		// binary expression.
+		return left
+	}
 	for {
 		pr, ok := precedence[p.tok]
 		if !ok || pr < prec {
@@ -1057,7 +1083,7 @@ func parseBinaryExpr(p *Parser, prec int) Expression {
 		}
 		op, opLoc := p.tok, p.lex.Start
 		p.next()
-		right := parseBinaryExpr(p, pr+1)
+		right := parseBinaryExpr(p, pr+1, false)
 		left = &BinaryOp{
 			Op:    op,
 			opLoc: opLoc,
@@ -1067,22 +1093,22 @@ func parseBinaryExpr(p *Parser, prec int) Expression {
 	}
 }
 
-func parseUnaryExpr(p *Parser) Expression {
+func parseUnaryExpr(p *Parser, typeSwitch bool) Expression {
 	if unary[p.tok] {
 		op, opLoc := p.tok, p.lex.Start
 		p.next()
-		operand := parseUnaryExpr(p)
+		operand := parseUnaryExpr(p, false)
 		return &UnaryOp{
 			Op:      op,
 			opLoc:   opLoc,
 			Operand: operand,
 		}
 	}
-	return parsePrimaryExpr(p)
+	return parsePrimaryExpr(p, typeSwitch)
 }
 
-func parsePrimaryExpr(p *Parser) Expression {
-	left := parseOperand(p)
+func parsePrimaryExpr(p *Parser, typeSwitch bool) Expression {
+	left := parseOperand(p, typeSwitch)
 	for {
 		switch p.tok {
 		case token.OpenBracket:
@@ -1090,7 +1116,7 @@ func parsePrimaryExpr(p *Parser) Expression {
 		case token.OpenParen:
 			left = parseCall(p, left)
 		case token.Dot:
-			left = parseSelectorOrTypeAssertion(p, left)
+			left = parseSelectorOrTypeAssertion(p, left, typeSwitch)
 		default:
 			return left
 		}
@@ -1178,12 +1204,32 @@ func parseExpressionList(p *Parser) []Expression {
 	return exprs
 }
 
-func parseOperand(p *Parser) Expression {
+func parseExpressionListOrTypeGuard(p *Parser) []Expression {
+	var exprs []Expression
+	for {
+		expr := parseExpressionOpts(p, len(exprs) == 0)
+		exprs = append(exprs, expr)
+		if ta, ok := expr.(*TypeAssertion); ok && ta.Type == nil {
+			if len(exprs) > 1 {
+				panic("parsed disallowed type switch guard")
+			}
+			// Type switch guard.  It must be first and nothing can follow it.
+			break
+		}
+		if p.tok != token.Comma {
+			break
+		}
+		p.next()
+	}
+	return exprs
+}
+
+func parseOperand(p *Parser, typeSwitch bool) Expression {
 	switch p.tok {
 	case token.Identifier:
 		id := parseIdentifier(p)
 		if p.tok == token.Dot {
-			return parseSelectorOrTypeAssertion(p, id)
+			return parseSelectorOrTypeAssertion(p, id, typeSwitch)
 		}
 		return id
 
@@ -1278,7 +1324,7 @@ func parseElement(p *Parser) Element {
 	return elm
 }
 
-func parseSelectorOrTypeAssertion(p *Parser, left Expression) Expression {
+func parseSelectorOrTypeAssertion(p *Parser, left Expression, typeSwitch bool) Expression {
 	p.expect(token.Dot)
 	dotLoc := p.lex.Start
 	p.next()
@@ -1287,7 +1333,11 @@ func parseSelectorOrTypeAssertion(p *Parser, left Expression) Expression {
 	case token.OpenParen:
 		p.next()
 		t := &TypeAssertion{Expression: left, dotLoc: dotLoc}
-		t.Type = parseType(p)
+		if typeSwitch && p.tok == token.Type {
+			p.next()
+		} else {
+			t.Type = parseType(p)
+		}
 		p.expect(token.CloseParen)
 		t.closeLoc = p.lex.Start
 		p.next()
@@ -1300,7 +1350,7 @@ func parseSelectorOrTypeAssertion(p *Parser, left Expression) Expression {
 			dotLoc:     dotLoc,
 		}
 		if p.tok == token.Dot {
-			return parseSelectorOrTypeAssertion(p, left)
+			return parseSelectorOrTypeAssertion(p, left, typeSwitch)
 		}
 		return left
 	}

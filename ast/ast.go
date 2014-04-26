@@ -643,7 +643,8 @@ func (n *Slice) End() token.Location   { return n.closeLoc }
 
 // A TypeAssertion is an expression node representing a type assertion.
 type TypeAssertion struct {
-	Expression       Expression
+	Expression Expression
+	// If Type == nil then this is a type switch guard.
 	Type             Node
 	dotLoc, closeLoc token.Location
 }
