@@ -20,6 +20,9 @@ func TestStatements(t *testing.T) {
 		{`return a, b, c`, returnStmt(a, b, c)},
 		{`go a()`, goStmt(call(a, false))},
 		{`defer a()`, deferStmt(call(a, false))},
+
+		// Range is disallowed outside of a for loop.
+		{`a := range b`, parseErr("range")},
 	}
 	tests.runStatements(t)
 }
@@ -90,6 +93,9 @@ func TestFor(t *testing.T) {
 		{`for a, b := range c, d { 1 }`, parseErr("")},
 		{`for a = range b, c { d }`, parseErr("")},
 		{`for a, b = range c, d { 1 }`, parseErr("")},
+
+		// Labels are not a simple statement.
+		{`for label:; a < 100; a++`, parseErr(":")},
 	}
 	tests.runStatements(t)
 }

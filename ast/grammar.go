@@ -82,7 +82,7 @@ func parseStatement(p *Parser) Statement {
 	case token.Defer:
 		return parseDefer(p)
 	}
-	return parseSimpleStmt(p, allowLabel)
+	return parseSimpleStmt(p, labelOK)
 }
 
 // A rangeClause is either an Assignment or a ShortVarDecl statement
@@ -101,7 +101,7 @@ func parseFor(p *Parser) Statement {
 		return f
 	}
 
-	stmt := parseSimpleStmt(p, allowRange)
+	stmt := parseSimpleStmt(p, rangeOK)
 	if r, ok := stmt.(rangeClause); ok {
 		f.Range = r.Statement
 	} else if ex, ok := stmt.(*ExpressionStmt); ok && p.tok == token.OpenBrace {
@@ -115,7 +115,7 @@ func parseFor(p *Parser) Statement {
 		}
 		p.expect(token.Semicolon)
 		p.next()
-		f.Post = parseSimpleStmt(p, 0)
+		f.Post = parseSimpleStmt(p, none)
 	}
 	f.Block = *parseBlock(p)
 	return f
@@ -126,7 +126,7 @@ func parseIf(p *Parser) Statement {
 	p.expect(token.If)
 	p.next()
 
-	stmt := parseSimpleStmt(p, 0)
+	stmt := parseSimpleStmt(p, none)
 	if expr, ok := stmt.(*ExpressionStmt); ok && p.tok == token.OpenBrace {
 		ifst.Condition = expr.Expression
 		ifst.Block = *parseBlock(p)
@@ -289,25 +289,25 @@ func expectAssign(p *Parser) token.Token {
 	panic(p.err(assignOps[0], ops...))
 }
 
-// SimpOpts are some options for simple statement parsing.
-// They allow for non-simple statements.
-type simpOpts int
+// SimpOptions are some options that allow parseSimpleStmt to return
+// non-simple statements.
+type options int
 
 const (
-	// AllowLabel allows parseSimpleStmt to return label statements.
-	allowLabel simpOpts = 1<<iota + 1
-	// AllowRange allows parseSimpleStmt to return RangeClauses
+	none options = iota
+	// LabelOK allows parseSimpleStmt to return label statements.
+	labelOK
+	// RangeOK allows parseSimpleStmt to return RangeClauses
 	// for either assingment or short variable declarations.
-	allowRange
+	rangeOK
 )
 
-func parseSimpleStmt(p *Parser, opts simpOpts) (st Statement) {
+func parseSimpleStmt(p *Parser, opts options) (st Statement) {
 	cmnts := p.comments()
 	if !expressionFirst[p.tok] {
 		// Empty statement
 		return nil
 	}
-	rng := opts&allowRange > 0
 	expr := parseExpression(p)
 	id, isID := expr.(*Identifier)
 	switch {
@@ -330,7 +330,8 @@ func parseSimpleStmt(p *Parser, opts simpOpts) (st Statement) {
 		}
 
 	case assignOp[p.tok]:
-		return parseAssignmentTail(p, cmnts, []Expression{expr}, rng)
+		exprs := []Expression{expr}
+		return parseAssignmentTail(p, cmnts, exprs, opts == rangeOK)
 
 	case p.tok == token.Comma:
 		p.next()
@@ -348,14 +349,15 @@ func parseSimpleStmt(p *Parser, opts simpOpts) (st Statement) {
 		// If all the expressions were identifiers then we could have
 		// a short variable declaration.  Otherwise, it's an assignment.
 		if len(ids) == len(exprs) && p.tok == token.ColonEqual {
-			return parseShortVarDeclTail(p, cmnts, ids, rng)
+			return parseShortVarDeclTail(p, cmnts, ids, opts == rangeOK)
 		}
-		return parseAssignmentTail(p, cmnts, exprs, rng)
+		return parseAssignmentTail(p, cmnts, exprs, opts == rangeOK)
 
 	case isID && p.tok == token.ColonEqual:
-		return parseShortVarDeclTail(p, cmnts, []Identifier{*id}, rng)
+		ids := []Identifier{*id}
+		return parseShortVarDeclTail(p, cmnts, ids, opts == rangeOK)
 
-	case opts&allowLabel > 0 && isID && p.tok == token.Colon:
+	case opts == labelOK && isID && p.tok == token.Colon:
 		p.next()
 		return &LabeledStmt{
 			comments:  cmnts,
@@ -374,10 +376,10 @@ func parseSimpleStmt(p *Parser, opts simpOpts) (st Statement) {
 // Parses a short variable declaration beginning with the := operator.  If
 // allowRange is true, then a rangeClause is returned if the range
 // keyword appears after the := operator.
-func parseShortVarDeclTail(p *Parser, cmnts comments, ids []Identifier, allowRange bool) Statement {
+func parseShortVarDeclTail(p *Parser, cmnts comments, ids []Identifier, rangeOK bool) Statement {
 	p.expect(token.ColonEqual)
 	p.next()
-	if allowRange && p.tok == token.Range {
+	if rangeOK && p.tok == token.Range {
 		p.next()
 		return rangeClause{&ShortVarDecl{
 			comments: cmnts,
@@ -395,10 +397,10 @@ func parseShortVarDeclTail(p *Parser, cmnts comments, ids []Identifier, allowRan
 // Parses an assignment statement beginning with the assignment
 // operator.  If allowRange is true, then a rangeClause is returned
 // if the range keyword appears after the assignment operator.
-func parseAssignmentTail(p *Parser, cmnts comments, exprs []Expression, allowRange bool) Statement {
+func parseAssignmentTail(p *Parser, cmnts comments, exprs []Expression, rangeOK bool) Statement {
 	op := expectAssign(p)
 	p.next()
-	if allowRange && op == token.Equal && p.tok == token.Range {
+	if rangeOK && op == token.Equal && p.tok == token.Range {
 		p.next()
 		return rangeClause{&Assignment{
 			comments: cmnts,
