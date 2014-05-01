@@ -91,7 +91,7 @@ func (tests parserTests) runType(t *testing.T) {
 
 func (tests parserTests) runExpr(t *testing.T) {
 	tests.run(t, func(p *Parser) Node {
-		return parseExpression(p)
+		return parseExpr(p)
 	})
 }
 

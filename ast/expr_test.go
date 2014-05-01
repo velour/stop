@@ -59,7 +59,7 @@ func TestTypeSwitchGuard(t *testing.T) {
 		{`a.(type) * 5`, tAssert(a, nil)},
 	}
 	okTests.run(t, func(p *Parser) Node {
-		return parseExpressionOpts(p, true)
+		return parseExpression(p, true)
 	})
 
 	// Check that type switch guards aren't allowed by the

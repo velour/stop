@@ -29,7 +29,7 @@ func Parse(p *Parser) (root Node, err error) {
 		}
 
 	}()
-	//	root = parseExpression(p)
+	//	root = parseExpr(p)
 	root = parseDeclarations(p)
 	return
 }
@@ -93,7 +93,7 @@ func parseSwitch(p *Parser) Statement {
 	cmnts := p.comments()
 	p.next()
 
-	stmt := parseSimpleStmt(p, guardOK)
+	stmt := parseSimpleStmt(p, typeSwitchOK)
 	if expr, id := guardStatement(stmt); expr != nil {
 		return parseTypeSwitchBlock(p, loc, cmnts, nil, expr, id)
 	}
@@ -107,7 +107,7 @@ func parseSwitch(p *Parser) Statement {
 	p.expect(token.Semicolon)
 	p.next()
 
-	expr := parseExpressionOpts(p, true)
+	expr := parseExpression(p, true)
 	if id, ok := expr.(*Identifier); ok && p.tok == token.ColonEqual {
 		// Must be a type switch with a declaration.
 		p.next()
@@ -268,7 +268,7 @@ func parseFor(p *Parser) Statement {
 		p.expect(token.Semicolon)
 		p.next()
 		if p.tok != token.Semicolon {
-			f.Condition = parseExpression(p)
+			f.Condition = parseExpr(p)
 		}
 		p.expect(token.Semicolon)
 		p.next()
@@ -291,7 +291,7 @@ func parseIf(p *Parser) Statement {
 		p.expect(token.Semicolon)
 		p.next()
 		ifst.Statement = stmt
-		ifst.Condition = parseExpression(p)
+		ifst.Condition = parseExpr(p)
 		ifst.Block = *parseBlock(p)
 	}
 	if p.tok != token.Else {
@@ -335,7 +335,7 @@ func parseGo(p *Parser) Statement {
 	return &GoStmt{
 		comments:   c,
 		startLoc:   s,
-		Expression: parseExpression(p),
+		Expression: parseExpr(p),
 	}
 }
 
@@ -346,7 +346,7 @@ func parseDefer(p *Parser) Statement {
 	return &DeferStmt{
 		comments:   c,
 		startLoc:   s,
-		Expression: parseExpression(p),
+		Expression: parseExpr(p),
 	}
 }
 
@@ -457,9 +457,9 @@ const (
 	// RangeOK allows parseSimpleStmt to return RangeClauses
 	// for either assingment or short variable declarations.
 	rangeOK
-	// guardOK allows for a type switch guard in short variable
+	// TypeSwitchOK allows for a type switch guard in short variable
 	// declarations.
-	guardOK
+	typeSwitchOK
 )
 
 func parseSimpleStmt(p *Parser, opts options) (st Statement) {
@@ -468,7 +468,7 @@ func parseSimpleStmt(p *Parser, opts options) (st Statement) {
 		// Empty statement
 		return nil
 	}
-	expr := parseExpressionOpts(p, opts == guardOK)
+	expr := parseExpression(p, opts == typeSwitchOK)
 	id, isID := expr.(*Identifier)
 	switch {
 	case p.tok == token.LessMinus:
@@ -476,7 +476,7 @@ func parseSimpleStmt(p *Parser, opts options) (st Statement) {
 		return &SendStmt{
 			comments:   cmnts,
 			Channel:    expr,
-			Expression: parseExpression(p),
+			Expression: parseExpr(p),
 		}
 
 	case p.tok == token.MinusMinus || p.tok == token.PlusPlus:
@@ -511,7 +511,7 @@ func parseSimpleStmt(p *Parser, opts options) (st Statement) {
 		if len(ids) == len(exprs) && p.tok == token.ColonEqual {
 			// A type switch guard is only allowed if there is a single
 			// identifier on the left hand side.
-			if opts == guardOK {
+			if opts == typeSwitchOK {
 				opts = none
 			}
 			return parseShortVarDeclTail(p, cmnts, ids, opts)
@@ -549,11 +549,11 @@ func parseShortVarDeclTail(p *Parser, cmnts comments, ids []Identifier, opts opt
 		return rangeClause{&ShortVarDecl{
 			comments: cmnts,
 			Left:     ids,
-			Right:    []Expression{parseExpression(p)},
+			Right:    []Expression{parseExpr(p)},
 		}}
 	}
 	var right []Expression
-	if opts == guardOK {
+	if opts == typeSwitchOK {
 		right = parseExpressionListOrTypeGuard(p)
 	} else {
 		right = parseExpressionList(p)
@@ -577,7 +577,7 @@ func parseAssignmentTail(p *Parser, cmnts comments, exprs []Expression, rangeOK 
 			comments: cmnts,
 			Op:       op,
 			Left:     exprs,
-			Right:    []Expression{parseExpression(p)},
+			Right:    []Expression{parseExpr(p)},
 		}}
 	}
 	return &Assignment{
@@ -1122,7 +1122,7 @@ func parseArrayOrSliceType(p *Parser, dotDotDot bool) Type {
 	if dotDotDot && p.tok == token.DotDotDot {
 		p.next()
 	} else {
-		ar.Size = parseExpression(p)
+		ar.Size = parseExpr(p)
 	}
 	p.expect(token.CloseBracket)
 	p.next()
@@ -1215,11 +1215,11 @@ var (
 	}
 )
 
-func parseExpression(p *Parser) Expression {
-	return parseExpressionOpts(p, false)
+func parseExpr(p *Parser) Expression {
+	return parseExpression(p, false)
 }
 
-func parseExpressionOpts(p *Parser, typeSwitch bool) Expression {
+func parseExpression(p *Parser, typeSwitch bool) Expression {
 	return parseBinaryExpr(p, 1, typeSwitch)
 }
 
@@ -1291,7 +1291,7 @@ func parseSliceOrIndex(p *Parser, left Expression) Expression {
 		return sl
 	}
 
-	e := parseExpression(p)
+	e := parseExpr(p)
 
 	switch p.tok {
 	case token.CloseBracket:
@@ -1320,10 +1320,10 @@ func parseSliceHighMax(p *Parser, left, low Expression) *Slice {
 
 	sl := &Slice{Expression: left, Low: low}
 	if p.tok != token.CloseBracket {
-		sl.High = parseExpression(p)
+		sl.High = parseExpr(p)
 		if p.tok == token.Colon {
 			p.next()
-			sl.Max = parseExpression(p)
+			sl.Max = parseExpr(p)
 		}
 	}
 	p.expect(token.CloseBracket)
@@ -1352,7 +1352,7 @@ func parseCall(p *Parser, left Expression) Expression {
 func parseExpressionList(p *Parser) []Expression {
 	var exprs []Expression
 	for {
-		exprs = append(exprs, parseExpression(p))
+		exprs = append(exprs, parseExpr(p))
 		if p.tok != token.Comma {
 			break
 		}
@@ -1364,7 +1364,7 @@ func parseExpressionList(p *Parser) []Expression {
 func parseExpressionListOrTypeGuard(p *Parser) []Expression {
 	var exprs []Expression
 	for {
-		expr := parseExpressionOpts(p, len(exprs) == 0)
+		expr := parseExpression(p, len(exprs) == 0)
 		exprs = append(exprs, expr)
 		if ta, ok := expr.(*TypeAssertion); ok && ta.Type == nil {
 			if len(exprs) > 1 {
@@ -1419,7 +1419,7 @@ func parseOperand(p *Parser, typeSwitch bool) Expression {
 
 	case token.OpenParen:
 		p.next()
-		e := parseExpression(p)
+		e := parseExpr(p)
 		p.expect(token.CloseParen)
 		p.next()
 		return e
@@ -1466,7 +1466,7 @@ func parseElement(p *Parser) Element {
 		return Element{Value: parseLiteralValue(p)}
 	}
 
-	expr := parseExpression(p)
+	expr := parseExpr(p)
 	if p.tok != token.Colon {
 		return Element{Value: expr}
 	}
@@ -1476,7 +1476,7 @@ func parseElement(p *Parser) Element {
 	if p.tok == token.OpenBrace {
 		elm.Value = parseLiteralValue(p)
 	} else {
-		elm.Value = parseExpression(p)
+		elm.Value = parseExpr(p)
 	}
 	return elm
 }
