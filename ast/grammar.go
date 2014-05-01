@@ -165,6 +165,7 @@ func parseExprSwitchBlock(p *Parser, loc token.Location, cmnts comments,
 		sw.Cases = append(sw.Cases, parseExprCase(p))
 	}
 	p.expect(token.CloseBrace)
+	sw.endLoc = p.lex.Start
 	p.next()
 	return sw
 }
@@ -200,6 +201,7 @@ func parseTypeSwitchBlock(p *Parser, loc token.Location, cmnts comments,
 		sw.Cases = append(sw.Cases, parseTypeCase(p))
 	}
 	p.expect(token.CloseBrace)
+	sw.endLoc = p.lex.Start
 	p.next()
 	return sw
 }
