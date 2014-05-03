@@ -27,6 +27,87 @@ func TestStatements(t *testing.T) {
 	tests.runStatements(t)
 }
 
+func TestSelect(t *testing.T) {
+	tests := parserTests{
+		{`select{}`, selectStmt()},
+		{
+			`select{ case a <- b: c() }`,
+			selectStmt(commMatcher{
+				send:  send(a, b),
+				stmts: ms(expr(call(c, false))),
+			}),
+		},
+		{
+			`select{ case a := <- b: c() }`,
+			selectStmt(commMatcher{
+				recv:  recv(ms(a), token.ColonEqual, b),
+				stmts: ms(expr(call(c, false))),
+			}),
+		},
+		{
+			`select{ case a, b := <- c: d() }`,
+			selectStmt(commMatcher{
+				recv:  recv(ms(a, b), token.ColonEqual, c),
+				stmts: ms(expr(call(d, false))),
+			}),
+		},
+		{
+			`select{ case a, b = <- c: d() }`,
+			selectStmt(commMatcher{
+				recv:  recv(ms(a, b), token.Equal, c),
+				stmts: ms(expr(call(d, false))),
+			}),
+		},
+		{
+			`select{ case a() = <- b: c() }`,
+			selectStmt(commMatcher{
+				recv:  recv(ms(call(a, false)), token.Equal, b),
+				stmts: ms(expr(call(c, false))),
+			}),
+		},
+		{
+			`select{ default: a() }`,
+			selectStmt(commMatcher{
+				stmts: ms(expr(call(a, false))),
+			}),
+		},
+		{
+			`select{
+				case a <- b:
+					c()
+				case a() = <- b:
+					c()
+					d()
+				default:
+					a()
+			}`,
+			selectStmt(
+				commMatcher{
+					send:  send(a, b),
+					stmts: ms(expr(call(c, false))),
+				},
+				commMatcher{
+					recv:  recv(ms(call(a, false)), token.Equal, b),
+					stmts: ms(expr(call(c, false)), expr(call(d, false))),
+				},
+				commMatcher{
+					stmts: ms(expr(call(a, false))),
+				},
+			),
+		},
+
+		// := cannot appear after non-identifiers.
+		{`select{ case a() := <- b: c() }`, parseErr(":=")},
+		{`select{ case a, a() := <- b: c() }`, parseErr(":=")},
+
+		// Only a receive expression can appear in a receive statement.
+		{`select{ case a := b: c() }`, parseErr("LessMinus")},
+		{`select{ case a = b: c() }`, parseErr("LessMinus")},
+		{`select{ case a, b = *d: c() }`, parseErr("LessMinus")},
+	}
+	tests.runStatements(t)
+}
+
 func TestSwitch(t *testing.T) {
 	tests := parserTests{
 		{`switch {}`, exprSwitch(nil, nil)},

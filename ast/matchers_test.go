@@ -114,6 +114,55 @@ func (tests parserTests) runStatements(t *testing.T) {
 	})
 }
 
+// Matches a select statement communication case.
+type commMatcher struct {
+	send  matcher
+	recv  matcher
+	stmts []matcher
+}
+
+func selectStmt(cases ...commMatcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*Select)
+		if !ok || len(cases) != len(s.Cases) {
+			return false
+		}
+		for i, c := range cases {
+			if (c.recv == nil) != (s.Cases[i].Receive == nil) ||
+				(c.recv != nil && !c.recv(s.Cases[i].Receive, nil)) ||
+				(c.send == nil) != (s.Cases[i].Send == nil) ||
+				(c.send != nil && !c.send(s.Cases[i].Send, nil)) ||
+				len(c.stmts) != len(s.Cases[i].Statements) {
+				return false
+			}
+			for j, m := range c.stmts {
+				if !m(s.Cases[i].Statements[j], nil) {
+					return false
+				}
+			}
+		}
+		return true
+	}
+
+}
+
+func recv(left []matcher, op token.Token, recvExpr matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*RecvStmt)
+		if err != nil || !ok || len(left) != len(s.Left) || op != s.Op ||
+			!unOp(token.LessMinus, recvExpr)(&s.Right, nil) {
+			return false
+		}
+		for i, l := range left {
+			if !l(s.Left[i], nil) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+// Matches a type switch or expression switch case.
 type caseMatcher struct {
 	guards []matcher
 	stmts  []matcher
@@ -126,7 +175,8 @@ func exprSwitch(init matcher, expr matcher, cases ...caseMatcher) matcher {
 			return false
 		}
 		for i, c := range cases {
-			if len(c.guards) != len(s.Cases[i].Expressions) || len(c.stmts) != len(s.Cases[i].Statements) {
+			if len(c.guards) != len(s.Cases[i].Expressions) ||
+				len(c.stmts) != len(s.Cases[i].Statements) {
 				return false
 			}
 			for j, m := range c.guards {

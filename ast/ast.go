@@ -27,6 +27,57 @@ type Statement interface {
 	Comments() []string
 }
 
+// A Select represents a select statement.
+type Select struct {
+	comments
+	startLoc, endLoc token.Location
+	Cases            []CommCase
+}
+
+func (n *Select) Start() token.Location {
+	return n.startLoc
+}
+
+func (n *Select) End() token.Location {
+	return n.endLoc
+}
+
+// A CommCase represents a single communication case in a select statement.
+// It is one of: a receive clause, a send clause, or a default clause.
+type CommCase struct {
+	// Receive is non-nil if this is a receive communication case.
+	Receive *RecvStmt
+	// Send is non-nil if this is a send communication case.
+	// If both Send and Receive are nil, this is a default case.
+	Send *SendStmt
+
+	Statements []Statement
+}
+
+// RecvStmt represents a receive statement in a communication clause
+// of a select statement.
+type RecvStmt struct {
+	comments
+	// Op is either a token.Equal or a token.ColonEqual for assignment
+	// and short variable declaration, respectively.
+	Op token.Token
+	// Left contains the expressions into which the value is received.
+	// If Op is token.ColonEqual then all of the expressions are simply
+	// identifiers.
+	Left []Expression
+	// Right is a unary operation with Op == token.LessMinus:
+	// a channel receive.
+	Right UnaryOp
+}
+
+func (n *RecvStmt) Start() token.Location {
+	return n.Left[0].Start()
+}
+
+func (n *RecvStmt) End() token.Location {
+	return n.Right.End()
+}
+
 // An ExprSwitch represents an expression switch statement.
 type ExprSwitch struct {
 	comments

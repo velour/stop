@@ -76,7 +76,7 @@ func parseStatement(p *Parser) Statement {
 		return parseSwitch(p)
 
 	case token.Select:
-		panic("unimplemented")
+		return parseSelect(p)
 
 	case token.For:
 		return parseFor(p)
@@ -85,6 +85,94 @@ func parseStatement(p *Parser) Statement {
 		return parseDefer(p)
 	}
 	return parseSimpleStmt(p, labelOK)
+}
+
+func parseSelect(p *Parser) Statement {
+	p.expect(token.Select)
+	s := &Select{
+		comments: p.comments(),
+		startLoc: p.lex.Start,
+	}
+	p.next()
+	p.expect(token.OpenBrace)
+	p.next()
+	for p.tok == token.Case || p.tok == token.Default {
+		s.Cases = append(s.Cases, parseCommCase(p))
+	}
+	p.expect(token.CloseBrace)
+	s.endLoc = p.lex.Start
+	p.next()
+	return s
+}
+
+func parseCommCase(p *Parser) CommCase {
+	var c CommCase
+	if p.tok == token.Default {
+		p.next()
+	} else {
+		p.expect(token.Case)
+		p.next()
+
+		s := parseSendOrRecvStmt(p)
+		if recv, ok := s.(*RecvStmt); ok {
+			c.Receive = recv
+		} else if send, ok := s.(*SendStmt); ok {
+			c.Send = send
+		} else {
+			panic("malformed communication case")
+		}
+	}
+	p.expect(token.Colon)
+	p.next()
+	c.Statements = parseCaseStatements(p)
+	return c
+}
+
+func parseSendOrRecvStmt(p *Parser) Statement {
+	cmnts := p.comments()
+	expr := parseExpr(p)
+	switch p.tok {
+	case token.Comma:
+		p.next()
+		exprs := append([]Expression{expr}, parseExpressionList(p)...)
+		return parseRecvStmtTail(p, cmnts, exprs)
+
+	case token.Equal, token.ColonEqual:
+		return parseRecvStmtTail(p, cmnts, []Expression{expr})
+
+	case token.LessMinus:
+		p.next()
+		return &SendStmt{
+			comments:   cmnts,
+			Channel:    expr,
+			Expression: parseExpr(p),
+		}
+	}
+	panic(p.err("send or receive statement"))
+}
+
+func parseRecvStmtTail(p *Parser, cmnts comments, left []Expression) Statement {
+	ids := true
+	for _, e := range left {
+		if _, ok := e.(*Identifier); !ok {
+			ids = false
+			break
+		}
+	}
+	recv := &RecvStmt{
+		comments: cmnts,
+		Op:       p.tok,
+		Left:     left,
+	}
+	if ids && p.tok == token.ColonEqual {
+		p.next()
+	} else {
+		p.expect(token.Equal)
+		p.next()
+	}
+	p.expect(token.LessMinus)
+	recv.Right = *parseUnaryExpr(p, false).(*UnaryOp)
+	return recv
 }
 
 func parseSwitch(p *Parser) Statement {
