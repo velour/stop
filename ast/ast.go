@@ -19,6 +19,407 @@ type Node interface {
 	End() token.Location
 }
 
+// A Statement is a node representing a statement.
+type Statement interface {
+	Node
+	// Comments returns the comments appearing before this
+	// declaration without an intervening blank line.
+	Comments() []string
+}
+
+// A Select represents a select statement.
+type Select struct {
+	comments
+	startLoc, endLoc token.Location
+	Cases            []CommCase
+}
+
+func (n *Select) Start() token.Location {
+	return n.startLoc
+}
+
+func (n *Select) End() token.Location {
+	return n.endLoc
+}
+
+// A CommCase represents a single communication case in a select statement.
+// It is one of: a receive clause, a send clause, or a default clause.
+type CommCase struct {
+	// Receive is non-nil if this is a receive communication case.
+	Receive *RecvStmt
+	// Send is non-nil if this is a send communication case.
+	// If both Send and Receive are nil, this is a default case.
+	Send *SendStmt
+
+	Statements []Statement
+}
+
+// RecvStmt represents a receive statement in a communication clause
+// of a select statement.
+type RecvStmt struct {
+	comments
+	// Op is either a token.Equal or a token.ColonEqual for assignment
+	// and short variable declaration, respectively.
+	Op token.Token
+	// Left contains the expressions into which the value is received.
+	// If Op is token.ColonEqual then all of the expressions are simply
+	// identifiers.
+	Left []Expression
+	// Right is a unary operation with Op == token.LessMinus:
+	// a channel receive.
+	Right UnaryOp
+}
+
+func (n *RecvStmt) Start() token.Location {
+	return n.Left[0].Start()
+}
+
+func (n *RecvStmt) End() token.Location {
+	return n.Right.End()
+}
+
+// An ExprSwitch represents an expression switch statement.
+type ExprSwitch struct {
+	comments
+	startLoc, endLoc token.Location
+	// Initialization is nil if there is no initialization for the switch.
+	Initialization Statement
+	// Expression is nil if there is no expression for the switch.
+	Expression Expression
+	Cases      []ExprCase
+}
+
+func (n *ExprSwitch) Start() token.Location {
+	return n.startLoc
+}
+
+func (n *ExprSwitch) End() token.Location {
+	return n.endLoc
+}
+
+// An ExprCase represents a case label for an expression switch statement.
+type ExprCase struct {
+	// The default case is represented by len(Expressions)==0.
+	Expressions []Expression
+	Statements  []Statement
+}
+
+// A TypeSwitch represents a type switch statement.
+type TypeSwitch struct {
+	comments
+	startLoc, endLoc token.Location
+	// Initialization is nil if there is no initialization for the switch.
+	Initialization Statement
+	// Declaration is the identifier declared in a type switch with a
+	// short variable declaration and nil for a type switch without
+	// a declaration.
+	Declaration *Identifier
+	// Expression is the expression for which the type is being
+	// switched.
+	Expression Expression
+	Cases      []TypeCase
+}
+
+func (n *TypeSwitch) Start() token.Location {
+	return n.startLoc
+}
+
+func (n *TypeSwitch) End() token.Location {
+	return n.endLoc
+}
+
+// A TypeCase represents a case label in a type switch statement.
+type TypeCase struct {
+	// The default case is represented by len(Types)==0.
+	Types      []Type
+	Statements []Statement
+}
+
+// A ForStmt is a statement node representing a for loop.
+type ForStmt struct {
+	comments
+	startLoc token.Location
+
+	// Block is the body of the for loop.
+	Block BlockStmt
+
+	// Range is an Assignment or a ShortVarDecl representing a
+	// range clause, or nil for non-range loops.
+	Range Statement
+
+	// Initialization is evaluated before non-range loops.  It is nil for both
+	// range-style for loops and for loops with no initialization.
+	Initialization Statement
+	// Condition is the condition for a non-range loop, or nil for
+	// either a range-style for loop or a conditionless for loop.
+	Condition Expression
+	// Post is evaluated after non-range loops.  It is nil for both
+	// range-style for loops and for loops with no post statement.
+	Post Statement
+}
+
+func (n *ForStmt) Start() token.Location {
+	return n.startLoc
+}
+
+func (n *ForStmt) End() token.Location {
+	return n.Block.End()
+}
+
+// An IfStmt is a statement node representing an if statement.
+type IfStmt struct {
+	comments
+	startLoc token.Location
+	// Statement is a simple statement evaluated before the condition.
+	Statement Statement
+	Condition Expression
+	// Block is a block statement, evaluated if the condition is true.
+	Block BlockStmt
+	// Else is an optional (may be nil) if or block statement, evaluated
+	// if the condition is false.
+	Else Statement
+}
+
+func (n *IfStmt) Start() token.Location {
+	return n.startLoc
+}
+
+func (n *IfStmt) End() token.Location {
+	if n.Else != nil {
+		return n.Else.End()
+	}
+	return n.Block.End()
+}
+
+// A BlockStmt is a statement node representing block of statements.
+type BlockStmt struct {
+	comments
+	startLoc, endLoc token.Location
+	Statements       []Statement
+}
+
+func (n *BlockStmt) Start() token.Location {
+	return n.startLoc
+}
+
+func (n *BlockStmt) End() token.Location {
+	return n.endLoc
+}
+
+// A DeferStmt is a statement node representing a defer statement.
+type DeferStmt struct {
+	comments
+	startLoc   token.Location
+	Expression Expression
+}
+
+func (n *DeferStmt) Start() token.Location {
+	return n.startLoc
+}
+
+func (n *DeferStmt) End() token.Location {
+	return n.Expression.End()
+}
+
+// A GoStmt is a statement node representing a go statement.
+type GoStmt struct {
+	comments
+	startLoc   token.Location
+	Expression Expression
+}
+
+func (n *GoStmt) Start() token.Location {
+	return n.startLoc
+}
+
+func (n *GoStmt) End() token.Location {
+	return n.Expression.End()
+}
+
+// A ReturnStmt is a statement node representing a return.
+type ReturnStmt struct {
+	comments
+	startLoc, endLoc token.Location
+	Expressions      []Expression
+}
+
+func (n *ReturnStmt) Start() token.Location {
+	return n.startLoc
+}
+
+func (n *ReturnStmt) End() token.Location {
+	return n.endLoc
+}
+
+// A FallthroughStmt is a statement node representing a fallthrough.
+type FallthroughStmt struct {
+	comments
+	startLoc, endLoc token.Location
+}
+
+func (n *FallthroughStmt) Start() token.Location {
+	return n.startLoc
+}
+
+func (n *FallthroughStmt) End() token.Location {
+	return n.endLoc
+}
+
+// A ContinueStmt is a statement node representing a continue
+// statement with on optional label.
+type ContinueStmt struct {
+	comments
+	startLoc token.Location
+	// Label is nil if no label was specified.
+	Label *Identifier
+}
+
+func (n *ContinueStmt) Start() token.Location {
+	return n.startLoc
+}
+
+func (n *ContinueStmt) End() token.Location {
+	return n.Label.End()
+}
+
+// A BreakStmt is a statement node represent a break statement
+// with on optional label.
+type BreakStmt struct {
+	comments
+	startLoc token.Location
+	// Label is nil if no label was specified.
+	Label *Identifier
+}
+
+func (n *BreakStmt) Start() token.Location {
+	return n.startLoc
+}
+
+func (n *BreakStmt) End() token.Location {
+	return n.Label.End()
+}
+
+// A GotoStmt is a statement node representing a goto.
+type GotoStmt struct {
+	comments
+	startLoc token.Location
+	Label    Identifier
+}
+
+func (n *GotoStmt) Start() token.Location {
+	return n.startLoc
+}
+
+func (n *GotoStmt) End() token.Location {
+	return n.Label.End()
+}
+
+// A LabeledStmt is a statement node representing a statement
+// that is preceeded by a label.
+type LabeledStmt struct {
+	comments
+	Label     Identifier
+	Statement Statement
+}
+
+func (n *LabeledStmt) Start() token.Location {
+	return n.Label.Start()
+}
+
+func (n *LabeledStmt) End() token.Location {
+	return n.Statement.End()
+}
+
+// A DeclarationStmt is a statement node representing a series of declarations.
+type DeclarationStmt struct {
+	comments
+	Declarations
+}
+
+// A ShortVarDecl is a statement node representing the declaration of
+// a series of variables.
+type ShortVarDecl struct {
+	comments
+	Left  []Identifier
+	Right []Expression
+}
+
+func (n *ShortVarDecl) Start() token.Location {
+	return n.Left[0].Start()
+}
+
+func (n *ShortVarDecl) End() token.Location {
+	return n.Right[len(n.Right)-1].End()
+}
+
+// An Assignment is a statement node representing an assignment of
+// a sequence of expressions.
+type Assignment struct {
+	comments
+	// Op is the assignment operation.
+	Op    token.Token
+	Left  []Expression
+	Right []Expression
+}
+
+func (n *Assignment) Start() token.Location {
+	return n.Left[0].Start()
+}
+
+func (n *Assignment) End() token.Location {
+	return n.Right[len(n.Right)-1].End()
+}
+
+// An ExpressionStmt is a statement node representing an
+// expression evaluation
+type ExpressionStmt struct {
+	comments
+	Expression Expression
+}
+
+func (n *ExpressionStmt) Start() token.Location {
+	return n.Expression.Start()
+}
+
+func (n *ExpressionStmt) End() token.Location {
+	return n.Expression.End()
+}
+
+// An IncDecStmt is a statement node representing either an
+// increment or a decrement operation.
+type IncDecStmt struct {
+	comments
+	Expression Expression
+	// Op is either token.PlusPlus or token.MinusMinus, representing
+	// either increment or decrement respectively.
+	Op    token.Token
+	opEnd token.Location
+}
+
+func (n *IncDecStmt) Start() token.Location {
+	return n.Expression.Start()
+}
+
+func (n *IncDecStmt) End() token.Location {
+	return n.opEnd
+}
+
+// A SendStmt is a statement node representing the sending of
+// an expression on a channel.
+type SendStmt struct {
+	comments
+	Channel    Expression
+	Expression Expression
+}
+
+func (n *SendStmt) Start() token.Location {
+	return n.Channel.Start()
+}
+
+func (n *SendStmt) End() token.Location {
+	return n.Expression.End()
+}
+
 // A Declaration is a node representing a declaration.
 type Declaration interface {
 	Node
@@ -349,7 +750,8 @@ func (n *Slice) End() token.Location   { return n.closeLoc }
 
 // A TypeAssertion is an expression node representing a type assertion.
 type TypeAssertion struct {
-	Expression       Expression
+	Expression Expression
+	// If Type == nil then this is a type switch guard.
 	Type             Node
 	dotLoc, closeLoc token.Location
 }

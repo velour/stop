@@ -8,46 +8,6 @@ import (
 	"github.com/velour/stop/token"
 )
 
-var (
-	// Binary op precedence for precedence climbing algorithm.
-	// http://www.engr.mun.ca/~theo/Misc/exp_parsing.htm
-	//
-	// BUG(eaburns): Define tokens.NTokens and change
-	// map[token.Token]Whatever to [nTokens]Whatever.
-	precedence = map[token.Token]int{
-		token.OrOr:           1,
-		token.AndAnd:         2,
-		token.EqualEqual:     3,
-		token.BangEqual:      3,
-		token.Less:           3,
-		token.LessEqual:      3,
-		token.Greater:        3,
-		token.GreaterEqual:   3,
-		token.Plus:           4,
-		token.Minus:          4,
-		token.Or:             4,
-		token.Carrot:         4,
-		token.Star:           5,
-		token.Divide:         5,
-		token.Percent:        5,
-		token.LessLess:       5,
-		token.GreaterGreater: 5,
-		token.And:            5,
-		token.AndCarrot:      5,
-	}
-
-	// Set of unary operators.
-	unary = map[token.Token]bool{
-		token.Plus:      true,
-		token.Minus:     true,
-		token.Bang:      true,
-		token.Carrot:    true,
-		token.Star:      true,
-		token.And:       true,
-		token.LessMinus: true,
-	}
-)
-
 // Parse returns the root of an abstract syntax tree for the Go language
 // or an error if one is encountered.
 //
@@ -69,9 +29,651 @@ func Parse(p *Parser) (root Node, err error) {
 		}
 
 	}()
-	//	root = parseExpression(p)
+	//	root = parseExpr(p)
 	root = parseDeclarations(p)
 	return
+}
+
+func parseStatement(p *Parser) Statement {
+	switch p.tok {
+	case token.Type, token.Const, token.Var:
+		return &DeclarationStmt{
+			comments:     p.comments(),
+			Declarations: parseDeclarations(p),
+		}
+
+	case token.Go:
+		return parseGo(p)
+
+	case token.Return:
+		return parseReturn(p)
+
+	case token.Break:
+		return parseBreak(p)
+
+	case token.Continue:
+		return parseContinue(p)
+
+	case token.Goto:
+		return parseGoto(p)
+
+	case token.Fallthrough:
+		c, s, e := p.comments(), p.lex.Start, p.lex.End
+		p.next()
+		return &FallthroughStmt{
+			comments: c,
+			startLoc: s,
+			endLoc:   e,
+		}
+
+	case token.OpenBrace:
+		return parseBlock(p)
+
+	case token.If:
+		return parseIf(p)
+
+	case token.Switch:
+		return parseSwitch(p)
+
+	case token.Select:
+		return parseSelect(p)
+
+	case token.For:
+		return parseFor(p)
+
+	case token.Defer:
+		return parseDefer(p)
+	}
+	return parseSimpleStmt(p, labelOK)
+}
+
+func parseSelect(p *Parser) Statement {
+	p.expect(token.Select)
+	s := &Select{
+		comments: p.comments(),
+		startLoc: p.lex.Start,
+	}
+	p.next()
+	p.expect(token.OpenBrace)
+	p.next()
+	for p.tok == token.Case || p.tok == token.Default {
+		s.Cases = append(s.Cases, parseCommCase(p))
+	}
+	p.expect(token.CloseBrace)
+	s.endLoc = p.lex.Start
+	p.next()
+	return s
+}
+
+func parseCommCase(p *Parser) CommCase {
+	var c CommCase
+	if p.tok == token.Default {
+		p.next()
+	} else {
+		p.expect(token.Case)
+		p.next()
+
+		s := parseSendOrRecvStmt(p)
+		if recv, ok := s.(*RecvStmt); ok {
+			c.Receive = recv
+		} else if send, ok := s.(*SendStmt); ok {
+			c.Send = send
+		} else {
+			panic("malformed communication case")
+		}
+	}
+	p.expect(token.Colon)
+	p.next()
+	c.Statements = parseCaseStatements(p)
+	return c
+}
+
+func parseSendOrRecvStmt(p *Parser) Statement {
+	cmnts := p.comments()
+	expr := parseExpr(p)
+	switch p.tok {
+	case token.Comma:
+		p.next()
+		exprs := append([]Expression{expr}, parseExpressionList(p)...)
+		return parseRecvStmtTail(p, cmnts, exprs)
+
+	case token.Equal, token.ColonEqual:
+		return parseRecvStmtTail(p, cmnts, []Expression{expr})
+
+	case token.LessMinus:
+		p.next()
+		return &SendStmt{
+			comments:   cmnts,
+			Channel:    expr,
+			Expression: parseExpr(p),
+		}
+	}
+	panic(p.err("send or receive statement"))
+}
+
+func parseRecvStmtTail(p *Parser, cmnts comments, left []Expression) Statement {
+	ids := true
+	for _, e := range left {
+		if _, ok := e.(*Identifier); !ok {
+			ids = false
+			break
+		}
+	}
+	recv := &RecvStmt{
+		comments: cmnts,
+		Op:       p.tok,
+		Left:     left,
+	}
+	if ids && p.tok == token.ColonEqual {
+		p.next()
+	} else {
+		p.expect(token.Equal)
+		p.next()
+	}
+	p.expect(token.LessMinus)
+	recv.Right = *parseUnaryExpr(p, false).(*UnaryOp)
+	return recv
+}
+
+func parseSwitch(p *Parser) Statement {
+	p.expect(token.Switch)
+	loc := p.lex.Start
+	cmnts := p.comments()
+	p.next()
+
+	stmt := parseSimpleStmt(p, typeSwitchOK)
+	if expr, id := guardStatement(stmt); expr != nil {
+		return parseTypeSwitchBlock(p, loc, cmnts, nil, expr, id)
+	}
+	if expr, ok := stmt.(*ExpressionStmt); ok && p.tok == token.OpenBrace {
+		return parseExprSwitchBlock(p, loc, cmnts, nil, expr.Expression)
+	}
+	if p.tok == token.OpenBrace {
+		return parseExprSwitchBlock(p, loc, cmnts, nil, nil)
+	}
+
+	p.expect(token.Semicolon)
+	p.next()
+
+	expr := parseExpression(p, true)
+	if id, ok := expr.(*Identifier); ok && p.tok == token.ColonEqual {
+		// Must be a type switch with a declaration.
+		p.next()
+		ta, ok := parsePrimaryExpr(p, true).(*TypeAssertion)
+		if !ok || ta.Type != nil {
+			panic(p.err("type switch guard"))
+		}
+		return parseTypeSwitchBlock(p, loc, cmnts, stmt, ta.Expression, id)
+	}
+	if ta, ok := expr.(*TypeAssertion); ok && ta.Type == nil {
+		return parseTypeSwitchBlock(p, loc, cmnts, stmt, ta.Expression, nil)
+	}
+
+	return parseExprSwitchBlock(p, loc, cmnts, stmt, expr)
+}
+
+// Returns the expression for a type switch guard or nil if the statement is not
+// a type switch guard.  If the statement is a type switch guard that includes
+// a short variable declaration, the identifier from the declaration is returned
+// as the second value.
+func guardStatement(stmt Statement) (Expression, *Identifier) {
+	switch s := stmt.(type) {
+	case *ShortVarDecl:
+		if len(s.Right) != 1 {
+			break
+		}
+		if ta, ok := s.Right[0].(*TypeAssertion); ok && ta.Type == nil {
+			if len(s.Left) != 1 {
+				panic("too many identifiers in a type switch guard")
+			}
+			return ta.Expression, &s.Left[0]
+		}
+		break
+
+	case *ExpressionStmt:
+		if ta, ok := s.Expression.(*TypeAssertion); ok && ta.Type == nil {
+			return ta.Expression, nil
+		}
+	}
+	return nil, nil
+}
+
+func parseExprSwitchBlock(p *Parser, loc token.Location, cmnts comments,
+	init Statement, expr Expression) *ExprSwitch {
+	p.expect(token.OpenBrace)
+	p.next()
+
+	sw := &ExprSwitch{
+		comments:       cmnts,
+		startLoc:       loc,
+		Initialization: init,
+		Expression:     expr,
+	}
+	for p.tok == token.Case || p.tok == token.Default {
+		sw.Cases = append(sw.Cases, parseExprCase(p))
+	}
+	p.expect(token.CloseBrace)
+	sw.endLoc = p.lex.Start
+	p.next()
+	return sw
+}
+
+func parseExprCase(p *Parser) (c ExprCase) {
+	if p.tok != token.Default && p.tok != token.Case {
+		panic(p.err(token.Default, token.Case))
+	}
+	def := p.tok == token.Default
+	p.next()
+	if !def {
+		c.Expressions = parseExpressionList(p)
+	}
+	p.expect(token.Colon)
+	p.next()
+	c.Statements = parseCaseStatements(p)
+	return c
+}
+
+func parseTypeSwitchBlock(p *Parser, loc token.Location, cmnts comments,
+	init Statement, expr Expression, id *Identifier) *TypeSwitch {
+	p.expect(token.OpenBrace)
+	p.next()
+
+	sw := &TypeSwitch{
+		comments:       cmnts,
+		startLoc:       loc,
+		Initialization: init,
+		Declaration:    id,
+		Expression:     expr,
+	}
+	for p.tok == token.Case || p.tok == token.Default {
+		sw.Cases = append(sw.Cases, parseTypeCase(p))
+	}
+	p.expect(token.CloseBrace)
+	sw.endLoc = p.lex.Start
+	p.next()
+	return sw
+}
+
+func parseTypeCase(p *Parser) (c TypeCase) {
+	if p.tok != token.Default && p.tok != token.Case {
+		panic(p.err(token.Default, token.Case))
+	}
+	def := p.tok == token.Default
+	p.next()
+	if !def {
+		c.Types = parseTypeList(p)
+	}
+	p.expect(token.Colon)
+	p.next()
+	c.Statements = parseCaseStatements(p)
+	return c
+}
+
+func parseTypeList(p *Parser) []Type {
+	types := []Type{parseType(p)}
+	for p.tok == token.Comma {
+		p.next()
+		types = append(types, parseType(p))
+	}
+	return types
+}
+
+func parseCaseStatements(p *Parser) []Statement {
+	var stmts []Statement
+	for p.tok != token.Case && p.tok != token.Default && p.tok != token.CloseBrace {
+		stmts = append(stmts, parseStatement(p))
+		if p.tok != token.Case && p.tok != token.Default && p.tok != token.CloseBrace {
+			p.expect(token.Semicolon)
+			p.next()
+		}
+	}
+	return stmts
+}
+
+// A rangeClause is either an Assignment or a ShortVarDecl statement
+// repressenting a range clause in a range-style for loop.
+type rangeClause struct {
+	Statement
+}
+
+func parseFor(p *Parser) Statement {
+	f := &ForStmt{comments: p.comments(), startLoc: p.lex.Start}
+	p.expect(token.For)
+	p.next()
+
+	if p.tok == token.OpenBrace {
+		f.Block = *parseBlock(p)
+		return f
+	}
+
+	stmt := parseSimpleStmt(p, rangeOK)
+	if r, ok := stmt.(rangeClause); ok {
+		f.Range = r.Statement
+	} else if ex, ok := stmt.(*ExpressionStmt); ok && p.tok == token.OpenBrace {
+		f.Condition = ex.Expression
+	} else {
+		f.Initialization = stmt
+		p.expect(token.Semicolon)
+		p.next()
+		if p.tok != token.Semicolon {
+			f.Condition = parseExpr(p)
+		}
+		p.expect(token.Semicolon)
+		p.next()
+		f.Post = parseSimpleStmt(p, none)
+	}
+	f.Block = *parseBlock(p)
+	return f
+}
+
+func parseIf(p *Parser) Statement {
+	ifst := &IfStmt{comments: p.comments(), startLoc: p.lex.Start}
+	p.expect(token.If)
+	p.next()
+
+	stmt := parseSimpleStmt(p, none)
+	if expr, ok := stmt.(*ExpressionStmt); ok && p.tok == token.OpenBrace {
+		ifst.Condition = expr.Expression
+		ifst.Block = *parseBlock(p)
+	} else {
+		p.expect(token.Semicolon)
+		p.next()
+		ifst.Statement = stmt
+		ifst.Condition = parseExpr(p)
+		ifst.Block = *parseBlock(p)
+	}
+	if p.tok != token.Else {
+		return ifst
+	}
+	p.next()
+	if p.tok == token.If {
+		ifst.Else = parseIf(p)
+		return ifst
+	}
+	ifst.Else = parseBlock(p)
+	return ifst
+}
+
+func parseBlock(p *Parser) *BlockStmt {
+	p.expect(token.OpenBrace)
+	c, s := p.comments(), p.lex.Start
+	p.next()
+	var stmts []Statement
+	for p.tok != token.CloseBrace {
+		stmts = append(stmts, parseStatement(p))
+		if p.tok == token.Semicolon {
+			p.next()
+		}
+	}
+	p.expect(token.CloseBrace)
+	e := p.lex.End
+	p.next()
+	return &BlockStmt{
+		comments:   c,
+		startLoc:   s,
+		endLoc:     e,
+		Statements: stmts,
+	}
+}
+
+func parseGo(p *Parser) Statement {
+	p.expect(token.Go)
+	c, s := p.comments(), p.lex.Start
+	p.next()
+	return &GoStmt{
+		comments:   c,
+		startLoc:   s,
+		Expression: parseExpr(p),
+	}
+}
+
+func parseDefer(p *Parser) Statement {
+	p.expect(token.Defer)
+	c, s := p.comments(), p.lex.Start
+	p.next()
+	return &DeferStmt{
+		comments:   c,
+		startLoc:   s,
+		Expression: parseExpr(p),
+	}
+}
+
+func parseReturn(p *Parser) Statement {
+	p.expect(token.Return)
+	c, s, e := p.comments(), p.lex.Start, p.lex.End
+	p.next()
+	var exprs []Expression
+	if expressionFirst[p.tok] {
+		exprs = parseExpressionList(p)
+		e = exprs[len(exprs)-1].End()
+	}
+	return &ReturnStmt{
+		comments:    c,
+		startLoc:    s,
+		endLoc:      e,
+		Expressions: exprs,
+	}
+}
+
+func parseGoto(p *Parser) Statement {
+	p.expect(token.Goto)
+	c, s := p.comments(), p.lex.Start
+	p.next()
+	return &GotoStmt{
+		comments: c,
+		startLoc: s,
+		Label:    *parseIdentifier(p),
+	}
+}
+
+func parseContinue(p *Parser) Statement {
+	p.expect(token.Continue)
+	c, s := p.comments(), p.lex.Start
+	p.next()
+	var l *Identifier
+	if p.tok == token.Identifier {
+		l = parseIdentifier(p)
+	}
+	return &ContinueStmt{
+		comments: c,
+		startLoc: s,
+		Label:    l,
+	}
+}
+
+func parseBreak(p *Parser) Statement {
+	p.expect(token.Break)
+	c, s := p.comments(), p.lex.Start
+	p.next()
+	var l *Identifier
+	if p.tok == token.Identifier {
+		l = parseIdentifier(p)
+	}
+	return &BreakStmt{
+		comments: c,
+		startLoc: s,
+		Label:    l,
+	}
+}
+
+// AssignOps is a slice of all assignment operatiors.
+var assignOps = []token.Token{
+	token.Equal,
+	token.PlusEqual,
+	token.MinusEqual,
+	token.OrEqual,
+	token.CarrotEqual,
+	token.StarEqual,
+	token.DivideEqual,
+	token.PercentEqual,
+	token.LessLessEqual,
+	token.GreaterGreaterEqual,
+	token.AndEqual,
+	token.AndCarrotEqual,
+}
+
+// AssignOp is the set of assignment operators.
+var assignOp = func() map[token.Token]bool {
+	ops := make(map[token.Token]bool)
+	for _, op := range assignOps {
+		ops[op] = true
+	}
+	return ops
+}()
+
+// Returns the current token if it is an assignment operator, otherwise
+// panics with a syntax error.
+func expectAssign(p *Parser) token.Token {
+	if assignOp[p.tok] {
+		return p.tok
+	}
+	ops := make([]interface{}, len(assignOps)-1)
+	for i, op := range assignOps[1:] {
+		ops[i] = op
+	}
+	panic(p.err(assignOps[0], ops...))
+}
+
+// SimpOptions are some options that allow parseSimpleStmt to return
+// non-simple statements.
+type options int
+
+const (
+	none options = iota
+	// LabelOK allows parseSimpleStmt to return label statements.
+	labelOK
+	// RangeOK allows parseSimpleStmt to return RangeClauses
+	// for either assingment or short variable declarations.
+	rangeOK
+	// TypeSwitchOK allows for a type switch guard in short variable
+	// declarations.
+	typeSwitchOK
+)
+
+func parseSimpleStmt(p *Parser, opts options) (st Statement) {
+	cmnts := p.comments()
+	if !expressionFirst[p.tok] {
+		// Empty statement
+		return nil
+	}
+	expr := parseExpression(p, opts == typeSwitchOK)
+	id, isID := expr.(*Identifier)
+	switch {
+	case p.tok == token.LessMinus:
+		p.next()
+		return &SendStmt{
+			comments:   cmnts,
+			Channel:    expr,
+			Expression: parseExpr(p),
+		}
+
+	case p.tok == token.MinusMinus || p.tok == token.PlusPlus:
+		op, opEnd := p.tok, p.lex.End
+		p.next()
+		return &IncDecStmt{
+			comments:   cmnts,
+			Expression: expr,
+			Op:         op,
+			opEnd:      opEnd,
+		}
+
+	case assignOp[p.tok]:
+		exprs := []Expression{expr}
+		return parseAssignmentTail(p, cmnts, exprs, opts == rangeOK)
+
+	case p.tok == token.Comma:
+		p.next()
+		exprs := []Expression{expr}
+		exprs = append(exprs, parseExpressionList(p)...)
+
+		var ids []Identifier
+		for _, e := range exprs {
+			if id, ok := e.(*Identifier); ok {
+				ids = append(ids, *id)
+			} else {
+				break
+			}
+		}
+		// If all the expressions were identifiers then we could have
+		// a short variable declaration.  Otherwise, it's an assignment.
+		if len(ids) == len(exprs) && p.tok == token.ColonEqual {
+			// A type switch guard is only allowed if there is a single
+			// identifier on the left hand side.
+			if opts == typeSwitchOK {
+				opts = none
+			}
+			return parseShortVarDeclTail(p, cmnts, ids, opts)
+		}
+		return parseAssignmentTail(p, cmnts, exprs, opts == rangeOK)
+
+	case isID && p.tok == token.ColonEqual:
+		ids := []Identifier{*id}
+		return parseShortVarDeclTail(p, cmnts, ids, opts)
+
+	case opts == labelOK && isID && p.tok == token.Colon:
+		p.next()
+		return &LabeledStmt{
+			comments:  cmnts,
+			Label:     *id,
+			Statement: parseStatement(p),
+		}
+
+	default:
+		return &ExpressionStmt{
+			comments:   cmnts,
+			Expression: expr,
+		}
+	}
+}
+
+// Parses a short variable declaration beginning with the := operator.  If
+// allowRange is true, then a rangeClause is returned if the range
+// keyword appears after the := operator.
+func parseShortVarDeclTail(p *Parser, cmnts comments, ids []Identifier, opts options) Statement {
+	p.expect(token.ColonEqual)
+	p.next()
+	if opts == rangeOK && p.tok == token.Range {
+		p.next()
+		return rangeClause{&ShortVarDecl{
+			comments: cmnts,
+			Left:     ids,
+			Right:    []Expression{parseExpr(p)},
+		}}
+	}
+	var right []Expression
+	if opts == typeSwitchOK {
+		right = parseExpressionListOrTypeGuard(p)
+	} else {
+		right = parseExpressionList(p)
+	}
+	return &ShortVarDecl{
+		comments: cmnts,
+		Left:     ids,
+		Right:    right,
+	}
+}
+
+// Parses an assignment statement beginning with the assignment
+// operator.  If allowRange is true, then a rangeClause is returned
+// if the range keyword appears after the assignment operator.
+func parseAssignmentTail(p *Parser, cmnts comments, exprs []Expression, rangeOK bool) Statement {
+	op := expectAssign(p)
+	p.next()
+	if rangeOK && op == token.Equal && p.tok == token.Range {
+		p.next()
+		return rangeClause{&Assignment{
+			comments: cmnts,
+			Op:       op,
+			Left:     exprs,
+			Right:    []Expression{parseExpr(p)},
+		}}
+	}
+	return &Assignment{
+		comments: cmnts,
+		Op:       op,
+		Left:     exprs,
+		Right:    parseExpressionList(p),
+	}
 }
 
 func parseDeclarations(p *Parser) Declarations {
@@ -608,7 +1210,7 @@ func parseArrayOrSliceType(p *Parser, dotDotDot bool) Type {
 	if dotDotDot && p.tok == token.DotDotDot {
 		p.next()
 	} else {
-		ar.Size = parseExpression(p)
+		ar.Size = parseExpr(p)
 	}
 	p.expect(token.CloseBracket)
 	p.next()
@@ -630,12 +1232,95 @@ func parseTypeName(p *Parser) Type {
 	return n
 }
 
-func parseExpression(p *Parser) Expression {
-	return parseBinaryExpr(p, 1)
+var (
+	// ExpressionFirst is the set of tokens that may begin an expression.
+	expressionFirst = map[token.Token]bool{
+		// Unary Op
+		token.Plus:      true,
+		token.Minus:     true,
+		token.Bang:      true,
+		token.Carrot:    true,
+		token.Star:      true,
+		token.And:       true,
+		token.LessMinus: true,
+
+		// Type First
+		token.Identifier: true,
+		//	token.Star:        true,
+		token.OpenBracket: true,
+		token.Struct:      true,
+		token.Func:        true,
+		token.Interface:   true,
+		token.Map:         true,
+		token.Chan:        true,
+		//	token.LessMinus:   true,
+		token.OpenParen: true,
+
+		// Literals
+		token.IntegerLiteral:   true,
+		token.FloatLiteral:     true,
+		token.ImaginaryLiteral: true,
+		token.RuneLiteral:      true,
+		token.StringLiteral:    true,
+	}
+
+	// Binary op precedence for precedence climbing algorithm.
+	// http://www.engr.mun.ca/~theo/Misc/exp_parsing.htm
+	//
+	// BUG(eaburns): Define tokens.NTokens and change
+	// map[token.Token]Whatever to [nTokens]Whatever.
+	precedence = map[token.Token]int{
+		token.OrOr:           1,
+		token.AndAnd:         2,
+		token.EqualEqual:     3,
+		token.BangEqual:      3,
+		token.Less:           3,
+		token.LessEqual:      3,
+		token.Greater:        3,
+		token.GreaterEqual:   3,
+		token.Plus:           4,
+		token.Minus:          4,
+		token.Or:             4,
+		token.Carrot:         4,
+		token.Star:           5,
+		token.Divide:         5,
+		token.Percent:        5,
+		token.LessLess:       5,
+		token.GreaterGreater: 5,
+		token.And:            5,
+		token.AndCarrot:      5,
+	}
+
+	// Set of unary operators.
+	unary = map[token.Token]bool{
+		token.Plus:      true,
+		token.Minus:     true,
+		token.Bang:      true,
+		token.Carrot:    true,
+		token.Star:      true,
+		token.And:       true,
+		token.LessMinus: true,
+	}
+)
+
+func parseExpr(p *Parser) Expression {
+	return parseExpression(p, false)
 }
 
-func parseBinaryExpr(p *Parser, prec int) Expression {
-	left := parseUnaryExpr(p)
+func parseExpression(p *Parser, typeSwitch bool) Expression {
+	return parseBinaryExpr(p, 1, typeSwitch)
+}
+
+func parseBinaryExpr(p *Parser, prec int, typeSwitch bool) Expression {
+	left := parseUnaryExpr(p, typeSwitch)
+	if ta, ok := left.(*TypeAssertion); ok && ta.Type == nil {
+		if !typeSwitch {
+			panic("parsed a disallowed type switch guard")
+		}
+		// This is a type guard, it cannot be the left operand of a
+		// binary expression.
+		return left
+	}
 	for {
 		pr, ok := precedence[p.tok]
 		if !ok || pr < prec {
@@ -643,7 +1328,7 @@ func parseBinaryExpr(p *Parser, prec int) Expression {
 		}
 		op, opLoc := p.tok, p.lex.Start
 		p.next()
-		right := parseBinaryExpr(p, pr+1)
+		right := parseBinaryExpr(p, pr+1, false)
 		left = &BinaryOp{
 			Op:    op,
 			opLoc: opLoc,
@@ -653,22 +1338,22 @@ func parseBinaryExpr(p *Parser, prec int) Expression {
 	}
 }
 
-func parseUnaryExpr(p *Parser) Expression {
+func parseUnaryExpr(p *Parser, typeSwitch bool) Expression {
 	if unary[p.tok] {
 		op, opLoc := p.tok, p.lex.Start
 		p.next()
-		operand := parseUnaryExpr(p)
+		operand := parseUnaryExpr(p, false)
 		return &UnaryOp{
 			Op:      op,
 			opLoc:   opLoc,
 			Operand: operand,
 		}
 	}
-	return parsePrimaryExpr(p)
+	return parsePrimaryExpr(p, typeSwitch)
 }
 
-func parsePrimaryExpr(p *Parser) Expression {
-	left := parseOperand(p)
+func parsePrimaryExpr(p *Parser, typeSwitch bool) Expression {
+	left := parseOperand(p, typeSwitch)
 	for {
 		switch p.tok {
 		case token.OpenBracket:
@@ -676,7 +1361,7 @@ func parsePrimaryExpr(p *Parser) Expression {
 		case token.OpenParen:
 			left = parseCall(p, left)
 		case token.Dot:
-			left = parseSelectorOrTypeAssertion(p, left)
+			left = parseSelectorOrTypeAssertion(p, left, typeSwitch)
 		default:
 			return left
 		}
@@ -694,7 +1379,7 @@ func parseSliceOrIndex(p *Parser, left Expression) Expression {
 		return sl
 	}
 
-	e := parseExpression(p)
+	e := parseExpr(p)
 
 	switch p.tok {
 	case token.CloseBracket:
@@ -723,10 +1408,10 @@ func parseSliceHighMax(p *Parser, left, low Expression) *Slice {
 
 	sl := &Slice{Expression: left, Low: low}
 	if p.tok != token.CloseBracket {
-		sl.High = parseExpression(p)
+		sl.High = parseExpr(p)
 		if p.tok == token.Colon {
 			p.next()
-			sl.Max = parseExpression(p)
+			sl.Max = parseExpr(p)
 		}
 	}
 	p.expect(token.CloseBracket)
@@ -739,10 +1424,12 @@ func parseCall(p *Parser, left Expression) Expression {
 	p.expect(token.OpenParen)
 	c := &Call{Function: left, openLoc: p.lex.Start}
 	p.next()
-	c.Arguments = parseExpressionList(p)
-	if p.tok == token.DotDotDot {
-		c.DotDotDot = true
-		p.next()
+	if p.tok != token.CloseParen {
+		c.Arguments = parseExpressionList(p)
+		if p.tok == token.DotDotDot {
+			c.DotDotDot = true
+			p.next()
+		}
 	}
 	p.expect(token.CloseParen)
 	c.closeLoc = p.lex.End
@@ -753,7 +1440,7 @@ func parseCall(p *Parser, left Expression) Expression {
 func parseExpressionList(p *Parser) []Expression {
 	var exprs []Expression
 	for {
-		exprs = append(exprs, parseExpression(p))
+		exprs = append(exprs, parseExpr(p))
 		if p.tok != token.Comma {
 			break
 		}
@@ -762,12 +1449,32 @@ func parseExpressionList(p *Parser) []Expression {
 	return exprs
 }
 
-func parseOperand(p *Parser) Expression {
+func parseExpressionListOrTypeGuard(p *Parser) []Expression {
+	var exprs []Expression
+	for {
+		expr := parseExpression(p, len(exprs) == 0)
+		exprs = append(exprs, expr)
+		if ta, ok := expr.(*TypeAssertion); ok && ta.Type == nil {
+			if len(exprs) > 1 {
+				panic("parsed disallowed type switch guard")
+			}
+			// Type switch guard.  It must be first and nothing can follow it.
+			break
+		}
+		if p.tok != token.Comma {
+			break
+		}
+		p.next()
+	}
+	return exprs
+}
+
+func parseOperand(p *Parser, typeSwitch bool) Expression {
 	switch p.tok {
 	case token.Identifier:
 		id := parseIdentifier(p)
 		if p.tok == token.Dot {
-			return parseSelectorOrTypeAssertion(p, id)
+			return parseSelectorOrTypeAssertion(p, id, typeSwitch)
 		}
 		return id
 
@@ -800,7 +1507,7 @@ func parseOperand(p *Parser) Expression {
 
 	case token.OpenParen:
 		p.next()
-		e := parseExpression(p)
+		e := parseExpr(p)
 		p.expect(token.CloseParen)
 		p.next()
 		return e
@@ -847,7 +1554,7 @@ func parseElement(p *Parser) Element {
 		return Element{Value: parseLiteralValue(p)}
 	}
 
-	expr := parseExpression(p)
+	expr := parseExpr(p)
 	if p.tok != token.Colon {
 		return Element{Value: expr}
 	}
@@ -857,12 +1564,12 @@ func parseElement(p *Parser) Element {
 	if p.tok == token.OpenBrace {
 		elm.Value = parseLiteralValue(p)
 	} else {
-		elm.Value = parseExpression(p)
+		elm.Value = parseExpr(p)
 	}
 	return elm
 }
 
-func parseSelectorOrTypeAssertion(p *Parser, left Expression) Expression {
+func parseSelectorOrTypeAssertion(p *Parser, left Expression, typeSwitch bool) Expression {
 	p.expect(token.Dot)
 	dotLoc := p.lex.Start
 	p.next()
@@ -871,7 +1578,11 @@ func parseSelectorOrTypeAssertion(p *Parser, left Expression) Expression {
 	case token.OpenParen:
 		p.next()
 		t := &TypeAssertion{Expression: left, dotLoc: dotLoc}
-		t.Type = parseType(p)
+		if typeSwitch && p.tok == token.Type {
+			p.next()
+		} else {
+			t.Type = parseType(p)
+		}
 		p.expect(token.CloseParen)
 		t.closeLoc = p.lex.Start
 		p.next()
@@ -884,7 +1595,7 @@ func parseSelectorOrTypeAssertion(p *Parser, left Expression) Expression {
 			dotLoc:     dotLoc,
 		}
 		if p.tok == token.Dot {
-			return parseSelectorOrTypeAssertion(p, left)
+			return parseSelectorOrTypeAssertion(p, left, typeSwitch)
 		}
 		return left
 	}

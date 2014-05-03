@@ -30,7 +30,7 @@ func ms(ms ...matcher) []matcher {
 // Returns true if both the node and matcher are nil, or if they are
 // both non-nil and the matcher matches the node.
 func nilOr(n Node, m matcher) bool {
-	return (n == nil && m == nil) || (n != nil && m != nil && m(n, nil))
+	return n == nil && m == nil || n != nil && m != nil && m(n, nil)
 }
 
 func parseErr(reStr string) matcher {
@@ -91,7 +91,7 @@ func (tests parserTests) runType(t *testing.T) {
 
 func (tests parserTests) runExpr(t *testing.T) {
 	tests.run(t, func(p *Parser) Node {
-		return parseExpression(p)
+		return parseExpr(p)
 	})
 }
 
@@ -106,6 +106,309 @@ func (tests parserTests) runDeclarations(t *testing.T) {
 	tests.run(t, func(p *Parser) Node {
 		return parseDeclarations(p)
 	})
+}
+
+func (tests parserTests) runStatements(t *testing.T) {
+	tests.run(t, func(p *Parser) Node {
+		return parseStatement(p)
+	})
+}
+
+// Matches a select statement communication case.
+type commMatcher struct {
+	send  matcher
+	recv  matcher
+	stmts []matcher
+}
+
+func selectStmt(cases ...commMatcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*Select)
+		if !ok || len(cases) != len(s.Cases) {
+			return false
+		}
+		for i, c := range cases {
+			if (c.recv == nil) != (s.Cases[i].Receive == nil) ||
+				(c.recv != nil && !c.recv(s.Cases[i].Receive, nil)) ||
+				(c.send == nil) != (s.Cases[i].Send == nil) ||
+				(c.send != nil && !c.send(s.Cases[i].Send, nil)) ||
+				len(c.stmts) != len(s.Cases[i].Statements) {
+				return false
+			}
+			for j, m := range c.stmts {
+				if !m(s.Cases[i].Statements[j], nil) {
+					return false
+				}
+			}
+		}
+		return true
+	}
+
+}
+
+func recv(left []matcher, op token.Token, recvExpr matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*RecvStmt)
+		if err != nil || !ok || len(left) != len(s.Left) || op != s.Op ||
+			!unOp(token.LessMinus, recvExpr)(&s.Right, nil) {
+			return false
+		}
+		for i, l := range left {
+			if !l(s.Left[i], nil) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+// Matches a type switch or expression switch case.
+type caseMatcher struct {
+	guards []matcher
+	stmts  []matcher
+}
+
+func exprSwitch(init matcher, expr matcher, cases ...caseMatcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*ExprSwitch)
+		if !ok || !nilOr(s.Initialization, init) || !nilOr(s.Expression, expr) || len(cases) != len(s.Cases) {
+			return false
+		}
+		for i, c := range cases {
+			if len(c.guards) != len(s.Cases[i].Expressions) ||
+				len(c.stmts) != len(s.Cases[i].Statements) {
+				return false
+			}
+			for j, m := range c.guards {
+				if !m(s.Cases[i].Expressions[j], nil) {
+					return false
+				}
+			}
+			for j, m := range c.stmts {
+				if !m(s.Cases[i].Statements[j], nil) {
+					return false
+				}
+			}
+		}
+		return true
+	}
+}
+
+func typeSwitch(init matcher, decl matcher, expr matcher, cases ...caseMatcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*TypeSwitch)
+		if !ok || !nilOr(s.Initialization, init) || !expr(s.Expression, nil) || len(cases) != len(s.Cases) {
+			return false
+		}
+		if (s.Declaration == nil) != (decl == nil) || (decl != nil && !decl(s.Declaration, nil)) {
+			return false
+		}
+		for i, c := range cases {
+			if len(c.guards) != len(s.Cases[i].Types) || len(c.stmts) != len(s.Cases[i].Statements) {
+				return false
+			}
+			for j, m := range c.guards {
+				if !m(s.Cases[i].Types[j], nil) {
+					return false
+				}
+			}
+			for j, m := range c.stmts {
+				if !m(s.Cases[i].Statements[j], nil) {
+					return false
+				}
+			}
+		}
+		return true
+	}
+}
+
+func forRange(rng matcher, blk matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*ForStmt)
+		return err == nil && ok && s.Initialization == nil && s.Condition == nil && s.Post == nil && rng(s.Range, nil) && blk(&s.Block, nil)
+	}
+}
+
+func forLoop(init matcher, cond matcher, post matcher, blk matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*ForStmt)
+		return err == nil && ok && s.Range == nil && nilOr(s.Initialization, init) && nilOr(s.Condition, cond) && nilOr(s.Post, post) && blk(&s.Block, nil)
+	}
+}
+
+func ifStmt(st matcher, cond matcher, blk matcher, els matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*IfStmt)
+		return err == nil && ok && nilOr(s.Statement, st) && cond(s.Condition, nil) && blk(&s.Block, nil) && nilOr(s.Else, els)
+	}
+}
+
+func labeled(l matcher, st matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*LabeledStmt)
+		return err == nil && ok && l(&s.Label, nil) && st(s.Statement, nil)
+	}
+}
+
+func block(stmts ...matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*BlockStmt)
+		if err != nil || !ok || len(stmts) != len(s.Statements) {
+			return false
+		}
+		for i, stmt := range stmts {
+			if !stmt(s.Statements[i], nil) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+func deferStmt(e matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*DeferStmt)
+		return err == nil && ok && e(s.Expression, nil)
+	}
+}
+
+func goStmt(e matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*GoStmt)
+		return err == nil && ok && e(s.Expression, nil)
+	}
+}
+
+func fallthroughStmt() matcher {
+	return func(n Node, err error) bool {
+		_, ok := n.(*FallthroughStmt)
+		return err == nil && ok
+	}
+}
+
+func returnStmt(es ...matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*ReturnStmt)
+		if err != nil || !ok || len(es) != len(s.Expressions) {
+			return false
+		}
+		for i, e := range es {
+			if !e(s.Expressions[i], nil) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+func continueStmt(l matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*ContinueStmt)
+		return err == nil && ok && (s.Label == nil && l == nil || s.Label != nil && l != nil && l(s.Label, nil))
+	}
+}
+
+func breakStmt(l matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*BreakStmt)
+		return err == nil && ok && (s.Label == nil && l == nil || s.Label != nil && l != nil && l(s.Label, nil))
+	}
+}
+
+func gotoStmt(l matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*GotoStmt)
+		return err == nil && ok && l(&s.Label, nil)
+	}
+}
+
+func decl(ds ...matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*DeclarationStmt)
+		if err != nil || !ok || len(ds) != len(s.Declarations) {
+			return false
+		}
+		for i, d := range ds {
+			if !d(s.Declarations[i], nil) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+func shortDecl(left []matcher, right ...matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*ShortVarDecl)
+		if err != nil || !ok || len(left) != len(s.Left) || len(right) != len(s.Right) {
+			return false
+		}
+		for i, l := range left {
+			if !l(&s.Left[i], nil) {
+				return false
+			}
+		}
+		for i, r := range right {
+			if !r(s.Right[i], nil) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+func assign(op token.Token, left []matcher, right ...matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*Assignment)
+		if err != nil || !ok || len(left) != len(s.Left) || len(right) != len(s.Right) || op != s.Op {
+			return false
+		}
+		for i, l := range left {
+			if !l(s.Left[i], nil) {
+				return false
+			}
+		}
+		for i, r := range right {
+			if !r(s.Right[i], nil) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+func expr(ex matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*ExpressionStmt)
+		return err == nil && ok && ex(s.Expression, nil)
+	}
+}
+
+func decr(ex matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*IncDecStmt)
+		return err == nil && ok && s.Op == token.MinusMinus && ex(s.Expression, nil)
+	}
+}
+
+func incr(ex matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*IncDecStmt)
+		return err == nil && ok && s.Op == token.PlusPlus && ex(s.Expression, nil)
+	}
+}
+
+func send(ch, ex matcher) matcher {
+	return func(n Node, err error) bool {
+		s, ok := n.(*SendStmt)
+		return err == nil && ok && ch(s.Channel, nil) && ex(s.Expression, nil)
+	}
+}
+
+func empty() matcher {
+	return func(n Node, err error) bool {
+		return err == nil && n == nil
+	}
 }
 
 func decls(decls ...matcher) matcher {
@@ -385,7 +688,7 @@ func index(expr, idx matcher) matcher {
 func tAssert(expr, typ matcher) matcher {
 	return func(n Node, err error) bool {
 		t, ok := n.(*TypeAssertion)
-		return err == nil && ok && expr(t.Expression, nil) && typ(t.Type, nil)
+		return err == nil && ok && expr(t.Expression, nil) && nilOr(t.Type, typ)
 	}
 }
 
