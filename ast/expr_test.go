@@ -48,7 +48,7 @@ func TestCompositeLiteral(t *testing.T) {
 func TestTypeSwitchGuard(t *testing.T) {
 	okTests := parserTests{
 		{`a.(type)`, tAssert(a, nil)},
-		{`a.(b).(type)`, tAssert(tAssert(a, ident("b")), nil)},
+		{`a.(b).(type)`, tAssert(tAssert(a, b), nil)},
 		{`a.b.(type)`, tAssert(sel(a, b), nil)},
 		{`a[5].(type)`, tAssert(index(a, intLit("5")), nil)},
 
@@ -79,15 +79,15 @@ func TestConversionExpr(t *testing.T) {
 	tests := parserTests{
 		{`(int)(a)`, call(ident("int"), false, a)},
 		{`(struct{x int})(a)`, call(structType(fieldDecl(ident("int"), ident("x"))), false, a)},
-		{`(chan <- a)(b)`, call(sendChan(ident("a")), false, b)},
+		{`(chan <- a)(b)`, call(sendChan(a), false, b)},
 	}
 	tests.runExpr(t)
 }
 
 func TestBuiltInCall(t *testing.T) {
 	tests := parserTests{
-		{`make(chan <- a)`, call(ident("make"), false, sendChan(ident("a")))},
-		{`make(chan <- a, 5)`, call(ident("make"), false, sendChan(ident("a")), intLit("5"))},
+		{`make(chan <- a)`, call(ident("make"), false, sendChan(a))},
+		{`make(chan <- a, 5)`, call(ident("make"), false, sendChan(a), intLit("5"))},
 	}
 	tests.runExpr(t)
 }
@@ -117,10 +117,10 @@ func TestPrimaryExpr(t *testing.T) {
 		{`a(b).c(d)`, call(sel(call(a, false, b), c), false, d)},
 
 		// TypeAssertion
-		{`a.(b)`, tAssert(a, ident("b"))},
-		{`a.b.(c)`, tAssert(sel(a, b), ident("c"))},
-		{`a.(b).(c)`, tAssert(tAssert(a, ident("b")), ident("c"))},
-		{`a.(b).(c).d`, sel(tAssert(tAssert(a, ident("b")), ident("c")), d)},
+		{`a.(b)`, tAssert(a, b)},
+		{`a.b.(c)`, tAssert(sel(a, b), c)},
+		{`a.(b).(c)`, tAssert(tAssert(a, b), c)},
+		{`a.(b).(c).d`, sel(tAssert(tAssert(a, b), c), d)},
 
 		// Index
 		{`a[b]`, index(a, b)},

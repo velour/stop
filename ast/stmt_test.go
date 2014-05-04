@@ -172,7 +172,7 @@ func TestSwitch(t *testing.T) {
 		{`switch ; a.(type) {}`, typeSwitch(nil, nil, a)},
 		{`switch a.b.(type) {}`, typeSwitch(nil, nil, sel(a, b))},
 		{`switch a(b).(type) {}`, typeSwitch(nil, nil, call(a, false, b))},
-		{`switch a.(b).(type) {}`, typeSwitch(nil, nil, tAssert(a, ident("b")))},
+		{`switch a.(b).(type) {}`, typeSwitch(nil, nil, tAssert(a, b))},
 		{`switch a := b.(type) {}`, typeSwitch(nil, a, b)},
 		{`switch a(); b := c.(type) {}`, typeSwitch(expr(call(a, false)), b, c)},
 
