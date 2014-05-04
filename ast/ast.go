@@ -547,15 +547,6 @@ func (n *PointerType) Start() token.Location { return n.starLoc }
 func (n *PointerType) End() token.Location   { return n.Type.End() }
 func (n *PointerType) typeNode()             {}
 
-// A TypeName is a type node that represents a named type.
-type TypeName struct {
-	Package string
-	Name    string
-	span
-}
-
-func (n *TypeName) typeNode() {}
-
 // The Expression interface is implemented by all nodes that are
 // also expressions.
 type Expression interface {
@@ -636,17 +627,18 @@ func (n *TypeAssertion) Start() token.Location { return n.Expression.Start() }
 func (n *TypeAssertion) Loc() token.Location   { return n.dotLoc }
 func (n *TypeAssertion) End() token.Location   { return n.closeLoc }
 
-// Selector is an expression node representing a selector or a
-// qualified identifier.
+// Selector is a qualified identifier representing either a type name or
+// an selector expression.
 type Selector struct {
-	Expression Node
-	Selection  *Identifier
-	dotLoc     token.Location
+	Parent Node
+	Name   *Identifier
+	dotLoc token.Location
 }
 
-func (n *Selector) Start() token.Location { return n.Expression.Start() }
+func (n *Selector) Start() token.Location { return n.Parent.Start() }
 func (n *Selector) Loc() token.Location   { return n.dotLoc }
-func (n *Selector) End() token.Location   { return n.Selection.End() }
+func (n *Selector) End() token.Location   { return n.Name.End() }
+func (n *Selector) typeNode()             {}
 
 // Call is a function call expression.
 // After parsing but before type checking, a Call can represent
@@ -685,12 +677,14 @@ func (u *UnaryOp) Start() token.Location { return u.opLoc }
 func (u *UnaryOp) Loc() token.Location   { return u.opLoc }
 func (u *UnaryOp) End() token.Location   { return u.Operand.End() }
 
-// An Identifier is an expression node that represents an
-// un-qualified identifier.
+// An Identifier is an un-qualified identifier representing either  type
+// name or an identifier expression.
 type Identifier struct {
 	Name string
 	span
 }
+
+func (n *Identifier) typeNode() {}
 
 // IntegerLiteral is an expression node representing a decimal,
 // octal, or hex

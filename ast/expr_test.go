@@ -14,34 +14,33 @@ var (
 func TestCompositeLiteral(t *testing.T) {
 	tests := parserTests{
 		{`struct{ a int }{ a: 4 }`, compLit(
-			structType(fieldDecl(typeName("", "int"), a)),
+			structType(fieldDecl(ident("int"), a)),
 			elm(a, intLit("4")))},
 		{`struct{ a, b int }{ a: 4, b: 5}`, compLit(
-			structType(fieldDecl(typeName("", "int"), a, b)),
+			structType(fieldDecl(ident("int"), a, b)),
 			elm(a, intLit("4")),
 			elm(b, intLit("5")))},
 
 		{`struct{ a []int }{ a: { 4, 5 } }`, compLit(
-			structType(fieldDecl(sliceType(typeName("", "int")), a)),
+			structType(fieldDecl(sliceType(ident("int")), a)),
 			elm(a, litVal(elm(nil, intLit("4")), elm(nil, intLit("5")))))},
 
 		{`[][]int{ {4, 5} }`, compLit(
-			sliceType(sliceType(typeName("", "int"))),
+			sliceType(sliceType(ident("int"))),
 			elm(nil, litVal(elm(nil, intLit("4")), elm(nil, intLit("5")))))},
 
 		{`[...]int{ 4, 5 }`, compLit(
-			arrayType(nil, typeName("", "int")),
+			arrayType(nil, ident("int")),
 			elm(nil, intLit("4")),
 			elm(nil, intLit("5")))},
 
 		// Trailing ,
 		{`struct{ a, b int }{ a: 4, b: 5,}`, compLit(
-			structType(fieldDecl(typeName("", "int"), a, b)),
+			structType(fieldDecl(ident("int"), a, b)),
 			elm(a, intLit("4")),
 			elm(b, intLit("5")))},
 
-		// BUG(eaburns): Should be a composite literal, not a parse error.
-		// {`point{x: 5, y: 6}`, parseErr("")},
+		{`a{b: 5, c: 6}`, compLit(a, elm(b, intLit("5")), elm(c, intLit("6")))},
 	}
 	tests.runExpr(t)
 }
@@ -49,7 +48,7 @@ func TestCompositeLiteral(t *testing.T) {
 func TestTypeSwitchGuard(t *testing.T) {
 	okTests := parserTests{
 		{`a.(type)`, tAssert(a, nil)},
-		{`a.(b).(type)`, tAssert(tAssert(a, typeName("", "b")), nil)},
+		{`a.(b).(type)`, tAssert(tAssert(a, ident("b")), nil)},
 		{`a.b.(type)`, tAssert(sel(a, b), nil)},
 		{`a[5].(type)`, tAssert(index(a, intLit("5")), nil)},
 
@@ -79,16 +78,16 @@ func TestTypeSwitchGuard(t *testing.T) {
 func TestConversionExpr(t *testing.T) {
 	tests := parserTests{
 		{`(int)(a)`, call(ident("int"), false, a)},
-		{`(struct{x int})(a)`, call(structType(fieldDecl(typeName("", "int"), ident("x"))), false, a)},
-		{`(chan <- a)(b)`, call(sendChan(typeName("", "a")), false, b)},
+		{`(struct{x int})(a)`, call(structType(fieldDecl(ident("int"), ident("x"))), false, a)},
+		{`(chan <- a)(b)`, call(sendChan(ident("a")), false, b)},
 	}
 	tests.runExpr(t)
 }
 
 func TestBuiltInCall(t *testing.T) {
 	tests := parserTests{
-		{`make(chan <- a)`, call(ident("make"), false, sendChan(typeName("", "a")))},
-		{`make(chan <- a, 5)`, call(ident("make"), false, sendChan(typeName("", "a")), intLit("5"))},
+		{`make(chan <- a)`, call(ident("make"), false, sendChan(ident("a")))},
+		{`make(chan <- a, 5)`, call(ident("make"), false, sendChan(ident("a")), intLit("5"))},
 	}
 	tests.runExpr(t)
 }
@@ -118,10 +117,10 @@ func TestPrimaryExpr(t *testing.T) {
 		{`a(b).c(d)`, call(sel(call(a, false, b), c), false, d)},
 
 		// TypeAssertion
-		{`a.(b)`, tAssert(a, typeName("", "b"))},
-		{`a.b.(c)`, tAssert(sel(a, b), typeName("", "c"))},
-		{`a.(b).(c)`, tAssert(tAssert(a, typeName("", "b")), typeName("", "c"))},
-		{`a.(b).(c).d`, sel(tAssert(tAssert(a, typeName("", "b")), typeName("", "c")), d)},
+		{`a.(b)`, tAssert(a, ident("b"))},
+		{`a.b.(c)`, tAssert(sel(a, b), ident("c"))},
+		{`a.(b).(c)`, tAssert(tAssert(a, ident("b")), ident("c"))},
+		{`a.(b).(c).d`, sel(tAssert(tAssert(a, ident("b")), ident("c")), d)},
 
 		// Index
 		{`a[b]`, index(a, b)},

@@ -61,6 +61,12 @@ type Parser struct {
 	lex *token.Lexer
 	tok token.Token
 
+	// ExprLevel is the nesting level of expressions.  When the level
+	// is greater or equal to zero, composite literals are allowed.
+	// It is negative when parsing the initialization statement of an
+	// if, switch, or for statement.
+	exprLevel int
+
 	// Cmnts is a slice of all comments that are preceeding the
 	// current token without an intervening blank line.
 	cmnts []string

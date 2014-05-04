@@ -181,7 +181,11 @@ func parseSwitch(p *Parser) Statement {
 	cmnts := p.comments()
 	p.next()
 
+	prevLevel := p.exprLevel
+	p.exprLevel = -1
 	stmt := parseSimpleStmt(p, typeSwitchOK)
+	p.exprLevel = prevLevel
+
 	if expr, id := guardStatement(stmt); expr != nil {
 		return parseTypeSwitchBlock(p, loc, cmnts, nil, expr, id)
 	}
@@ -195,7 +199,10 @@ func parseSwitch(p *Parser) Statement {
 	p.expect(token.Semicolon)
 	p.next()
 
+	prevLevel, p.exprLevel = p.exprLevel, -1
 	expr := parseExpression(p, true)
+	p.exprLevel = prevLevel
+
 	if id, ok := expr.(*Identifier); ok && p.tok == token.ColonEqual {
 		// Must be a type switch with a declaration.
 		p.next()
@@ -346,7 +353,11 @@ func parseFor(p *Parser) Statement {
 		return f
 	}
 
+	prevLevel := p.exprLevel
+	p.exprLevel = -1
 	stmt := parseSimpleStmt(p, rangeOK)
+	p.exprLevel = prevLevel
+
 	if r, ok := stmt.(rangeClause); ok {
 		f.Range = r.Statement
 	} else if ex, ok := stmt.(*ExpressionStmt); ok && p.tok == token.OpenBrace {
@@ -356,11 +367,17 @@ func parseFor(p *Parser) Statement {
 		p.expect(token.Semicolon)
 		p.next()
 		if p.tok != token.Semicolon {
+			prevLevel, p.exprLevel = p.exprLevel, -1
 			f.Condition = parseExpr(p)
+			p.exprLevel = prevLevel
 		}
 		p.expect(token.Semicolon)
 		p.next()
+
+		prevLevel, p.exprLevel = p.exprLevel, -1
 		f.Post = parseSimpleStmt(p, none)
+		p.exprLevel = prevLevel
+
 	}
 	f.Block = *parseBlock(p)
 	return f
@@ -371,7 +388,11 @@ func parseIf(p *Parser) Statement {
 	p.expect(token.If)
 	p.next()
 
+	prevLevel := p.exprLevel
+	p.exprLevel = -1
 	stmt := parseSimpleStmt(p, none)
+	p.exprLevel = prevLevel
+
 	if expr, ok := stmt.(*ExpressionStmt); ok && p.tok == token.OpenBrace {
 		ifst.Condition = expr.Expression
 		ifst.Block = *parseBlock(p)
@@ -379,7 +400,9 @@ func parseIf(p *Parser) Statement {
 		p.expect(token.Semicolon)
 		p.next()
 		ifst.Statement = stmt
+		prevLevel, p.exprLevel = p.exprLevel, -1
 		ifst.Condition = parseExpr(p)
+		p.exprLevel = prevLevel
 		ifst.Block = *parseBlock(p)
 	}
 	if p.tok != token.Else {
@@ -900,14 +923,13 @@ func parseFieldDecl(p *Parser) FieldDecl {
 	id = parseIdentifier(p)
 	switch p.tok {
 	case token.Dot:
+		l := p.lex.Start
 		p.next()
-		p.expect(token.Identifier)
-		d.Type = &TypeName{
-			Package: id.Name,
-			Name:    p.text(),
-			span:    span{start: id.start, end: p.lex.End},
+		d.Type = &Selector{
+			Parent: id,
+			Name:   parseIdentifier(p),
+			dotLoc: l,
 		}
-		p.next()
 		goto tag
 
 	case token.StringLiteral:
@@ -916,7 +938,7 @@ func parseFieldDecl(p *Parser) FieldDecl {
 	case token.Semicolon:
 		fallthrough
 	case token.CloseBrace:
-		d.Type = &TypeName{Name: id.Name, span: id.span}
+		d.Type = id
 		return d
 	}
 
@@ -952,20 +974,16 @@ func parseInterfaceType(p *Parser) *InterfaceType {
 			})
 
 		case token.Dot:
+			l := p.lex.Start
 			p.next()
-			p.expect(token.Identifier)
-			it.Methods = append(it.Methods, &TypeName{
-				Package: id.Name,
-				Name:    p.text(),
-				span:    span{start: id.start, end: p.lex.End},
+			it.Methods = append(it.Methods, &Selector{
+				Parent: id,
+				Name:   parseIdentifier(p),
+				dotLoc: l,
 			})
-			p.next()
 
 		default:
-			it.Methods = append(it.Methods, &TypeName{
-				Name: id.Name,
-				span: id.span,
-			})
+			it.Methods = append(it.Methods, id)
 		}
 		if p.tok != token.CloseBrace {
 			p.expect(token.Semicolon)
@@ -1048,19 +1066,17 @@ func parseParameterListTail(p *Parser, pl *ParameterList, idents []Identifier) {
 			p.next()
 			fallthrough
 		case p.tok == token.CloseParen:
-			idents = append(idents, *id)
-			parseParameterListTail(p, pl, idents)
+			parseParameterListTail(p, pl, append(idents, *id))
 			return
 
 		case p.tok == token.Dot:
+			l := p.lex.Start
 			p.next()
-			p.expect(token.Identifier)
-			t := &TypeName{
-				Package: id.Name,
-				Name:    p.text(),
-				span:    span{start: id.span.start, end: p.lex.End},
+			t := &Selector{
+				Parent: id,
+				Name:   parseIdentifier(p),
+				dotLoc: l,
 			}
-			p.next()
 			d := ParameterDecl{Type: t}
 			pl.Parameters = append(typeNameDecls(idents), d)
 			parseTypeParameterList(p, pl)
@@ -1157,8 +1173,8 @@ func parseDeclParameterList(p *Parser, pl *ParameterList) {
 
 func typeNameDecls(idents []Identifier) []ParameterDecl {
 	decls := make([]ParameterDecl, len(idents))
-	for i, id := range idents {
-		decls[i].Type = &TypeName{Name: id.Name, span: id.span}
+	for i := range idents {
+		decls[i].Type = &idents[i]
 	}
 	return decls
 }
@@ -1218,14 +1234,15 @@ func parseArrayOrSliceType(p *Parser, dotDotDot bool) Type {
 
 func parseTypeName(p *Parser) Type {
 	p.expect(token.Identifier)
-	n := &TypeName{Name: p.text(), span: p.span()}
-	p.next()
+	n := parseIdentifier(p)
 	if p.tok == token.Dot {
+		l := p.lex.Start
 		p.next()
-		p.expect(token.Identifier)
-		n.Package = n.Name
-		n.Name = p.text()
-		p.next()
+		return &Selector{
+			Parent: n,
+			Name:   parseIdentifier(p),
+			dotLoc: l,
+		}
 	}
 	return n
 }
@@ -1352,7 +1369,7 @@ func parseUnaryExpr(p *Parser, typeSwitch bool) Node {
 
 func parsePrimaryExpr(p *Parser, typeSwitch bool) Node {
 	left := parseOperand(p, typeSwitch)
-	if t, ok := left.(Type); ok && p.tok == token.OpenBrace {
+	if t, ok := left.(Type); ok && p.exprLevel >= 0 && p.tok == token.OpenBrace {
 		lit := parseLiteralValue(p)
 		lit.Type = t
 		return lit
@@ -1360,9 +1377,13 @@ func parsePrimaryExpr(p *Parser, typeSwitch bool) Node {
 	for {
 		switch p.tok {
 		case token.OpenBracket:
+			p.exprLevel++
 			left = parseSliceOrIndex(p, left)
+			p.exprLevel--
 		case token.OpenParen:
+			p.exprLevel++
 			left = parseCall(p, left)
+			p.exprLevel--
 		case token.Dot:
 			left = parseSelectorOrTypeAssertion(p, left, typeSwitch)
 		default:
@@ -1500,7 +1521,9 @@ func parseOperand(p *Parser, typeSwitch bool) Node {
 
 	case token.OpenParen:
 		p.next()
+		p.exprLevel++
 		e := parseExpr(p)
+		p.exprLevel--
 		p.expect(token.CloseParen)
 		p.next()
 		return e
@@ -1576,9 +1599,9 @@ func parseSelectorOrTypeAssertion(p *Parser, left Node, typeSwitch bool) Node {
 
 	case token.Identifier:
 		left = &Selector{
-			Expression: left,
-			Selection:  parseIdentifier(p),
-			dotLoc:     dotLoc,
+			Parent: left,
+			Name:   parseIdentifier(p),
+			dotLoc: dotLoc,
 		}
 		if p.tok == token.Dot {
 			return parseSelectorOrTypeAssertion(p, left, typeSwitch)

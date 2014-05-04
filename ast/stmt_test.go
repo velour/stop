@@ -172,21 +172,21 @@ func TestSwitch(t *testing.T) {
 		{`switch ; a.(type) {}`, typeSwitch(nil, nil, a)},
 		{`switch a.b.(type) {}`, typeSwitch(nil, nil, sel(a, b))},
 		{`switch a(b).(type) {}`, typeSwitch(nil, nil, call(a, false, b))},
-		{`switch a.(b).(type) {}`, typeSwitch(nil, nil, tAssert(a, typeName("", "b")))},
+		{`switch a.(b).(type) {}`, typeSwitch(nil, nil, tAssert(a, ident("b")))},
 		{`switch a := b.(type) {}`, typeSwitch(nil, a, b)},
 		{`switch a(); b := c.(type) {}`, typeSwitch(expr(call(a, false)), b, c)},
 
 		{
 			`switch a.(type) { case int: b() }`,
 			typeSwitch(nil, nil, a, caseMatcher{
-				guards: ms(typeName("", "int")),
+				guards: ms(ident("int")),
 				stmts:  ms(expr(call(b, false))),
 			}),
 		},
 		{
 			`switch a.(type) { case int, float64: b() }`,
 			typeSwitch(nil, nil, a, caseMatcher{
-				guards: ms(typeName("", "int"), typeName("", "float64")),
+				guards: ms(ident("int"), ident("float64")),
 				stmts:  ms(expr(call(b, false))),
 			}),
 		},
@@ -210,7 +210,7 @@ func TestSwitch(t *testing.T) {
 			}`,
 			typeSwitch(nil, nil, a,
 				caseMatcher{
-					guards: ms(typeName("", "int"), typeName("", "float64")),
+					guards: ms(ident("int"), ident("float64")),
 					stmts:  ms(expr(call(b, false)), assign(token.Equal, ms(c), d)),
 				},
 				caseMatcher{
@@ -230,6 +230,11 @@ func TestSwitch(t *testing.T) {
 		{`switch a := b, c.(type) {}`, parseErr("")},
 		{`switch a := b.(type), c {}`, parseErr("")},
 		{`switch a = b.(type) {}`, parseErr("")},
+
+		// Switches and composite literals.
+		{`switch (struct{}{}) {}`, exprSwitch(nil, compLit(structType()))},
+		{`switch (struct{}{}); 5 {}`, exprSwitch(expr(compLit(structType())), intLit("5"))},
+		{`switch (struct{}{}).(type) {}`, typeSwitch(nil, nil, compLit(structType()))},
 	}
 	tests.runStatements(t)
 }
@@ -303,6 +308,9 @@ func TestFor(t *testing.T) {
 
 		// Labels are not a simple statement.
 		{`for label:; a < 100; a++`, parseErr(":")},
+
+		// For loops and composite literals.
+		{`for (struct{}{}) {}`, forLoop(nil, compLit(structType()), nil, block())},
 	}
 	tests.runStatements(t)
 }
@@ -324,6 +332,9 @@ func TestIf(t *testing.T) {
 					ifStmt(nil, c, block(expr(intLit("3"))),
 						block(expr(intLit("4")))))),
 		},
+
+		// If statements and composite literals.
+		{`if (struct{}{}) {}`, ifStmt(nil, compLit(structType()), block(), nil)},
 	}
 	tests.runStatements(t)
 }
@@ -345,12 +356,12 @@ func TestBlock(t *testing.T) {
 func TestDeclarationStmt(t *testing.T) {
 	tests := parserTests{
 		{`const a = 5`, decl(cnst(ms(a), nil, intLit("5")))},
-		{`const a int = 5`, decl(cnst(ms(a), typeName("", "int"), intLit("5")))},
+		{`const a int = 5`, decl(cnst(ms(a), ident("int"), intLit("5")))},
 		{`var(
 			a, b int = 5, 6
 			c = 7
 			d = 8.0
-		)`, decl(vars(ms(a, b), typeName("", "int"), intLit("5"), intLit("6")),
+		)`, decl(vars(ms(a, b), ident("int"), intLit("5"), intLit("6")),
 			vars(ms(c), nil, intLit("7")),
 			vars(ms(d), nil, floatLit("8.0")))},
 	}

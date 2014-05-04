@@ -624,13 +624,6 @@ func pointer(typ matcher) matcher {
 	}
 }
 
-func typeName(pkg, name string) matcher {
-	return func(n Node, err error) bool {
-		t, ok := n.(*TypeName)
-		return err == nil && ok && t.Package == pkg && t.Name == name
-	}
-}
-
 func compLit(typ matcher, elms ...matcher) matcher {
 	return func(n Node, err error) bool {
 		c, ok := n.(*CompositeLiteral)
@@ -695,7 +688,7 @@ func tAssert(expr, typ matcher) matcher {
 func sel(expr, sele matcher) matcher {
 	return func(n Node, err error) bool {
 		s, ok := n.(*Selector)
-		return err == nil && ok && expr(s.Expression, nil) && sele(s.Selection, nil)
+		return err == nil && ok && expr(s.Parent, nil) && sele(s.Name, nil)
 	}
 }
 
