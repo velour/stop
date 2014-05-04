@@ -39,6 +39,9 @@ func TestCompositeLiteral(t *testing.T) {
 			structType(fieldDecl(typeName("", "int"), a, b)),
 			elm(a, intLit("4")),
 			elm(b, intLit("5")))},
+
+		// BUG(eaburns): Should be a composite literal, not a parse error.
+		// {`point{x: 5, y: 6}`, parseErr("")},
 	}
 	tests.runExpr(t)
 }
@@ -71,6 +74,23 @@ func TestTypeSwitchGuard(t *testing.T) {
 		{`a.(type) * 5`, parseErr("type")},
 	}
 	notOKTests.runExpr(t)
+}
+
+func TestConversionExpr(t *testing.T) {
+	tests := parserTests{
+		{`(int)(a)`, call(ident("int"), false, a)},
+		{`(struct{x int})(a)`, call(structType(fieldDecl(typeName("", "int"), ident("x"))), false, a)},
+		{`(chan <- a)(b)`, call(sendChan(typeName("", "a")), false, b)},
+	}
+	tests.runExpr(t)
+}
+
+func TestBuiltInCall(t *testing.T) {
+	tests := parserTests{
+		{`make(chan <- a)`, call(ident("make"), false, sendChan(typeName("", "a")))},
+		{`make(chan <- a, 5)`, call(ident("make"), false, sendChan(typeName("", "a")), intLit("5"))},
+	}
+	tests.runExpr(t)
 }
 
 func TestPrimaryExpr(t *testing.T) {
