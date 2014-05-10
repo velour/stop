@@ -13,6 +13,7 @@ import (
 
 var (
 	a, b, c, d = id("a"), id("b"), id("c"), id("d")
+	bigInt     = sel(id("big"), id("Int")).(Type)
 )
 
 func runeLit(r rune) *RuneLiteral { return &RuneLiteral{Value: r} }
@@ -49,61 +50,538 @@ func sel(e Expression, ids ...*Identifier) Expression {
 	return p
 }
 
-func field(t Type, ids ...*Identifier) FieldDecl {
-	f := FieldDecl{Type: t}
-	for _, id := range ids {
-		f.Identifiers = append(f.Identifiers, *id)
-	}
-	return f
+func TestParseType(t *testing.T) {
+	parserTests{
+		{`a`, a},
+		{`(a)`, a},
+		{`((a))`, a},
+		{`*(a)`, &Star{Target: a}},
+		{`[](a)`, &SliceType{Type: a}},
+		{`[]*(a)`, &SliceType{Type: &Star{Target: a}}},
+		{`*[](a)`, &Star{Target: &SliceType{Type: a}}},
+		{`map[a]b`, &MapType{Key: a, Type: b}},
+
+		{`[]func()`, &SliceType{Type: &FunctionType{}}},
+		{
+			`[]func()<-chan int`,
+			&SliceType{
+				Type: &FunctionType{Signature: Signature{
+					ParameterList{},
+					ParameterList{Parameters: []ParameterDecl{
+						{Type: &ChannelType{Receive: true, Type: id("int")}},
+					}},
+				}},
+			},
+		},
+		{
+			`[]interface{ c()<-chan[5]big.Int }`,
+			&SliceType{
+				Type: &InterfaceType{Methods: []Node{
+					&Method{
+						Name: *c,
+						Signature: Signature{
+							ParameterList{},
+							ParameterList{Parameters: []ParameterDecl{
+								{Type: &ChannelType{
+									Receive: true,
+									Type: &ArrayType{
+										Size: intLit("5"),
+										Type: bigInt,
+									},
+								}},
+							}},
+						},
+					},
+				}},
+			},
+		},
+		{`1`, parseError{"expected"}},
+	}.run(t, func(p *Parser) Node { return parseType(p) })
 }
 
-func structType(fields ...FieldDecl) *StructType { return &StructType{Fields: fields} }
+func TestParseStructType(t *testing.T) {
+	parserTests{
+		{`struct{}`, &StructType{Fields: []FieldDecl{}}},
+		{`struct{a}`, &StructType{Fields: []FieldDecl{
+			{Type: a},
+		}}},
+		{`struct{a; b; c}`, &StructType{Fields: []FieldDecl{
+			{Type: a},
+			{Type: b},
+			{Type: c},
+		}}},
+		{`struct{a, b c}`, &StructType{Fields: []FieldDecl{
+			{Identifiers: []Identifier{*a, *b}, Type: c},
+		}}},
+		{`struct{a b; c}`, &StructType{Fields: []FieldDecl{
+			{Identifiers: []Identifier{*a}, Type: b},
+			{Type: c},
+		}}},
+		{`struct{a; b c}`, &StructType{Fields: []FieldDecl{
+			{Type: a},
+			{Identifiers: []Identifier{*b}, Type: c},
+		}}},
+		{`struct{big.Int}`, &StructType{Fields: []FieldDecl{
+			{Type: bigInt},
+		}}},
+		{`struct{big.Int; a}`, &StructType{Fields: []FieldDecl{
+			{Type: bigInt},
+			{Type: a},
+		}}},
+		{`struct{big.Int; a b}`, &StructType{Fields: []FieldDecl{
+			{Type: bigInt},
+			{Identifiers: []Identifier{*a}, Type: b},
+		}}},
+		{`struct{big.Int; a big.Int}`, &StructType{Fields: []FieldDecl{
+			{Type: bigInt},
+			{Identifiers: []Identifier{*a}, Type: bigInt},
+		}}},
+		{`struct{*big.Int}`, &StructType{Fields: []FieldDecl{
+			{Type: &Star{Target: bigInt}},
+		}}},
+		{`struct{*big.Int; a}`, &StructType{Fields: []FieldDecl{
+			{Type: &Star{Target: bigInt}},
+			{Type: a},
+		}}},
+		{`struct{a; *big.Int}`, &StructType{Fields: []FieldDecl{
+			{Type: a},
+			{Type: &Star{Target: bigInt}},
+		}}},
+
+		// Tagged.
+		{`struct{a "your it"}`, &StructType{Fields: []FieldDecl{
+			{Type: a, Tag: strLit("your it")},
+		}}},
+		{`struct{*a "your it"}`, &StructType{Fields: []FieldDecl{
+			{Type: &Star{Target: a}, Tag: strLit("your it")},
+		}}},
+		{`struct{big.Int "your it"}`, &StructType{Fields: []FieldDecl{
+			{Type: bigInt, Tag: strLit("your it")},
+		}}},
+		{`struct{*big.Int "your it"}`, &StructType{Fields: []FieldDecl{
+			{Type: &Star{Target: bigInt}, Tag: strLit("your it")},
+		}}},
+		{`struct{a "your it"; b}`, &StructType{Fields: []FieldDecl{
+			{Type: a, Tag: strLit("your it")},
+			{Type: b},
+		}}},
+		{`struct{a b "your it"}`, &StructType{Fields: []FieldDecl{
+			{Identifiers: []Identifier{*a}, Type: b, Tag: strLit("your it")},
+		}}},
+
+		// Trailing ;
+		{`struct{a;}`, &StructType{Fields: []FieldDecl{
+			{Type: a},
+		}}},
+		{`struct{a; b; c;}`, &StructType{Fields: []FieldDecl{
+			{Type: a},
+			{Type: b},
+			{Type: c},
+		}}},
+
+		// Embedded stars must be type names.
+		{`struct{**big.Int}`, parseError{"expected.*got \\*"}},
+		{`struct{*[]big.Int}`, parseError{"expected.*got \\["}},
+	}.run(t, func(p *Parser) Node { return parseType(p) })
+}
+
+func TestParseInterfaceType(t *testing.T) {
+	parserTests{
+		{`interface{}`, &InterfaceType{}},
+		{`interface{a; b; c}`, &InterfaceType{Methods: []Node{a, b, c}}},
+		{`interface{a; b; big.Int}`, &InterfaceType{Methods: []Node{a, b, bigInt}}},
+		{`interface{a; big.Int; b}`, &InterfaceType{Methods: []Node{a, bigInt, b}}},
+		{`interface{big.Int; a; b}`, &InterfaceType{Methods: []Node{bigInt, a, b}}},
+		{`interface{a; b; c()}`, &InterfaceType{Methods: []Node{a, b, &Method{Name: *c}}}},
+		{`interface{a; b(); c}`, &InterfaceType{Methods: []Node{a, &Method{Name: *b}, c}}},
+		{`interface{a(); b; c}`, &InterfaceType{Methods: []Node{&Method{Name: *a}, b, c}}},
+		{`interface{a; big.Int; c()}`, &InterfaceType{Methods: []Node{a, bigInt, &Method{Name: *c}}}},
+
+		// Trailing ;
+		{`interface{a; b; c;}`, &InterfaceType{Methods: []Node{a, b, c}}},
+	}.run(t, func(p *Parser) Node { return parseType(p) })
+}
+
+func TestParseFunctionType(t *testing.T) {
+	parserTests{
+		{`func()`, &FunctionType{}},
+		{
+			`func(a) b`,
+			&FunctionType{Signature: Signature{
+				ParameterList{Parameters: []ParameterDecl{
+					{Type: a},
+				}},
+				ParameterList{Parameters: []ParameterDecl{
+					{Type: b},
+				}},
+			}},
+		},
+		{
+			`func(...a) b`,
+			&FunctionType{Signature: Signature{
+				ParameterList{Parameters: []ParameterDecl{
+					{Type: a, DotDotDot: true},
+				}},
+				ParameterList{Parameters: []ParameterDecl{
+					{Type: b},
+				}},
+			}},
+		},
+		{
+			`func(a, b) c`,
+			&FunctionType{Signature: Signature{
+				ParameterList{Parameters: []ParameterDecl{
+					{Type: a},
+					{Type: b},
+				}},
+				ParameterList{Parameters: []ParameterDecl{
+					{Type: c},
+				}},
+			}},
+		},
+		{
+			`func(a) (b, c)`,
+			&FunctionType{Signature: Signature{
+				ParameterList{Parameters: []ParameterDecl{
+					{Type: a},
+				}},
+				ParameterList{Parameters: []ParameterDecl{
+					{Type: b},
+					{Type: c},
+				}},
+			}},
+		},
+		{
+			`func(...a) (b, c)`,
+			&FunctionType{Signature: Signature{
+				ParameterList{Parameters: []ParameterDecl{
+					{Type: a, DotDotDot: true},
+				}},
+				ParameterList{Parameters: []ParameterDecl{
+					{Type: b},
+					{Type: c},
+				}},
+			}},
+		},
+
+		// Invalid, but will have to be caught during type checking.
+		{
+			`func(a) (b, ...c)`,
+			&FunctionType{Signature: Signature{
+				ParameterList{Parameters: []ParameterDecl{
+					{Type: a},
+				}},
+				ParameterList{Parameters: []ParameterDecl{
+					{Type: b},
+					{Type: c, DotDotDot: true},
+				}},
+			}},
+		},
+	}.run(t, func(p *Parser) Node { return parseType(p) })
+}
+
+func TestParseParameterList(t *testing.T) {
+	parserTests{
+		{`()`, &ParameterList{}},
+
+		// Parameter declarations without any identifiers.
+		{
+			`(a, b, c)`,
+			&ParameterList{Parameters: []ParameterDecl{
+				{Type: a},
+				{Type: b},
+				{Type: c},
+			}},
+		},
+		{
+			`(a, b, ...c)`,
+			&ParameterList{Parameters: []ParameterDecl{
+				{Type: a},
+				{Type: b},
+				{Type: c, DotDotDot: true},
+			}},
+		},
+		{
+			`(a, b, big.Int)`,
+			&ParameterList{Parameters: []ParameterDecl{
+				{Type: a},
+				{Type: b},
+				{Type: bigInt.(Type)},
+			}},
+		},
+		{
+			`(a, b, ...big.Int)`,
+			&ParameterList{Parameters: []ParameterDecl{
+				{Type: a},
+				{Type: b},
+				{Type: bigInt.(Type), DotDotDot: true},
+			}},
+		},
+		{
+			`(a, b, []c)`,
+			&ParameterList{Parameters: []ParameterDecl{
+				{Type: a},
+				{Type: b},
+				{Type: &SliceType{Type: c}},
+			}},
+		},
+		{
+			`(a, b, ...[]c)`,
+			&ParameterList{Parameters: []ParameterDecl{
+				{Type: a},
+				{Type: b},
+				{Type: &SliceType{Type: c}, DotDotDot: true},
+			}},
+		},
+		{
+			`([]a, b, c)`,
+			&ParameterList{Parameters: []ParameterDecl{
+				{Type: &SliceType{Type: a}},
+				{Type: b},
+				{Type: c},
+			}},
+		},
+		{
+			`([]a, b, ...c)`,
+			&ParameterList{Parameters: []ParameterDecl{
+				{Type: &SliceType{Type: a}},
+				{Type: b},
+				{Type: c, DotDotDot: true},
+			}},
+		},
+		{
+			`(...a)`,
+			&ParameterList{Parameters: []ParameterDecl{
+				{Type: a, DotDotDot: true},
+			}},
+		},
+
+		// Parameter declarations with identifiers
+		{
+			`(a, b c)`,
+			&ParameterList{Parameters: []ParameterDecl{
+				{Identifiers: []Identifier{*a, *b}, Type: c},
+			}},
+		},
+		{
+			`(a, b ...c)`,
+			&ParameterList{Parameters: []ParameterDecl{
+				{Identifiers: []Identifier{*a, *b}, Type: c, DotDotDot: true},
+			}},
+		},
+		{
+			`(a, b big.Int)`,
+			&ParameterList{Parameters: []ParameterDecl{
+				{Identifiers: []Identifier{*a, *b}, Type: bigInt.(Type)},
+			}},
+		},
+		{
+			`(a, b []int)`,
+			&ParameterList{Parameters: []ParameterDecl{
+				{Identifiers: []Identifier{*a, *b}, Type: &SliceType{Type: id("int")}},
+			}},
+		},
+		{
+			`(a, b ...[]int)`,
+			&ParameterList{Parameters: []ParameterDecl{
+				{Identifiers: []Identifier{*a, *b}, Type: &SliceType{Type: id("int")}, DotDotDot: true},
+			}},
+		},
+		{
+			`(a, b []int, c, d ...[]int)`,
+			&ParameterList{Parameters: []ParameterDecl{
+				{Identifiers: []Identifier{*a, *b}, Type: &SliceType{Type: id("int")}},
+				{Identifiers: []Identifier{*c, *d}, Type: &SliceType{Type: id("int")}, DotDotDot: true},
+			}},
+		},
+
+		// Trailing comma is OK.
+		{
+			`(a, b, c,)`,
+			&ParameterList{Parameters: []ParameterDecl{
+				{Type: a},
+				{Type: b},
+				{Type: c},
+			}},
+		},
+		{
+			`(a, []b, c,)`,
+			&ParameterList{Parameters: []ParameterDecl{
+				{Type: a},
+				{Type: &SliceType{Type: b}},
+				{Type: c},
+			}},
+		},
+		{
+			`(a, b []int,)`,
+			&ParameterList{Parameters: []ParameterDecl{
+				{Identifiers: []Identifier{*a, *b}, Type: &SliceType{Type: id("int")}},
+			}},
+		},
+		{
+			`(a, b []int, c, d ...[]int,)`,
+			&ParameterList{Parameters: []ParameterDecl{
+				{Identifiers: []Identifier{*a, *b}, Type: &SliceType{Type: id("int")}},
+				{Identifiers: []Identifier{*c, *d}, Type: &SliceType{Type: id("int")}, DotDotDot: true},
+			}},
+		},
+
+		// Strange, but OK.
+		{
+			`(int float64, float64 int)`,
+			&ParameterList{Parameters: []ParameterDecl{
+				{Identifiers: []Identifier{*id("int")}, Type: id("float64")},
+				{Identifiers: []Identifier{*id("float64")}, Type: id("int")},
+			}},
+		},
+
+		// ... types must be the last in the list.
+		{`(...a, b)`, parseError{""}},
+		{`([]a, ...b, c)`, parseError{""}},
+		{`(a, ...b, c)`, parseError{""}},
+		{`(a ...b, c int)`, parseError{""}},
+
+		// Can't mix declarations with identifiers with those without.
+		{`([]a, b c)`, parseError{""}},
+		{`(a b, c, d)`, parseError{""}},
+	}.run(t, func(p *Parser) Node {
+		parms := parseParameterList(p)
+		return &parms
+	})
+}
+
+func TestParseChannelType(t *testing.T) {
+	parserTests{
+		{`chan a`, &ChannelType{Send: true, Receive: true, Type: a}},
+		{`<-chan a`, &ChannelType{Receive: true, Type: a}},
+		{`chan<- a`, &ChannelType{Send: true, Type: a}},
+		{`chan<- <- chan a`, &ChannelType{Send: true, Type: &ChannelType{Receive: true, Type: a}}},
+		{`chan<- chan a`, &ChannelType{Send: true, Type: &ChannelType{Send: true, Receive: true, Type: a}}},
+		{`<- chan <-chan a`, &ChannelType{Receive: true, Type: &ChannelType{Receive: true, Type: a}}},
+
+		{`<- chan<- a`, parseError{"expected"}},
+		{`chan<- <- a`, parseError{"expected"}},
+		{`chan<- <- <- chan a`, parseError{"expected"}},
+	}.run(t, func(p *Parser) Node { return parseType(p) })
+}
+
+func TestParseMapType(t *testing.T) {
+	parserTests{
+		{`map[int]a`, &MapType{Key: id("int"), Type: a}},
+		{`map[*int]a.b`, &MapType{Key: &Star{Target: id("int")}, Type: sel(a, b).(Type)}},
+		{`map[*int]map[string]int]`, &MapType{
+			Key:  &Star{Target: id("int")},
+			Type: &MapType{Key: id("string"), Type: id("int")},
+		}},
+	}.run(t, func(p *Parser) Node { return parseType(p) })
+}
+
+func TestParseArrayType(t *testing.T) {
+	parserTests{
+		{`[4]a`, &ArrayType{Size: intLit("4"), Type: a}},
+		{`[4]a.b`, &ArrayType{Size: intLit("4"), Type: sel(a, b).(Type)}},
+		{`[4](a)`, &ArrayType{Size: intLit("4"), Type: a}},
+		{`[4][]a`, &ArrayType{Size: intLit("4"), Type: &SliceType{Type: a}}},
+		{`[4][42*b]a`, &ArrayType{
+			Size: intLit("4"),
+			Type: &ArrayType{Size: binOp(token.Star, intLit("42"), b), Type: a},
+		}},
+		// [...]Type notation is only allowed in composite literals,
+		// not types in general
+		{`[...]int`, parseError{"expected.*got \\.\\.\\."}},
+	}.run(t, func(p *Parser) Node { return parseType(p) })
+}
+
+func TestParseSliceType(t *testing.T) {
+	parserTests{
+		{`[]a`, &SliceType{Type: a}},
+		{`[]a.b`, &SliceType{Type: sel(a, b).(Type)}},
+		{`[](a)`, &SliceType{Type: a}},
+		{`[][]a`, &SliceType{Type: &SliceType{Type: a}}},
+	}.run(t, func(p *Parser) Node { return parseType(p) })
+}
+
+func TestParsePointerType(t *testing.T) {
+	parserTests{
+		{`*a`, &Star{Target: a}},
+		{`*a.b`, &Star{Target: sel(a, b)}},
+		{`*(a)`, &Star{Target: a}},
+		{`**(a)`, &Star{Target: &Star{Target: a}}},
+
+		{`α.`, parseError{"expected.*Identifier.*got EOF"}},
+	}.run(t, func(p *Parser) Node { return parseType(p) })
+}
+
+func TestParseTypeName(t *testing.T) {
+	parserTests{
+		{`a`, a},
+		{`a.b`, sel(a, b)},
+		{`α.b`, sel(id("α"), b)},
+	}.run(t, func(p *Parser) Node { return parseType(p) })
+}
 
 func TestParseCompositeLiteral(t *testing.T) {
 	parserTests{
 		{`struct{ a int }{ a: 4 }`, &CompositeLiteral{
-			Type:     structType(field(id("int"), a)),
-			Elements: []Element{{Key: a, Value: intLit("4")}},
+			Type: &StructType{Fields: []FieldDecl{
+				{Identifiers: []Identifier{*a}, Type: id("int")},
+			}},
+			Elements: []Element{
+				{Key: a, Value: intLit("4")},
+			},
 		}},
 		{`struct{ a, b int }{ a: 4, b: 5}`, &CompositeLiteral{
-			Type: structType(field(id("int"), a, b)),
+			Type: &StructType{Fields: []FieldDecl{
+				{Identifiers: []Identifier{*a, *b}, Type: id("int")},
+			}},
 			Elements: []Element{
 				{Key: a, Value: intLit("4")},
 				{Key: b, Value: intLit("5")},
-			}},
-		},
+			},
+		}},
 		{`struct{ a []int }{ a: { 4, 5 } }`, &CompositeLiteral{
-			Type: structType(field(&SliceType{Type: id("int")}, a)),
+			Type: &StructType{Fields: []FieldDecl{
+				{Identifiers: []Identifier{*a}, Type: &SliceType{Type: id("int")}},
+			}},
 			Elements: []Element{
 				{Key: a, Value: &CompositeLiteral{
-					Elements: []Element{{Value: intLit("4")}, {Value: intLit("5")}},
-				}}}},
-		},
+					Elements: []Element{
+						{Value: intLit("4")}, {Value: intLit("5")},
+					}},
+				},
+			},
+		}},
 		{`[][]int{ {4, 5} }`, &CompositeLiteral{
 			Type: &SliceType{Type: &SliceType{Type: id("int")}},
 			Elements: []Element{
 				{Value: &CompositeLiteral{
 					Elements: []Element{{Value: intLit("4")}, {Value: intLit("5")}},
-				}}}},
-		},
+				}},
+			},
+		}},
 		{`[...]int{ 4, 5 }`, &CompositeLiteral{
-			Type:     &ArrayType{Type: id("int")},
-			Elements: []Element{{Value: intLit("4")}, {Value: intLit("5")}}},
-		},
+			Type: &ArrayType{Type: id("int")},
+			Elements: []Element{
+				{Value: intLit("4")}, {Value: intLit("5")},
+			},
+		}},
 		// Trailing ,
 		{`struct{ a, b int }{ a: 4, b: 5,}`, &CompositeLiteral{
-			Type: structType(field(id("int"), a, b)),
+			Type: &StructType{Fields: []FieldDecl{
+				{Identifiers: []Identifier{*a, *b}, Type: id("int")},
+			}},
 			Elements: []Element{
 				{Key: a, Value: intLit("4")},
 				{Key: b, Value: intLit("5")},
-			}}},
+			},
+		}},
 		{`a{b: 5, c: 6}`, &CompositeLiteral{
 			Type: a,
 			Elements: []Element{
 				{Key: b, Value: intLit("5")},
 				{Key: c, Value: intLit("6")},
-			}},
-		},
+			},
+		}},
 	}.run(t, func(p *Parser) Node { return parseExpr(p) })
 }
 
@@ -341,14 +819,17 @@ func (test parserTest) run(t *testing.T, production func(*Parser) Node) {
 	n, err := parse(NewParser(token.NewLexer("", test.text)), production)
 	if pe, ok := test.node.(parseError); ok {
 		if err == nil {
-			t.Errorf("expected error matching %s, got\n%s", pe.re, str(n))
+			t.Errorf("parse(%s): expected error matching %s, got\n%s", test.text, pe.re, str(n))
 		} else if !regexp.MustCompile(pe.re).MatchString(err.Error()) {
-			t.Errorf("expected an error matching %s, got %s", pe.re, err.Error())
+			t.Errorf("parse(%s): expected an error matching %s, got %s", test.text, pe.re, err.Error())
 		}
 		return
 	}
+	if err != nil {
+		t.Errorf("parse(%s): unexpected error: %s", test.text, err.Error())
+	}
 	if !eq.Deep(n, test.node) {
-		t.Errorf("parse(%s)=%s,\nexpected: %s", test.text, str(n), str(test.node))
+		t.Errorf("parse(%s): %s,\nexpected: %s", test.text, str(n), str(test.node))
 	}
 }
 
