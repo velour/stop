@@ -11,10 +11,10 @@ func TestType(t *testing.T) {
 		{`a`, a},
 		{`(a)`, a},
 		{`((a))`, a},
-		{`*(a)`, pointer(a)},
+		{`*(a)`, star(a)},
 		{`[](a)`, sliceType(a)},
-		{`[]*(a)`, sliceType(pointer(a))},
-		{`*[](a)`, pointer(sliceType(a))},
+		{`[]*(a)`, sliceType(star(a))},
+		{`*[](a)`, star(sliceType(a))},
 		{`map[a]b`, mapType(a, b)},
 
 		{`[]func()`, sliceType(funcType(parmList(), parmList()))},
@@ -42,15 +42,15 @@ func TestStructType(t *testing.T) {
 		{`struct{big.Int; a}`, structType(fieldDecl(bi), fieldDecl(a))},
 		{`struct{big.Int; a b}`, structType(fieldDecl(bi), fieldDecl(b, a))},
 		{`struct{big.Int; a big.Int}`, structType(fieldDecl(bi), fieldDecl(bi, a))},
-		{`struct{*big.Int}`, structType(fieldDecl(pointer(bi)))},
-		{`struct{*big.Int; a}`, structType(fieldDecl(pointer(bi)), fieldDecl(a))},
-		{`struct{a; *big.Int}`, structType(fieldDecl(a), fieldDecl(pointer(bi)))},
+		{`struct{*big.Int}`, structType(fieldDecl(star(bi)))},
+		{`struct{*big.Int; a}`, structType(fieldDecl(star(bi)), fieldDecl(a))},
+		{`struct{a; *big.Int}`, structType(fieldDecl(a), fieldDecl(star(bi)))},
 
 		// Tagged.
 		{`struct{a "your it"}`, structType(tagFieldDecl(a, strLit("your it")))},
-		{`struct{*a "your it"}`, structType(tagFieldDecl(pointer(a), strLit("your it")))},
+		{`struct{*a "your it"}`, structType(tagFieldDecl(star(a), strLit("your it")))},
 		{`struct{big.Int "your it"}`, structType(tagFieldDecl(bi, strLit("your it")))},
-		{`struct{*big.Int "your it"}`, structType(tagFieldDecl(pointer(bi), strLit("your it")))},
+		{`struct{*big.Int "your it"}`, structType(tagFieldDecl(star(bi), strLit("your it")))},
 		{`struct{a "your it"; b}`, structType(tagFieldDecl(a, strLit("your it")), fieldDecl(b))},
 		{`struct{a b "your it"}`, structType(tagFieldDecl(b, strLit("your it"), a))},
 
@@ -58,7 +58,7 @@ func TestStructType(t *testing.T) {
 		{`struct{a;}`, structType(fieldDecl(a))},
 		{`struct{a; b; c;}`, structType(fieldDecl(a), fieldDecl(b), fieldDecl(c))},
 
-		// Embedded pointers must be type names.
+		// Embedded stars must be type names.
 		{`struct{**big.Int}`, parseErr("expected.*got \\*")},
 		{`struct{*[]big.Int}`, parseErr("expected.*got \\[")},
 	}
@@ -211,8 +211,8 @@ func TestChannelType(t *testing.T) {
 func TestMapType(t *testing.T) {
 	tests := parserTests{
 		{`map[int]a`, mapType(ident("int"), a)},
-		{`map[*int]a.b`, mapType(pointer(ident("int")), sel(a, b))},
-		{`map[*int]map[string]int]`, mapType(pointer(ident("int")), mapType(ident("string"), ident("int")))},
+		{`map[*int]a.b`, mapType(star(ident("int")), sel(a, b))},
+		{`map[*int]map[string]int]`, mapType(star(ident("int")), mapType(ident("string"), ident("int")))},
 	}
 	tests.runType(t)
 }
@@ -244,10 +244,10 @@ func TestSliceType(t *testing.T) {
 
 func TestPointerType(t *testing.T) {
 	tests := parserTests{
-		{`*a`, pointer(a)},
-		{`*a.b`, pointer(sel(a, b))},
-		{`*(a)`, pointer(a)},
-		{`**(a)`, pointer(pointer(a))},
+		{`*a`, star(a)},
+		{`*a.b`, star(sel(a, b))},
+		{`*(a)`, star(a)},
+		{`**(a)`, star(star(a))},
 
 		{`α.`, parseErr("expected.*Identifier.*got EOF")},
 	}

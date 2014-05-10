@@ -182,7 +182,7 @@ func TestParseUnaryExpr(t *testing.T) {
 		{`-a.b`, unOp(token.Minus, sel(a, b))},
 		{`!0`, unOp(token.Bang, intLit("0"))},
 		{`^(a)`, unOp(token.Carrot, a)},
-		{`*5.1`, unOp(token.Star, floatLit("5.1"))},
+		{`*5.1`, star(floatLit("5.1"))},
 		{`&!1`, unOp(token.And, unOp(token.Bang, intLit("1")))},
 		{`<-a`, unOp(token.LessMinus, a)},
 		{`<-!-a`, unOp(token.LessMinus, unOp(token.Bang, unOp(token.Minus, a)))},

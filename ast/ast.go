@@ -65,7 +65,7 @@ type RecvStmt struct {
 	// Left contains the expressions into which the value is received.
 	// If Op is token.ColonEqual then all of the expressions are simply
 	// identifiers.
-	Left []Node
+	Left []Expression
 	// Right is a unary operation with Op == token.LessMinus:
 	// a channel receive.
 	Right UnaryOp
@@ -81,7 +81,7 @@ type ExprSwitch struct {
 	// Initialization is nil if there is no initialization for the switch.
 	Initialization Statement
 	// Expression is nil if there is no expression for the switch.
-	Expression Node
+	Expression Expression
 	Cases      []ExprCase
 }
 
@@ -91,7 +91,7 @@ func (n *ExprSwitch) End() token.Location   { return n.endLoc }
 // An ExprCase represents a case label for an expression switch statement.
 type ExprCase struct {
 	// The default case is represented by len(Expressions)==0.
-	Expressions []Node
+	Expressions []Expression
 	Statements  []Statement
 }
 
@@ -107,7 +107,7 @@ type TypeSwitch struct {
 	Declaration *Identifier
 	// Expression is the expression for which the type is being
 	// switched.
-	Expression Node
+	Expression Expression
 	Cases      []TypeCase
 }
 
@@ -138,7 +138,7 @@ type ForStmt struct {
 	Initialization Statement
 	// Condition is the condition for a non-range loop, or nil for
 	// either a range-style for loop or a conditionless for loop.
-	Condition Node
+	Condition Expression
 	// Post is evaluated after non-range loops.  It is nil for both
 	// range-style for loops and for loops with no post statement.
 	Post Statement
@@ -153,7 +153,7 @@ type IfStmt struct {
 	startLoc token.Location
 	// Statement is a simple statement evaluated before the condition.
 	Statement Statement
-	Condition Node
+	Condition Expression
 	// Block is a block statement, evaluated if the condition is true.
 	Block BlockStmt
 	// Else is an optional (may be nil) if or block statement, evaluated
@@ -184,7 +184,7 @@ func (n *BlockStmt) End() token.Location   { return n.endLoc }
 type DeferStmt struct {
 	comments
 	startLoc   token.Location
-	Expression Node
+	Expression Expression
 }
 
 func (n *DeferStmt) Start() token.Location { return n.startLoc }
@@ -194,7 +194,7 @@ func (n *DeferStmt) End() token.Location   { return n.Expression.End() }
 type GoStmt struct {
 	comments
 	startLoc   token.Location
-	Expression Node
+	Expression Expression
 }
 
 func (n *GoStmt) Start() token.Location { return n.startLoc }
@@ -204,7 +204,7 @@ func (n *GoStmt) End() token.Location   { return n.Expression.End() }
 type ReturnStmt struct {
 	comments
 	startLoc, endLoc token.Location
-	Expressions      []Node
+	Expressions      []Expression
 }
 
 func (n *ReturnStmt) Start() token.Location { return n.startLoc }
@@ -275,7 +275,7 @@ type DeclarationStmt struct {
 type ShortVarDecl struct {
 	comments
 	Left  []Identifier
-	Right []Node
+	Right []Expression
 }
 
 func (n *ShortVarDecl) Start() token.Location { return n.Left[0].Start() }
@@ -287,8 +287,8 @@ type Assignment struct {
 	comments
 	// Op is the assignment operation.
 	Op    token.Token
-	Left  []Node
-	Right []Node
+	Left  []Expression
+	Right []Expression
 }
 
 func (n *Assignment) Start() token.Location { return n.Left[0].Start() }
@@ -298,7 +298,7 @@ func (n *Assignment) End() token.Location   { return n.Right[len(n.Right)-1].End
 // expression evaluation
 type ExpressionStmt struct {
 	comments
-	Expression Node
+	Expression Expression
 }
 
 func (n *ExpressionStmt) Start() token.Location { return n.Expression.Start() }
@@ -308,7 +308,7 @@ func (n *ExpressionStmt) End() token.Location   { return n.Expression.End() }
 // increment or a decrement operation.
 type IncDecStmt struct {
 	comments
-	Expression Node
+	Expression Expression
 	// Op is either token.PlusPlus or token.MinusMinus, representing
 	// either increment or decrement respectively.
 	Op    token.Token
@@ -322,8 +322,8 @@ func (n *IncDecStmt) End() token.Location   { return n.opEnd }
 // an expression on a channel.
 type SendStmt struct {
 	comments
-	Channel    Node
-	Expression Node
+	Channel    Expression
+	Expression Expression
 }
 
 func (n *SendStmt) Start() token.Location { return n.Channel.Start() }
@@ -352,7 +352,7 @@ type ConstSpec struct {
 	// from the values.
 	Type   Type
 	Names  []Identifier
-	Values []Node
+	Values []Expression
 }
 
 func (n *ConstSpec) Start() token.Location { return n.Names[0].Start() }
@@ -366,7 +366,7 @@ type VarSpec struct {
 	// from the values.
 	Type   Type
 	Names  []Identifier
-	Values []Node
+	Values []Expression
 }
 
 func (n *VarSpec) Start() token.Location { return n.Names[0].Start() }
@@ -385,7 +385,7 @@ func (n *TypeSpec) End() token.Location   { return n.Type.End() }
 
 // The Type interface is implemented by nodes that represent types.
 type Type interface {
-	Node
+	Expression
 	typeNode()
 }
 
@@ -397,6 +397,7 @@ type StructType struct {
 
 func (n *StructType) Start() token.Location { return n.keywordLoc }
 func (n *StructType) End() token.Location   { return n.closeLoc }
+func (n *StructType) Loc() token.Location   { return n.Start() }
 func (n *StructType) typeNode()             {}
 
 // A FieldDecl is a node representing a struct field declaration.
@@ -432,6 +433,7 @@ type InterfaceType struct {
 
 func (n *InterfaceType) Start() token.Location { return n.keywordLoc }
 func (n *InterfaceType) End() token.Location   { return n.closeLoc }
+func (n *InterfaceType) Loc() token.Location   { return n.Start() }
 func (n *InterfaceType) typeNode()             {}
 
 // A Method is a node representing a method name and its signature.
@@ -451,9 +453,11 @@ func (n *Method) End() token.Location {
 // A FunctionType is a type node representing a function type.
 type FunctionType struct {
 	Signature
+	funcLoc token.Location
 }
 
-func (n *FunctionType) typeNode() {}
+func (n *FunctionType) Loc() token.Location { return n.funcLoc }
+func (n *FunctionType) typeNode()           {}
 
 // A Signature is a node representing a parameter list and result types.
 type Signature struct {
@@ -501,6 +505,7 @@ type ChannelType struct {
 
 func (n *ChannelType) Start() token.Location { return n.startLoc }
 func (n *ChannelType) End() token.Location   { return n.Type.End() }
+func (n *ChannelType) Loc() token.Location   { return n.Start() }
 func (n *ChannelType) typeNode()             {}
 
 // An MapType is a type node that represents a map from types to types.
@@ -512,19 +517,21 @@ type MapType struct {
 
 func (n *MapType) Start() token.Location { return n.mapLoc }
 func (n *MapType) End() token.Location   { return n.Type.End() }
+func (n *MapType) Loc() token.Location   { return n.Start() }
 func (n *MapType) typeNode()             {}
 
 // An ArrayType is a type node that represents an array of types.
 type ArrayType struct {
 	// If size==nil then this is an array type for a composite literal
 	// with the size specified using [...]Type notation.
-	Size    Node
+	Size    Expression
 	Type    Type
 	openLoc token.Location
 }
 
 func (n *ArrayType) Start() token.Location { return n.openLoc }
 func (n *ArrayType) End() token.Location   { return n.Type.End() }
+func (n *ArrayType) Loc() token.Location   { return n.Start() }
 func (n *ArrayType) typeNode()             {}
 
 // A SliceType is a type node that represents a slice of types.
@@ -535,17 +542,23 @@ type SliceType struct {
 
 func (n *SliceType) Start() token.Location { return n.openLoc }
 func (n *SliceType) End() token.Location   { return n.Type.End() }
+func (n *SliceType) Loc() token.Location   { return n.Start() }
 func (n *SliceType) typeNode()             {}
 
-// A PointerType is a type node that represents a pointer to a type.
-type PointerType struct {
-	Type    Type
+// A Star is either a dereference expression or a type node that representing
+// a pointer to a type.
+type Star struct {
+	// Target is either the expression being dereferenced, in the case of a
+	// dereference expression, or the type being pointed to, in the case of
+	// a pointer type.
+	Target  Expression
 	starLoc token.Location
 }
 
-func (n *PointerType) Start() token.Location { return n.starLoc }
-func (n *PointerType) End() token.Location   { return n.Type.End() }
-func (n *PointerType) typeNode()             {}
+func (n *Star) Start() token.Location { return n.starLoc }
+func (n *Star) End() token.Location   { return n.Target.End() }
+func (n *Star) Loc() token.Location   { return n.starLoc }
+func (n *Star) typeNode()             {}
 
 // The Expression interface is implemented by all nodes that are
 // also expressions.
@@ -579,8 +592,8 @@ func (n *CompositeLiteral) End() token.Location { return n.closeLoc }
 // An Element is a node representing the key-value mapping
 // of a single element of a composite literal.
 type Element struct {
-	Key   Node
-	Value Node
+	Key   Expression
+	Value Expression
 }
 
 func (n *Element) Start() token.Location {
@@ -595,8 +608,8 @@ func (n *Element) End() token.Location { return n.Value.End() }
 // An Index is an expression node that represents indexing into an
 // array or a slice.
 type Index struct {
-	Expression        Node
-	Index             Node
+	Expression        Expression
+	Index             Expression
 	openLoc, closeLoc token.Location
 }
 
@@ -606,8 +619,8 @@ func (n *Index) End() token.Location   { return n.closeLoc }
 
 // A Slice is an expression node that represents a slice of an array.
 type Slice struct {
-	Expression        Node
-	Low, High, Max    Node
+	Expression        Expression
+	Low, High, Max    Expression
 	openLoc, closeLoc token.Location
 }
 
@@ -617,7 +630,7 @@ func (n *Slice) End() token.Location   { return n.closeLoc }
 
 // A TypeAssertion is an expression node representing a type assertion.
 type TypeAssertion struct {
-	Expression Node
+	Expression Expression
 	// If Type == nil then this is a type switch guard.
 	Type             Type
 	dotLoc, closeLoc token.Location
@@ -630,7 +643,7 @@ func (n *TypeAssertion) End() token.Location   { return n.closeLoc }
 // Selector is a qualified identifier representing either a type name or
 // an selector expression.
 type Selector struct {
-	Parent Node
+	Parent Expression
 	Name   *Identifier
 	dotLoc token.Location
 }
@@ -644,8 +657,8 @@ func (n *Selector) typeNode()             {}
 // After parsing but before type checking, a Call can represent
 // either a function call or a type conversion.
 type Call struct {
-	Function  Node
-	Arguments []Node
+	Function  Expression
+	Arguments []Expression
 	// DotDotDot is true if the last argument ended with "...".
 	DotDotDot         bool
 	openLoc, closeLoc token.Location
@@ -659,7 +672,7 @@ func (c *Call) End() token.Location   { return c.closeLoc }
 type BinaryOp struct {
 	Op          token.Token
 	opLoc       token.Location
-	Left, Right Node
+	Left, Right Expression
 }
 
 func (b *BinaryOp) Start() token.Location { return b.Left.Start() }
@@ -670,7 +683,7 @@ func (b *BinaryOp) End() token.Location   { return b.Right.End() }
 type UnaryOp struct {
 	Op      token.Token
 	opLoc   token.Location
-	Operand Node
+	Operand Expression
 }
 
 func (u *UnaryOp) Start() token.Location { return u.opLoc }

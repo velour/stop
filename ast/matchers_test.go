@@ -617,10 +617,10 @@ func sliceType(typ matcher) matcher {
 	}
 }
 
-func pointer(typ matcher) matcher {
+func star(typ matcher) matcher {
 	return func(n Node, err error) bool {
-		p, ok := n.(*PointerType)
-		return err == nil && ok && typ(p.Type, nil)
+		p, ok := n.(*Star)
+		return err == nil && ok && typ(p.Target, nil)
 	}
 }
 
