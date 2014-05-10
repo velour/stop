@@ -8,22 +8,21 @@ import (
 
 func TestType(t *testing.T) {
 	tests := parserTests{
-		{`a`, typeName("", "a")},
-		{`(a)`, typeName("", "a")},
-		{`((a))`, typeName("", "a")},
-		{`*(a)`, pointer(typeName("", "a"))},
-		{`[](a)`, sliceType(typeName("", "a"))},
-		{`[]*(a)`, sliceType(pointer(typeName("", "a")))},
-		{`*[](a)`, pointer(sliceType(typeName("", "a")))},
-		{`map[a]b`, mapType(typeName("", "a"), typeName("", "b"))},
-		//{`[](map[([4]a)*b)`, sliceType(mapType(arrayType(intLit("4"), typeName("", "a")), pointer(typeName("", "b"))))},
+		{`a`, a},
+		{`(a)`, a},
+		{`((a))`, a},
+		{`*(a)`, star(a)},
+		{`[](a)`, sliceType(a)},
+		{`[]*(a)`, sliceType(star(a))},
+		{`*[](a)`, star(sliceType(a))},
+		{`map[a]b`, mapType(a, b)},
 
 		{`[]func()`, sliceType(funcType(parmList(), parmList()))},
 		{`[]func()<-chan int`,
 			sliceType(funcType(
 				parmList(),
-				parmList(parmDecl(recvChan(typeName("", "int")), false))))},
-		{`[]interface{ c()<-chan[5]sort.Interface }`, sliceType(ifaceType(method(c, parmList(), parmList(parmDecl(recvChan(arrayType(intLit("5"), typeName("sort", "Interface"))), false)))))},
+				parmList(parmDecl(recvChan(ident("int")), false))))},
+		{`[]interface{ c()<-chan[5]sort.Interface }`, sliceType(ifaceType(method(c, parmList(), parmList(parmDecl(recvChan(arrayType(intLit("5"), sel(ident("sort"), ident("Interface")))), false)))))},
 
 		{`1`, parseErr("expected")},
 	}
@@ -31,36 +30,35 @@ func TestType(t *testing.T) {
 }
 
 func TestStructType(t *testing.T) {
-	ta, tb, tc := typeName("", "a"), typeName("", "b"), typeName("", "c")
-	bi := typeName("big", "Int")
+	bi := sel(ident("big"), ident("Int"))
 	tests := parserTests{
 		{`struct{}`, structType()},
-		{`struct{a}`, structType(fieldDecl(ta))},
-		{`struct{a; b; c}`, structType(fieldDecl(ta), fieldDecl(tb), fieldDecl(tc))},
-		{`struct{a, b c}`, structType(fieldDecl(tc, a, b))},
-		{`struct{a b; c}`, structType(fieldDecl(tb, a), fieldDecl(tc))},
-		{`struct{a; b c}`, structType(fieldDecl(ta), fieldDecl(tc, b))},
+		{`struct{a}`, structType(fieldDecl(a))},
+		{`struct{a; b; c}`, structType(fieldDecl(a), fieldDecl(b), fieldDecl(c))},
+		{`struct{a, b c}`, structType(fieldDecl(c, a, b))},
+		{`struct{a b; c}`, structType(fieldDecl(b, a), fieldDecl(c))},
+		{`struct{a; b c}`, structType(fieldDecl(a), fieldDecl(c, b))},
 		{`struct{big.Int}`, structType(fieldDecl(bi))},
-		{`struct{big.Int; a}`, structType(fieldDecl(bi), fieldDecl(ta))},
-		{`struct{big.Int; a b}`, structType(fieldDecl(bi), fieldDecl(tb, a))},
+		{`struct{big.Int; a}`, structType(fieldDecl(bi), fieldDecl(a))},
+		{`struct{big.Int; a b}`, structType(fieldDecl(bi), fieldDecl(b, a))},
 		{`struct{big.Int; a big.Int}`, structType(fieldDecl(bi), fieldDecl(bi, a))},
-		{`struct{*big.Int}`, structType(fieldDecl(pointer(bi)))},
-		{`struct{*big.Int; a}`, structType(fieldDecl(pointer(bi)), fieldDecl(ta))},
-		{`struct{a; *big.Int}`, structType(fieldDecl(ta), fieldDecl(pointer(bi)))},
+		{`struct{*big.Int}`, structType(fieldDecl(star(bi)))},
+		{`struct{*big.Int; a}`, structType(fieldDecl(star(bi)), fieldDecl(a))},
+		{`struct{a; *big.Int}`, structType(fieldDecl(a), fieldDecl(star(bi)))},
 
 		// Tagged.
-		{`struct{a "your it"}`, structType(tagFieldDecl(ta, strLit("your it")))},
-		{`struct{*a "your it"}`, structType(tagFieldDecl(pointer(ta), strLit("your it")))},
+		{`struct{a "your it"}`, structType(tagFieldDecl(a, strLit("your it")))},
+		{`struct{*a "your it"}`, structType(tagFieldDecl(star(a), strLit("your it")))},
 		{`struct{big.Int "your it"}`, structType(tagFieldDecl(bi, strLit("your it")))},
-		{`struct{*big.Int "your it"}`, structType(tagFieldDecl(pointer(bi), strLit("your it")))},
-		{`struct{a "your it"; b}`, structType(tagFieldDecl(ta, strLit("your it")), fieldDecl(tb))},
-		{`struct{a b "your it"}`, structType(tagFieldDecl(tb, strLit("your it"), a))},
+		{`struct{*big.Int "your it"}`, structType(tagFieldDecl(star(bi), strLit("your it")))},
+		{`struct{a "your it"; b}`, structType(tagFieldDecl(a, strLit("your it")), fieldDecl(b))},
+		{`struct{a b "your it"}`, structType(tagFieldDecl(b, strLit("your it"), a))},
 
 		// Trailing ;
-		{`struct{a;}`, structType(fieldDecl(ta))},
-		{`struct{a; b; c;}`, structType(fieldDecl(ta), fieldDecl(tb), fieldDecl(tc))},
+		{`struct{a;}`, structType(fieldDecl(a))},
+		{`struct{a; b; c;}`, structType(fieldDecl(a), fieldDecl(b), fieldDecl(c))},
 
-		// Embedded pointers must be type names.
+		// Embedded stars must be type names.
 		{`struct{**big.Int}`, parseErr("expected.*got \\*")},
 		{`struct{*[]big.Int}`, parseErr("expected.*got \\[")},
 	}
@@ -68,121 +66,118 @@ func TestStructType(t *testing.T) {
 }
 
 func TestInterfaceType(t *testing.T) {
-	ta, tb, tc := typeName("", "a"), typeName("", "b"), typeName("", "c")
 	tests := parserTests{
 		{`interface{}`, ifaceType()},
-		{`interface{a; b; c}`, ifaceType(ta, tb, tc)},
-		{`interface{a; b; big.Int}`, ifaceType(ta, tb, typeName("big", "Int"))},
-		{`interface{a; big.Int; b}`, ifaceType(ta, typeName("big", "Int"), tb)},
-		{`interface{big.Int; a; b}`, ifaceType(typeName("big", "Int"), ta, tb)},
+		{`interface{a; b; c}`, ifaceType(a, b, c)},
+		{`interface{a; b; big.Int}`, ifaceType(a, b, sel(ident("big"), ident("Int")))},
+		{`interface{a; big.Int; b}`, ifaceType(a, sel(ident("big"), ident("Int")), b)},
+		{`interface{big.Int; a; b}`, ifaceType(sel(ident("big"), ident("Int")), a, b)},
 
-		{`interface{a; b; c()}`, ifaceType(ta, tb, method(c, parmList(), parmList()))},
-		{`interface{a; b(); c}`, ifaceType(ta, method(b, parmList(), parmList()), tc)},
-		{`interface{a(); b; c}`, ifaceType(method(a, parmList(), parmList()), tb, tc)},
-		{`interface{a; big.Int; c()}`, ifaceType(ta, typeName("big", "Int"), method(c, parmList(), parmList()))},
+		{`interface{a; b; c()}`, ifaceType(a, b, method(c, parmList(), parmList()))},
+		{`interface{a; b(); c}`, ifaceType(a, method(b, parmList(), parmList()), c)},
+		{`interface{a(); b; c}`, ifaceType(method(a, parmList(), parmList()), b, c)},
+		{`interface{a; big.Int; c()}`, ifaceType(a, sel(ident("big"), ident("Int")), method(c, parmList(), parmList()))},
 
 		// Trailing ;
-		{`interface{a; b; c;}`, ifaceType(ta, tb, tc)},
+		{`interface{a; b; c;}`, ifaceType(a, b, c)},
 	}
 	tests.runType(t)
 }
 
 func TestFunctionType(t *testing.T) {
-	ta, tb, tc := typeName("", "a"), typeName("", "b"), typeName("", "c")
 	tests := parserTests{
 		{`func()`, funcType(parmList(), parmList())},
 		{`func(a) b`, funcType(
-			parmList(parmDecl(ta, false)),
-			parmList(parmDecl(tb, false)))},
+			parmList(parmDecl(a, false)),
+			parmList(parmDecl(b, false)))},
 		{`func(...a) b`, funcType(
-			parmList(parmDecl(ta, true)),
-			parmList(parmDecl(tb, false)))},
+			parmList(parmDecl(a, true)),
+			parmList(parmDecl(b, false)))},
 		{`func(a, b) c`, funcType(
-			parmList(parmDecl(ta, false), parmDecl(tb, false)),
-			parmList(parmDecl(tc, false)))},
+			parmList(parmDecl(a, false), parmDecl(b, false)),
+			parmList(parmDecl(c, false)))},
 		{`func(a) (b, c)`, funcType(
-			parmList(parmDecl(ta, false)),
-			parmList(parmDecl(tb, false), parmDecl(tc, false)))},
+			parmList(parmDecl(a, false)),
+			parmList(parmDecl(b, false), parmDecl(c, false)))},
 		{`func(...a) (b, c)`, funcType(
-			parmList(parmDecl(ta, true)),
-			parmList(parmDecl(tb, false), parmDecl(tc, false)))},
+			parmList(parmDecl(a, true)),
+			parmList(parmDecl(b, false), parmDecl(c, false)))},
 
 		// Invalid, but will have to be caught during type checking.
 		{`func(a) (b, ...c)`, funcType(
-			parmList(parmDecl(ta, false)),
-			parmList(parmDecl(tb, false), parmDecl(tc, true)))},
+			parmList(parmDecl(a, false)),
+			parmList(parmDecl(b, false), parmDecl(c, true)))},
 	}
 	tests.runType(t)
 }
 
 func TestParameterList(t *testing.T) {
-	ta, tb, tc := typeName("", "a"), typeName("", "b"), typeName("", "c")
 	tests := parserTests{
 		{`()`, parmList()},
 
 		// Parameter declarations without any identifiers.
 		{`(a, b, c)`, parmList(
-			parmDecl(ta, false),
-			parmDecl(tb, false),
-			parmDecl(tc, false))},
+			parmDecl(a, false),
+			parmDecl(b, false),
+			parmDecl(c, false))},
 		{`(a, b, ...c)`, parmList(
-			parmDecl(ta, false),
-			parmDecl(tb, false),
-			parmDecl(tc, true))},
+			parmDecl(a, false),
+			parmDecl(b, false),
+			parmDecl(c, true))},
 		{`(a, b, big.Int)`, parmList(
-			parmDecl(ta, false),
-			parmDecl(tb, false),
-			parmDecl(typeName("big", "Int"), false))},
+			parmDecl(a, false),
+			parmDecl(b, false),
+			parmDecl(sel(ident("big"), ident("Int")), false))},
 		{`(a, b, ...big.Int)`, parmList(
-			parmDecl(ta, false),
-			parmDecl(tb, false),
-			parmDecl(typeName("big", "Int"), true))},
+			parmDecl(a, false),
+			parmDecl(b, false),
+			parmDecl(sel(ident("big"), ident("Int")), true))},
 		{`(a, b, []c)`, parmList(
-			parmDecl(ta, false),
-			parmDecl(tb, false),
-			parmDecl(sliceType(tc), false))},
+			parmDecl(a, false),
+			parmDecl(b, false),
+			parmDecl(sliceType(c), false))},
 		{`(a, b, ...[]c)`, parmList(
-			parmDecl(ta, false),
-			parmDecl(tb, false),
-			parmDecl(sliceType(tc), true))},
+			parmDecl(a, false),
+			parmDecl(b, false),
+			parmDecl(sliceType(c), true))},
 		{`([]a, b, c)`, parmList(
-			parmDecl(sliceType(ta), false),
-			parmDecl(tb, false),
-			parmDecl(tc, false))},
+			parmDecl(sliceType(a), false),
+			parmDecl(b, false),
+			parmDecl(c, false))},
 		{`([]a, b, ...c)`, parmList(
-			parmDecl(sliceType(ta), false),
-			parmDecl(tb, false),
-			parmDecl(tc, true))},
-		{`(...a)`, parmList(parmDecl(ta, true))},
+			parmDecl(sliceType(a), false),
+			parmDecl(b, false),
+			parmDecl(c, true))},
+		{`(...a)`, parmList(parmDecl(a, true))},
 
 		// Parameter declarations with identifiers
-		{`(a, b c)`, parmList(parmDecl(tc, false, a, b))},
-		{`(a, b ...c)`, parmList(parmDecl(tc, true, a, b))},
-		{`(a, b big.Int)`, parmList(parmDecl(typeName("big", "Int"), false, a, b))},
-		{`(a, b []int)`, parmList(parmDecl(sliceType(typeName("", "int")), false, a, b))},
-		{`(a, b ...[]int)`, parmList(parmDecl(sliceType(typeName("", "int")), true, a, b))},
+		{`(a, b c)`, parmList(parmDecl(c, false, a, b))},
+		{`(a, b ...c)`, parmList(parmDecl(c, true, a, b))},
+		{`(a, b big.Int)`, parmList(parmDecl(sel(ident("big"), ident("Int")), false, a, b))},
+		{`(a, b []int)`, parmList(parmDecl(sliceType(ident("int")), false, a, b))},
+		{`(a, b ...[]int)`, parmList(parmDecl(sliceType(ident("int")), true, a, b))},
 		{`(a, b []int, c, d ...[]int)`, parmList(
-			parmDecl(sliceType(typeName("", "int")), false, a, b),
-			parmDecl(sliceType(typeName("", "int")), true, c, d))},
+			parmDecl(sliceType(ident("int")), false, a, b),
+			parmDecl(sliceType(ident("int")), true, c, d))},
 
 		// Trailing comma is OK.
 		{`(a, b, c,)`, parmList(
-			parmDecl(ta, false),
-			parmDecl(tb, false),
-			parmDecl(tc, false))},
+			parmDecl(a, false),
+			parmDecl(b, false),
+			parmDecl(c, false))},
 		{`(a, []b, c,)`, parmList(
-			parmDecl(ta, false),
-			parmDecl(sliceType(tb), false),
-			parmDecl(tc, false))},
-		{`(a, b []int,)`, parmList(parmDecl(sliceType(typeName("", "int")), false, a, b))},
+			parmDecl(a, false),
+			parmDecl(sliceType(b), false),
+			parmDecl(c, false))},
+		{`(a, b []int,)`, parmList(parmDecl(sliceType(ident("int")), false, a, b))},
 		{`(a, b []int, c, d ...[]int,)`, parmList(
-			parmDecl(sliceType(typeName("", "int")), false, a, b),
-			parmDecl(sliceType(typeName("", "int")), true, c, d))},
+			parmDecl(sliceType(ident("int")), false, a, b),
+			parmDecl(sliceType(ident("int")), true, c, d))},
 
 		// Strange, but OK.
 		{`(int float64, float64 int)`, parmList(
-			parmDecl(typeName("", "float64"), false, ident("int")),
-			parmDecl(typeName("", "int"), false, ident("float64")))},
+			parmDecl(ident("float64"), false, ident("int")),
+			parmDecl(ident("int"), false, ident("float64")))},
 
 		// ... types must be the last in the list.
 		{`(...a, b)`, parseErr("")},
@@ -199,12 +194,12 @@ func TestParameterList(t *testing.T) {
 
 func TestChannelType(t *testing.T) {
 	tests := parserTests{
-		{`chan a`, chanType(typeName("", "a"))},
-		{`<-chan a`, recvChan(typeName("", "a"))},
-		{`chan<- a`, sendChan(typeName("", "a"))},
-		{`chan<- <- chan a`, sendChan(recvChan(typeName("", "a")))},
-		{`chan<- chan a`, sendChan(chanType(typeName("", "a")))},
-		{`<- chan <-chan a`, recvChan(recvChan(typeName("", "a")))},
+		{`chan a`, chanType(a)},
+		{`<-chan a`, recvChan(a)},
+		{`chan<- a`, sendChan(a)},
+		{`chan<- <- chan a`, sendChan(recvChan(a))},
+		{`chan<- chan a`, sendChan(chanType(a))},
+		{`<- chan <-chan a`, recvChan(recvChan(a))},
 
 		{`<- chan<- a`, parseErr("expected")},
 		{`chan<- <- a`, parseErr("expected")},
@@ -215,20 +210,20 @@ func TestChannelType(t *testing.T) {
 
 func TestMapType(t *testing.T) {
 	tests := parserTests{
-		{`map[int]a`, mapType(typeName("", "int"), typeName("", "a"))},
-		{`map[*int]a.b`, mapType(pointer(typeName("", "int")), typeName("a", "b"))},
-		{`map[*int]map[string]int]`, mapType(pointer(typeName("", "int")), mapType(typeName("", "string"), typeName("", "int")))},
+		{`map[int]a`, mapType(ident("int"), a)},
+		{`map[*int]a.b`, mapType(star(ident("int")), sel(a, b))},
+		{`map[*int]map[string]int]`, mapType(star(ident("int")), mapType(ident("string"), ident("int")))},
 	}
 	tests.runType(t)
 }
 
 func TestArrayType(t *testing.T) {
 	tests := parserTests{
-		{`[4]a`, arrayType(intLit("4"), typeName("", "a"))},
-		{`[4]a.b`, arrayType(intLit("4"), typeName("a", "b"))},
-		{`[4](a)`, arrayType(intLit("4"), typeName("", "a"))},
-		{`[4][]a`, arrayType(intLit("4"), sliceType(typeName("", "a")))},
-		{`[4][42*z]a`, arrayType(intLit("4"), arrayType(binOp(token.Star, intLit("42"), ident("z")), typeName("", "a")))},
+		{`[4]a`, arrayType(intLit("4"), a)},
+		{`[4]a.b`, arrayType(intLit("4"), sel(a, b))},
+		{`[4](a)`, arrayType(intLit("4"), a)},
+		{`[4][]a`, arrayType(intLit("4"), sliceType(a))},
+		{`[4][42*z]a`, arrayType(intLit("4"), arrayType(binOp(token.Star, intLit("42"), ident("z")), a))},
 
 		// [...]Type notation is only allowed in composite literals,
 		// not types in general
@@ -239,20 +234,20 @@ func TestArrayType(t *testing.T) {
 
 func TestSliceType(t *testing.T) {
 	tests := parserTests{
-		{`[]a`, sliceType(typeName("", "a"))},
-		{`[]a.b`, sliceType(typeName("a", "b"))},
-		{`[](a)`, sliceType(typeName("", "a"))},
-		{`[][]a)`, sliceType(sliceType(typeName("", "a")))},
+		{`[]a`, sliceType(a)},
+		{`[]a.b`, sliceType(sel(a, b))},
+		{`[](a)`, sliceType(a)},
+		{`[][]a)`, sliceType(sliceType(a))},
 	}
 	tests.runType(t)
 }
 
 func TestPointerType(t *testing.T) {
 	tests := parserTests{
-		{`*a`, pointer(typeName("", "a"))},
-		{`*a.b`, pointer(typeName("a", "b"))},
-		{`*(a)`, pointer(typeName("", "a"))},
-		{`**(a)`, pointer(pointer(typeName("", "a")))},
+		{`*a`, star(a)},
+		{`*a.b`, star(sel(a, b))},
+		{`*(a)`, star(a)},
+		{`**(a)`, star(star(a))},
 
 		{`α.`, parseErr("expected.*Identifier.*got EOF")},
 	}
@@ -261,11 +256,9 @@ func TestPointerType(t *testing.T) {
 
 func TestTypeName(t *testing.T) {
 	tests := parserTests{
-		{`a`, typeName("", "a")},
-		{`a.b`, typeName("a", "b")},
-		{`α.b`, typeName("α", "b")},
-
-		{`α.`, parseErr("expected.*Identifier.*got EOF")},
+		{`a`, a},
+		{`a.b`, sel(a, b)},
+		{`α.b`, sel(ident("α"), b)},
 	}
 	tests.runType(t)
 }

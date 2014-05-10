@@ -27,6 +27,12 @@ type Statement interface {
 	Comments() []string
 }
 
+// A Comments implements the Comments method of the Declaration
+// and Statements interfaces.
+type comments []string
+
+func (c comments) Comments() []string { return []string(c) }
+
 // A Select represents a select statement.
 type Select struct {
 	comments
@@ -34,13 +40,8 @@ type Select struct {
 	Cases            []CommCase
 }
 
-func (n *Select) Start() token.Location {
-	return n.startLoc
-}
-
-func (n *Select) End() token.Location {
-	return n.endLoc
-}
+func (n *Select) Start() token.Location { return n.startLoc }
+func (n *Select) End() token.Location   { return n.endLoc }
 
 // A CommCase represents a single communication case in a select statement.
 // It is one of: a receive clause, a send clause, or a default clause.
@@ -70,13 +71,8 @@ type RecvStmt struct {
 	Right UnaryOp
 }
 
-func (n *RecvStmt) Start() token.Location {
-	return n.Left[0].Start()
-}
-
-func (n *RecvStmt) End() token.Location {
-	return n.Right.End()
-}
+func (n *RecvStmt) Start() token.Location { return n.Left[0].Start() }
+func (n *RecvStmt) End() token.Location   { return n.Right.End() }
 
 // An ExprSwitch represents an expression switch statement.
 type ExprSwitch struct {
@@ -89,13 +85,8 @@ type ExprSwitch struct {
 	Cases      []ExprCase
 }
 
-func (n *ExprSwitch) Start() token.Location {
-	return n.startLoc
-}
-
-func (n *ExprSwitch) End() token.Location {
-	return n.endLoc
-}
+func (n *ExprSwitch) Start() token.Location { return n.startLoc }
+func (n *ExprSwitch) End() token.Location   { return n.endLoc }
 
 // An ExprCase represents a case label for an expression switch statement.
 type ExprCase struct {
@@ -120,13 +111,8 @@ type TypeSwitch struct {
 	Cases      []TypeCase
 }
 
-func (n *TypeSwitch) Start() token.Location {
-	return n.startLoc
-}
-
-func (n *TypeSwitch) End() token.Location {
-	return n.endLoc
-}
+func (n *TypeSwitch) Start() token.Location { return n.startLoc }
+func (n *TypeSwitch) End() token.Location   { return n.endLoc }
 
 // A TypeCase represents a case label in a type switch statement.
 type TypeCase struct {
@@ -158,13 +144,8 @@ type ForStmt struct {
 	Post Statement
 }
 
-func (n *ForStmt) Start() token.Location {
-	return n.startLoc
-}
-
-func (n *ForStmt) End() token.Location {
-	return n.Block.End()
-}
+func (n *ForStmt) Start() token.Location { return n.startLoc }
+func (n *ForStmt) End() token.Location   { return n.Block.End() }
 
 // An IfStmt is a statement node representing an if statement.
 type IfStmt struct {
@@ -180,9 +161,7 @@ type IfStmt struct {
 	Else Statement
 }
 
-func (n *IfStmt) Start() token.Location {
-	return n.startLoc
-}
+func (n *IfStmt) Start() token.Location { return n.startLoc }
 
 func (n *IfStmt) End() token.Location {
 	if n.Else != nil {
@@ -198,13 +177,8 @@ type BlockStmt struct {
 	Statements       []Statement
 }
 
-func (n *BlockStmt) Start() token.Location {
-	return n.startLoc
-}
-
-func (n *BlockStmt) End() token.Location {
-	return n.endLoc
-}
+func (n *BlockStmt) Start() token.Location { return n.startLoc }
+func (n *BlockStmt) End() token.Location   { return n.endLoc }
 
 // A DeferStmt is a statement node representing a defer statement.
 type DeferStmt struct {
@@ -213,13 +187,8 @@ type DeferStmt struct {
 	Expression Expression
 }
 
-func (n *DeferStmt) Start() token.Location {
-	return n.startLoc
-}
-
-func (n *DeferStmt) End() token.Location {
-	return n.Expression.End()
-}
+func (n *DeferStmt) Start() token.Location { return n.startLoc }
+func (n *DeferStmt) End() token.Location   { return n.Expression.End() }
 
 // A GoStmt is a statement node representing a go statement.
 type GoStmt struct {
@@ -228,13 +197,8 @@ type GoStmt struct {
 	Expression Expression
 }
 
-func (n *GoStmt) Start() token.Location {
-	return n.startLoc
-}
-
-func (n *GoStmt) End() token.Location {
-	return n.Expression.End()
-}
+func (n *GoStmt) Start() token.Location { return n.startLoc }
+func (n *GoStmt) End() token.Location   { return n.Expression.End() }
 
 // A ReturnStmt is a statement node representing a return.
 type ReturnStmt struct {
@@ -243,13 +207,8 @@ type ReturnStmt struct {
 	Expressions      []Expression
 }
 
-func (n *ReturnStmt) Start() token.Location {
-	return n.startLoc
-}
-
-func (n *ReturnStmt) End() token.Location {
-	return n.endLoc
-}
+func (n *ReturnStmt) Start() token.Location { return n.startLoc }
+func (n *ReturnStmt) End() token.Location   { return n.endLoc }
 
 // A FallthroughStmt is a statement node representing a fallthrough.
 type FallthroughStmt struct {
@@ -257,13 +216,8 @@ type FallthroughStmt struct {
 	startLoc, endLoc token.Location
 }
 
-func (n *FallthroughStmt) Start() token.Location {
-	return n.startLoc
-}
-
-func (n *FallthroughStmt) End() token.Location {
-	return n.endLoc
-}
+func (n *FallthroughStmt) Start() token.Location { return n.startLoc }
+func (n *FallthroughStmt) End() token.Location   { return n.endLoc }
 
 // A ContinueStmt is a statement node representing a continue
 // statement with on optional label.
@@ -274,13 +228,8 @@ type ContinueStmt struct {
 	Label *Identifier
 }
 
-func (n *ContinueStmt) Start() token.Location {
-	return n.startLoc
-}
-
-func (n *ContinueStmt) End() token.Location {
-	return n.Label.End()
-}
+func (n *ContinueStmt) Start() token.Location { return n.startLoc }
+func (n *ContinueStmt) End() token.Location   { return n.Label.End() }
 
 // A BreakStmt is a statement node represent a break statement
 // with on optional label.
@@ -291,13 +240,8 @@ type BreakStmt struct {
 	Label *Identifier
 }
 
-func (n *BreakStmt) Start() token.Location {
-	return n.startLoc
-}
-
-func (n *BreakStmt) End() token.Location {
-	return n.Label.End()
-}
+func (n *BreakStmt) Start() token.Location { return n.startLoc }
+func (n *BreakStmt) End() token.Location   { return n.Label.End() }
 
 // A GotoStmt is a statement node representing a goto.
 type GotoStmt struct {
@@ -306,13 +250,8 @@ type GotoStmt struct {
 	Label    Identifier
 }
 
-func (n *GotoStmt) Start() token.Location {
-	return n.startLoc
-}
-
-func (n *GotoStmt) End() token.Location {
-	return n.Label.End()
-}
+func (n *GotoStmt) Start() token.Location { return n.startLoc }
+func (n *GotoStmt) End() token.Location   { return n.Label.End() }
 
 // A LabeledStmt is a statement node representing a statement
 // that is preceeded by a label.
@@ -322,13 +261,8 @@ type LabeledStmt struct {
 	Statement Statement
 }
 
-func (n *LabeledStmt) Start() token.Location {
-	return n.Label.Start()
-}
-
-func (n *LabeledStmt) End() token.Location {
-	return n.Statement.End()
-}
+func (n *LabeledStmt) Start() token.Location { return n.Label.Start() }
+func (n *LabeledStmt) End() token.Location   { return n.Statement.End() }
 
 // A DeclarationStmt is a statement node representing a series of declarations.
 type DeclarationStmt struct {
@@ -344,13 +278,8 @@ type ShortVarDecl struct {
 	Right []Expression
 }
 
-func (n *ShortVarDecl) Start() token.Location {
-	return n.Left[0].Start()
-}
-
-func (n *ShortVarDecl) End() token.Location {
-	return n.Right[len(n.Right)-1].End()
-}
+func (n *ShortVarDecl) Start() token.Location { return n.Left[0].Start() }
+func (n *ShortVarDecl) End() token.Location   { return n.Right[len(n.Right)-1].End() }
 
 // An Assignment is a statement node representing an assignment of
 // a sequence of expressions.
@@ -362,13 +291,8 @@ type Assignment struct {
 	Right []Expression
 }
 
-func (n *Assignment) Start() token.Location {
-	return n.Left[0].Start()
-}
-
-func (n *Assignment) End() token.Location {
-	return n.Right[len(n.Right)-1].End()
-}
+func (n *Assignment) Start() token.Location { return n.Left[0].Start() }
+func (n *Assignment) End() token.Location   { return n.Right[len(n.Right)-1].End() }
 
 // An ExpressionStmt is a statement node representing an
 // expression evaluation
@@ -377,13 +301,8 @@ type ExpressionStmt struct {
 	Expression Expression
 }
 
-func (n *ExpressionStmt) Start() token.Location {
-	return n.Expression.Start()
-}
-
-func (n *ExpressionStmt) End() token.Location {
-	return n.Expression.End()
-}
+func (n *ExpressionStmt) Start() token.Location { return n.Expression.Start() }
+func (n *ExpressionStmt) End() token.Location   { return n.Expression.End() }
 
 // An IncDecStmt is a statement node representing either an
 // increment or a decrement operation.
@@ -396,13 +315,8 @@ type IncDecStmt struct {
 	opEnd token.Location
 }
 
-func (n *IncDecStmt) Start() token.Location {
-	return n.Expression.Start()
-}
-
-func (n *IncDecStmt) End() token.Location {
-	return n.opEnd
-}
+func (n *IncDecStmt) Start() token.Location { return n.Expression.Start() }
+func (n *IncDecStmt) End() token.Location   { return n.opEnd }
 
 // A SendStmt is a statement node representing the sending of
 // an expression on a channel.
@@ -412,13 +326,8 @@ type SendStmt struct {
 	Expression Expression
 }
 
-func (n *SendStmt) Start() token.Location {
-	return n.Channel.Start()
-}
-
-func (n *SendStmt) End() token.Location {
-	return n.Expression.End()
-}
+func (n *SendStmt) Start() token.Location { return n.Channel.Start() }
+func (n *SendStmt) End() token.Location   { return n.Expression.End() }
 
 // A Declaration is a node representing a declaration.
 type Declaration interface {
@@ -429,24 +338,11 @@ type Declaration interface {
 	Comments() []string
 }
 
-// A Comments implements the Comments method of the Declaration
-// and Statements interfaces.
-type comments []string
-
-func (c comments) Comments() []string {
-	return []string(c)
-}
-
 // A Declarations is node representing a non-empty list of declarations.
 type Declarations []Declaration
 
-func (n Declarations) Start() token.Location {
-	return n[0].Start()
-}
-
-func (n Declarations) End() token.Location {
-	return n[len(n)-1].End()
-}
+func (n Declarations) Start() token.Location { return n[0].Start() }
+func (n Declarations) End() token.Location   { return n[len(n)-1].End() }
 
 // A ConstSpec is a declaration node representing the declaration of
 // a series of constants.
@@ -459,13 +355,8 @@ type ConstSpec struct {
 	Values []Expression
 }
 
-func (n *ConstSpec) Start() token.Location {
-	return n.Names[0].Start()
-}
-
-func (n *ConstSpec) End() token.Location {
-	return n.Values[len(n.Values)-1].End()
-}
+func (n *ConstSpec) Start() token.Location { return n.Names[0].Start() }
+func (n *ConstSpec) End() token.Location   { return n.Values[len(n.Values)-1].End() }
 
 // A VarSpec is a declaration node representing the declaration of
 // a series of variables.
@@ -478,13 +369,8 @@ type VarSpec struct {
 	Values []Expression
 }
 
-func (n *VarSpec) Start() token.Location {
-	return n.Names[0].Start()
-}
-
-func (n *VarSpec) End() token.Location {
-	return n.Values[len(n.Values)-1].End()
-}
+func (n *VarSpec) Start() token.Location { return n.Names[0].Start() }
+func (n *VarSpec) End() token.Location   { return n.Values[len(n.Values)-1].End() }
 
 // A TypeSpec is a declaration node representing the declaration of
 // a single type.
@@ -494,17 +380,13 @@ type TypeSpec struct {
 	Type Type
 }
 
-func (n *TypeSpec) Start() token.Location {
-	return n.Name.Start()
-}
-
-func (n *TypeSpec) End() token.Location {
-	return n.Type.End()
-}
+func (n *TypeSpec) Start() token.Location { return n.Name.Start() }
+func (n *TypeSpec) End() token.Location   { return n.Type.End() }
 
 // The Type interface is implemented by nodes that represent types.
 type Type interface {
-	Node
+	Expression
+	typeNode()
 }
 
 // A StructType is a type node representing a struct type.
@@ -513,13 +395,10 @@ type StructType struct {
 	keywordLoc, closeLoc token.Location
 }
 
-func (n *StructType) Start() token.Location {
-	return n.keywordLoc
-}
-
-func (n *StructType) End() token.Location {
-	return n.closeLoc
-}
+func (n *StructType) Start() token.Location { return n.keywordLoc }
+func (n *StructType) End() token.Location   { return n.closeLoc }
+func (n *StructType) Loc() token.Location   { return n.Start() }
+func (n *StructType) typeNode()             {}
 
 // A FieldDecl is a node representing a struct field declaration.
 type FieldDecl struct {
@@ -552,13 +431,10 @@ type InterfaceType struct {
 	keywordLoc, closeLoc token.Location
 }
 
-func (n *InterfaceType) Start() token.Location {
-	return n.keywordLoc
-}
-
-func (n *InterfaceType) End() token.Location {
-	return n.closeLoc
-}
+func (n *InterfaceType) Start() token.Location { return n.keywordLoc }
+func (n *InterfaceType) End() token.Location   { return n.closeLoc }
+func (n *InterfaceType) Loc() token.Location   { return n.Start() }
+func (n *InterfaceType) typeNode()             {}
 
 // A Method is a node representing a method name and its signature.
 type Method struct {
@@ -577,7 +453,11 @@ func (n *Method) End() token.Location {
 // A FunctionType is a type node representing a function type.
 type FunctionType struct {
 	Signature
+	funcLoc token.Location
 }
+
+func (n *FunctionType) Loc() token.Location { return n.funcLoc }
+func (n *FunctionType) typeNode()           {}
 
 // A Signature is a node representing a parameter list and result types.
 type Signature struct {
@@ -625,6 +505,8 @@ type ChannelType struct {
 
 func (n *ChannelType) Start() token.Location { return n.startLoc }
 func (n *ChannelType) End() token.Location   { return n.Type.End() }
+func (n *ChannelType) Loc() token.Location   { return n.Start() }
+func (n *ChannelType) typeNode()             {}
 
 // An MapType is a type node that represents a map from types to types.
 type MapType struct {
@@ -635,6 +517,8 @@ type MapType struct {
 
 func (n *MapType) Start() token.Location { return n.mapLoc }
 func (n *MapType) End() token.Location   { return n.Type.End() }
+func (n *MapType) Loc() token.Location   { return n.Start() }
+func (n *MapType) typeNode()             {}
 
 // An ArrayType is a type node that represents an array of types.
 type ArrayType struct {
@@ -647,6 +531,8 @@ type ArrayType struct {
 
 func (n *ArrayType) Start() token.Location { return n.openLoc }
 func (n *ArrayType) End() token.Location   { return n.Type.End() }
+func (n *ArrayType) Loc() token.Location   { return n.Start() }
+func (n *ArrayType) typeNode()             {}
 
 // A SliceType is a type node that represents a slice of types.
 type SliceType struct {
@@ -656,22 +542,23 @@ type SliceType struct {
 
 func (n *SliceType) Start() token.Location { return n.openLoc }
 func (n *SliceType) End() token.Location   { return n.Type.End() }
+func (n *SliceType) Loc() token.Location   { return n.Start() }
+func (n *SliceType) typeNode()             {}
 
-// A PointerType is a type node that represents a pointer to a type.
-type PointerType struct {
-	Type    Type
+// A Star is either a dereference expression or a type node that representing
+// a pointer to a type.
+type Star struct {
+	// Target is either the expression being dereferenced, in the case of a
+	// dereference expression, or the type being pointed to, in the case of
+	// a pointer type.
+	Target  Expression
 	starLoc token.Location
 }
 
-func (n *PointerType) Start() token.Location { return n.starLoc }
-func (n *PointerType) End() token.Location   { return n.Type.End() }
-
-// A TypeName is a type node that represents a named type.
-type TypeName struct {
-	Package string
-	Name    string
-	span
-}
+func (n *Star) Start() token.Location { return n.starLoc }
+func (n *Star) End() token.Location   { return n.Target.End() }
+func (n *Star) Loc() token.Location   { return n.starLoc }
+func (n *Star) typeNode()             {}
 
 // The Expression interface is implemented by all nodes that are
 // also expressions.
@@ -699,13 +586,8 @@ func (n *CompositeLiteral) Start() token.Location {
 	return n.Type.Start()
 }
 
-func (n *CompositeLiteral) Loc() token.Location {
-	return n.Start()
-}
-
-func (n *CompositeLiteral) End() token.Location {
-	return n.closeLoc
-}
+func (n *CompositeLiteral) Loc() token.Location { return n.Start() }
+func (n *CompositeLiteral) End() token.Location { return n.closeLoc }
 
 // An Element is a node representing the key-value mapping
 // of a single element of a composite literal.
@@ -721,9 +603,7 @@ func (n *Element) Start() token.Location {
 	return n.Value.Start()
 }
 
-func (n *Element) End() token.Location {
-	return n.Value.End()
-}
+func (n *Element) End() token.Location { return n.Value.End() }
 
 // An Index is an expression node that represents indexing into an
 // array or a slice.
@@ -752,7 +632,7 @@ func (n *Slice) End() token.Location   { return n.closeLoc }
 type TypeAssertion struct {
 	Expression Expression
 	// If Type == nil then this is a type switch guard.
-	Type             Node
+	Type             Type
 	dotLoc, closeLoc token.Location
 }
 
@@ -760,17 +640,18 @@ func (n *TypeAssertion) Start() token.Location { return n.Expression.Start() }
 func (n *TypeAssertion) Loc() token.Location   { return n.dotLoc }
 func (n *TypeAssertion) End() token.Location   { return n.closeLoc }
 
-// Selector is an expression node representing a selector or a
-// qualified identifier.
+// Selector is a qualified identifier representing either a type name or
+// an selector expression.
 type Selector struct {
-	Expression Expression
-	Selection  *Identifier
-	dotLoc     token.Location
+	Parent Expression
+	Name   *Identifier
+	dotLoc token.Location
 }
 
-func (n *Selector) Start() token.Location { return n.Expression.Start() }
+func (n *Selector) Start() token.Location { return n.Parent.Start() }
 func (n *Selector) Loc() token.Location   { return n.dotLoc }
-func (n *Selector) End() token.Location   { return n.Selection.End() }
+func (n *Selector) End() token.Location   { return n.Name.End() }
+func (n *Selector) typeNode()             {}
 
 // Call is a function call expression.
 // After parsing but before type checking, a Call can represent
@@ -809,12 +690,14 @@ func (u *UnaryOp) Start() token.Location { return u.opLoc }
 func (u *UnaryOp) Loc() token.Location   { return u.opLoc }
 func (u *UnaryOp) End() token.Location   { return u.Operand.End() }
 
-// An Identifier is an expression node that represents an
-// un-qualified identifier.
+// An Identifier is an un-qualified identifier representing either  type
+// name or an identifier expression.
 type Identifier struct {
 	Name string
 	span
 }
+
+func (n *Identifier) typeNode() {}
 
 // IntegerLiteral is an expression node representing a decimal,
 // octal, or hex
