@@ -14,6 +14,14 @@ import (
 
 var (
 	a, b, c, d = id("a"), id("b"), id("c"), id("d")
+	aStmt      = &ExpressionStmt{Expression: a}
+	bStmt      = &ExpressionStmt{Expression: b}
+	cStmt      = &ExpressionStmt{Expression: c}
+	dStmt      = &ExpressionStmt{Expression: d}
+	oneStmt    = &ExpressionStmt{Expression: intLit("1")}
+	twoStmt    = &ExpressionStmt{Expression: intLit("2")}
+	threeStmt  = &ExpressionStmt{Expression: intLit("3")}
+	fourStmt   = &ExpressionStmt{Expression: intLit("4")}
 	x, y, z    = id("x"), id("y"), id("z")
 	bigInt     = sel(id("big"), id("Int")).(Type)
 )
@@ -50,6 +58,968 @@ func sel(e Expression, ids ...*Identifier) Expression {
 		p = &Selector{Parent: p, Name: i}
 	}
 	return p
+}
+
+func TestParseStatements(t *testing.T) {
+	parserTests{
+		{``, nil},
+		{`;`, nil},
+		{`fallthrough`, &FallthroughStmt{}},
+		{`goto a`, &GotoStmt{Label: *a}},
+		{`break`, &BreakStmt{}},
+		{`break a`, &BreakStmt{Label: a}},
+		{`continue`, &ContinueStmt{}},
+		{`continue a`, &ContinueStmt{Label: a}},
+		{`return`, &ReturnStmt{}},
+		{`return a, b, c`, &ReturnStmt{Expressions: []Expression{a, b, c}}},
+		{`go a()`, &GoStmt{Expression: call(a, false)}},
+		{`defer a()`, &DeferStmt{Expression: call(a, false)}},
+
+		// Range is disallowed outside of a for loop.
+		{`a := range b`, parseError{"range"}},
+	}.run(t, func(p *Parser) Node { return parseStatement(p) })
+}
+
+func TestParseSelect(t *testing.T) {
+	parserTests{
+		{`select{}`, &Select{}},
+		{
+			`select{ case a <- b: c() }`,
+			&Select{
+				Cases: []CommCase{
+					{
+						Send: &SendStmt{Channel: a, Expression: b},
+						Statements: []Statement{
+							&ExpressionStmt{Expression: call(c, false)},
+						},
+					},
+				},
+			},
+		},
+		{
+			`select{ case a := <- b: c() }`,
+			&Select{
+				Cases: []CommCase{
+					{
+						Receive: &RecvStmt{
+							Op:    token.ColonEqual,
+							Left:  []Expression{a},
+							Right: *unOp(token.LessMinus, b),
+						},
+						Statements: []Statement{
+							&ExpressionStmt{Expression: call(c, false)},
+						},
+					},
+				},
+			},
+		},
+		{
+			`select{ case a, b := <- c: d() }`,
+			&Select{
+				Cases: []CommCase{
+					{
+						Receive: &RecvStmt{
+							Op:    token.ColonEqual,
+							Left:  []Expression{a, b},
+							Right: *unOp(token.LessMinus, c),
+						},
+						Statements: []Statement{
+							&ExpressionStmt{Expression: call(d, false)},
+						},
+					},
+				},
+			},
+		},
+		{
+			`select{ case a, b = <- c: d() }`,
+			&Select{
+				Cases: []CommCase{
+					{
+						Receive: &RecvStmt{
+							Op:    token.Equal,
+							Left:  []Expression{a, b},
+							Right: *unOp(token.LessMinus, c),
+						},
+						Statements: []Statement{
+							&ExpressionStmt{Expression: call(d, false)},
+						},
+					},
+				},
+			},
+		},
+		{
+			`select{ case a() = <- b: c() }`,
+			&Select{
+				Cases: []CommCase{
+					{
+						Receive: &RecvStmt{
+							Op:    token.Equal,
+							Left:  []Expression{call(a, false)},
+							Right: *unOp(token.LessMinus, b),
+						},
+						Statements: []Statement{
+							&ExpressionStmt{Expression: call(c, false)},
+						},
+					},
+				},
+			},
+		},
+		{
+			`select{ default: a() }`,
+			&Select{
+				Cases: []CommCase{
+					{
+						Statements: []Statement{
+							&ExpressionStmt{Expression: call(a, false)},
+						},
+					},
+				},
+			},
+		},
+		{
+			`select{
+				case a <- b:
+					c()
+				case a() = <- b:
+					c()
+					d()
+				default:
+					a()
+			}`,
+			&Select{
+				Cases: []CommCase{
+					{
+						Send: &SendStmt{Channel: a, Expression: b},
+						Statements: []Statement{
+							&ExpressionStmt{Expression: call(c, false)},
+						},
+					},
+					{
+						Receive: &RecvStmt{
+							Op:    token.Equal,
+							Left:  []Expression{call(a, false)},
+							Right: *unOp(token.LessMinus, b),
+						},
+						Statements: []Statement{
+							&ExpressionStmt{Expression: call(c, false)},
+							&ExpressionStmt{Expression: call(d, false)},
+						},
+					},
+					{
+						Statements: []Statement{
+							&ExpressionStmt{Expression: call(a, false)},
+						},
+					},
+				},
+			},
+		},
+
+		// := cannot appear after non-identifiers.
+		{`select{ case a() := <- b: c() }`, parseError{":="}},
+		{`select{ case a, a() := <- b: c() }`, parseError{":="}},
+
+		// Only a receive expression can appear in a receive statement.
+		{`select{ case a := b: c() }`, parseError{"LessMinus"}},
+		{`select{ case a = b: c() }`, parseError{"LessMinus"}},
+		{`select{ case a, b = *d: c() }`, parseError{"LessMinus"}},
+	}.run(t, func(p *Parser) Node { return parseStatement(p) })
+}
+
+func TestParseSwitch(t *testing.T) {
+	parserTests{
+		{`switch {}`, &ExprSwitch{}},
+		{`switch a {}`, &ExprSwitch{Expression: a}},
+		{`switch ; a {}`, &ExprSwitch{Expression: a}},
+		{
+			`switch a(b, c) {}`,
+			&ExprSwitch{Expression: call(a, false, b, c)},
+		},
+		{
+			`switch a(); b {}`,
+			&ExprSwitch{
+				Initialization: &ExpressionStmt{Expression: call(a, false)},
+				Expression:     b,
+			},
+		},
+		{
+			`switch a = b; c {}`,
+			&ExprSwitch{
+				Initialization: &Assignment{
+					Op:    token.Equal,
+					Left:  []Expression{a},
+					Right: []Expression{b},
+				},
+				Expression: c,
+			},
+		},
+		{
+			`switch a := b; c {}`,
+			&ExprSwitch{
+				Initialization: &ShortVarDecl{
+					Left:  []Identifier{*a},
+					Right: []Expression{b},
+				},
+				Expression: c,
+			},
+		},
+		{
+			`switch a, b := b, a; c {}`,
+			&ExprSwitch{
+				Initialization: &ShortVarDecl{
+					Left:  []Identifier{*a, *b},
+					Right: []Expression{b, a},
+				},
+				Expression: c,
+			},
+		},
+		{
+			`switch a, b := b, a; a(b, c) {}`,
+			&ExprSwitch{
+				Initialization: &ShortVarDecl{
+					Left:  []Identifier{*a, *b},
+					Right: []Expression{b, a},
+				},
+				Expression: call(a, false, b, c),
+			},
+		},
+		{
+			`switch { case a: b() }`,
+			&ExprSwitch{
+				Cases: []ExprCase{
+					{
+						Expressions: []Expression{a},
+						Statements: []Statement{
+							&ExpressionStmt{Expression: call(b, false)},
+						},
+					},
+				},
+			},
+		},
+		{
+			`switch { case a, 5: b() }`,
+			&ExprSwitch{
+				Cases: []ExprCase{
+					{
+						Expressions: []Expression{a, intLit("5")},
+						Statements: []Statement{
+							&ExpressionStmt{Expression: call(b, false)},
+						},
+					},
+				},
+			},
+		},
+		{
+			`switch { default: a() }`,
+			&ExprSwitch{
+				Cases: []ExprCase{
+					{
+						Statements: []Statement{
+							&ExpressionStmt{Expression: call(a, false)},
+						},
+					},
+				},
+			},
+		},
+		{
+			`switch { 
+				case a, 5:
+					b()
+					c = d
+				case true, false:
+					d()
+					fallthrough
+				default:
+					return 42
+			}`,
+			&ExprSwitch{
+				Cases: []ExprCase{
+					{
+						Expressions: []Expression{a, intLit("5")},
+						Statements: []Statement{
+							&ExpressionStmt{Expression: call(b, false)},
+							&Assignment{
+								Op:    token.Equal,
+								Left:  []Expression{c},
+								Right: []Expression{d},
+							},
+						},
+					},
+					{
+						Expressions: []Expression{id("true"), id("false")},
+						Statements: []Statement{
+							&ExpressionStmt{Expression: call(d, false)},
+							&FallthroughStmt{},
+						},
+					},
+					{
+						Statements: []Statement{
+							&ReturnStmt{
+								Expressions: []Expression{intLit("42")},
+							},
+						},
+					},
+				},
+			},
+		},
+
+		{`switch a.(type) {}`, &TypeSwitch{Expression: a}},
+		{`switch ; a.(type) {}`, &TypeSwitch{Expression: a}},
+		{`switch a.b.(type) {}`, &TypeSwitch{Expression: sel(a, b)}},
+		{`switch a(b).(type) {}`, &TypeSwitch{Expression: call(a, false, b)}},
+		{`switch a.(b).(type) {}`, &TypeSwitch{Expression: assert(a, b)}},
+		{`switch a := b.(type) {}`, &TypeSwitch{Declaration: a, Expression: b}},
+		{
+			`switch a(); b := c.(type) {}`,
+			&TypeSwitch{
+				Initialization: &ExpressionStmt{Expression: call(a, false)},
+				Declaration:    b,
+				Expression:     c,
+			},
+		},
+		{
+			`switch a.(type) { case big.Int: b() }`,
+			&TypeSwitch{
+				Expression: a,
+				Cases: []TypeCase{
+					{
+						Types: []Type{bigInt},
+						Statements: []Statement{
+							&ExpressionStmt{Expression: call(b, false)},
+						},
+					},
+				},
+			},
+		},
+		{
+			`switch a.(type) { case big.Int, float64: b() }`,
+			&TypeSwitch{
+				Expression: a,
+				Cases: []TypeCase{
+					{
+						Types: []Type{bigInt, id("float64")},
+						Statements: []Statement{
+							&ExpressionStmt{Expression: call(b, false)},
+						},
+					},
+				},
+			},
+		},
+		{
+			`switch a.(type) { default: b() }`,
+			&TypeSwitch{
+				Expression: a,
+				Cases: []TypeCase{
+					{
+						Statements: []Statement{
+							&ExpressionStmt{Expression: call(b, false)},
+						},
+					},
+				},
+			},
+		},
+		{
+			`switch a.(type) { 
+				case big.Int, float64:
+					b()
+					c = d
+				case interface{}:
+					d()
+					fallthrough
+				default:
+					return 42
+			}`,
+			&TypeSwitch{
+				Expression: a,
+				Cases: []TypeCase{
+					{
+						Types: []Type{bigInt, id("float64")},
+						Statements: []Statement{
+							&ExpressionStmt{Expression: call(b, false)},
+							&Assignment{
+								Op:    token.Equal,
+								Left:  []Expression{c},
+								Right: []Expression{d},
+							},
+						},
+					},
+					{
+						Types: []Type{&InterfaceType{}},
+						Statements: []Statement{
+							&ExpressionStmt{Expression: call(d, false)},
+							&FallthroughStmt{},
+						},
+					},
+					{
+						Statements: []Statement{
+							&ReturnStmt{Expressions: []Expression{intLit("42")}},
+						},
+					},
+				},
+			},
+		},
+
+		// Bad type switches.
+		{`switch a.(type); b.(type) {}`, parseError{""}},
+		{`switch a, b := c.(type) {}`, parseError{""}},
+		{`switch a := b, c.(type) {}`, parseError{""}},
+		{`switch a := b.(type), c {}`, parseError{""}},
+		{`switch a = b.(type) {}`, parseError{""}},
+
+		// Switches and composite literals.
+		{
+			`switch (struct{}{}) {}`,
+			&ExprSwitch{
+				Expression: &CompositeLiteral{Type: &StructType{}},
+			},
+		},
+		{
+			`switch (struct{}{}); 5 {}`,
+			&ExprSwitch{
+				Initialization: &ExpressionStmt{
+					Expression: &CompositeLiteral{Type: &StructType{}},
+				},
+				Expression: intLit("5"),
+			},
+		},
+		{
+			`switch (struct{}{}).(type) {}`,
+			&TypeSwitch{
+				Expression: &CompositeLiteral{Type: &StructType{}},
+			},
+		},
+	}.run(t, func(p *Parser) Node { return parseStatement(p) })
+}
+
+func TestParseFor(t *testing.T) {
+	parserTests{
+		{
+			`for { a }`,
+			&ForStmt{
+				Block: BlockStmt{Statements: []Statement{aStmt}},
+			},
+		},
+		{
+			`for a { b }`,
+			&ForStmt{
+				Condition: a,
+				Block:     BlockStmt{Statements: []Statement{bStmt}},
+			},
+		},
+		{
+			`for a := 1; b; a++ { c }`,
+			&ForStmt{
+				Initialization: &ShortVarDecl{
+					Left:  []Identifier{*a},
+					Right: []Expression{intLit("1")},
+				},
+				Condition: b,
+				Post:      &IncDecStmt{Op: token.PlusPlus, Expression: a},
+				Block:     BlockStmt{Statements: []Statement{cStmt}},
+			},
+		},
+		{
+			`for ; b; a++ { c }`,
+			&ForStmt{
+				Condition: b,
+				Post:      &IncDecStmt{Op: token.PlusPlus, Expression: a},
+				Block:     BlockStmt{Statements: []Statement{cStmt}},
+			},
+		},
+		{
+			`for a := 1; ; a++ { c }`,
+			&ForStmt{
+				Initialization: &ShortVarDecl{
+					Left:  []Identifier{*a},
+					Right: []Expression{intLit("1")},
+				},
+				Post:  &IncDecStmt{Op: token.PlusPlus, Expression: a},
+				Block: BlockStmt{Statements: []Statement{cStmt}},
+			},
+		},
+		{
+			`for a := 1; b; { c }`,
+			&ForStmt{
+				Initialization: &ShortVarDecl{
+					Left:  []Identifier{*a},
+					Right: []Expression{intLit("1")},
+				},
+				Condition: b,
+				Block:     BlockStmt{Statements: []Statement{cStmt}},
+			},
+		},
+		{
+			`for ; ; { c }`,
+			&ForStmt{
+				Block: BlockStmt{Statements: []Statement{cStmt}},
+			},
+		},
+		{
+			`for a := range b { c }`,
+			&ForStmt{
+				Range: &ShortVarDecl{
+					Left:  []Identifier{*a},
+					Right: []Expression{b},
+				},
+				Block: BlockStmt{Statements: []Statement{cStmt}},
+			},
+		},
+		{
+			`for a, b := range c { d }`,
+			&ForStmt{
+				Range: &ShortVarDecl{
+					Left:  []Identifier{*a, *b},
+					Right: []Expression{c},
+				},
+				Block: BlockStmt{Statements: []Statement{dStmt}},
+			},
+		},
+		{
+			`for a = range b { c }`,
+			&ForStmt{
+				Range: &Assignment{
+					Op:    token.Equal,
+					Left:  []Expression{a},
+					Right: []Expression{b},
+				},
+				Block: BlockStmt{Statements: []Statement{cStmt}},
+			},
+		},
+		{
+			`for a, b = range c { d }`,
+			&ForStmt{
+				Range: &Assignment{
+					Op:    token.Equal,
+					Left:  []Expression{a, b},
+					Right: []Expression{c},
+				},
+				Block: BlockStmt{Statements: []Statement{dStmt}},
+			},
+		},
+
+		// Range is unexpected with any assign op other that =.
+		{`for a *= range b { c }`, parseError{"range"}},
+		{`for a, b *= range c { d }`, parseError{"range"}},
+
+		// Only a single expression allow on LHS of a range.
+		{`for a := range b, c { d }`, parseError{""}},
+		{`for a, b := range c, d { 1 }`, parseError{""}},
+		{`for a = range b, c { d }`, parseError{""}},
+		{`for a, b = range c, d { 1 }`, parseError{""}},
+
+		// Labels are not a simple statement.
+		{`for label:; a < 100; a++`, parseError{":"}},
+
+		// For loops and composite literals.
+		{
+			`for (struct{}{}) {}`,
+			&ForStmt{
+				Condition: &CompositeLiteral{Type: &StructType{}},
+			},
+		},
+	}.run(t, func(p *Parser) Node { return parseStatement(p) })
+}
+
+func TestParseIf(t *testing.T) {
+	parserTests{
+		{
+			`if a { b }`,
+			&IfStmt{
+				Condition: a,
+				Block:     BlockStmt{Statements: []Statement{bStmt}},
+			},
+		},
+		{
+			`if a; b { c }`,
+			&IfStmt{
+				Statement: aStmt,
+				Condition: b,
+				Block:     BlockStmt{Statements: []Statement{cStmt}},
+			},
+		},
+		{
+			`if a; b { c } else { d }`,
+			&IfStmt{
+				Statement: aStmt,
+				Condition: b,
+				Block:     BlockStmt{Statements: []Statement{cStmt}},
+				Else:      &BlockStmt{Statements: []Statement{dStmt}},
+			},
+		},
+		{
+			`if a; b { c } else if d { 1 }`,
+			&IfStmt{
+				Statement: aStmt,
+				Condition: b,
+				Block: BlockStmt{
+					Statements: []Statement{cStmt},
+				},
+				Else: &IfStmt{
+					Condition: d,
+					Block:     BlockStmt{Statements: []Statement{oneStmt}},
+				},
+			},
+		},
+		{
+			`if a { 1 } else if b { 2 } else if c { 3 } else { 4 }`,
+			&IfStmt{
+				Condition: a,
+				Block: BlockStmt{
+					Statements: []Statement{oneStmt},
+				},
+				Else: &IfStmt{
+					Condition: b,
+					Block: BlockStmt{
+						Statements: []Statement{twoStmt},
+					},
+					Else: &IfStmt{
+						Condition: c,
+						Block: BlockStmt{
+							Statements: []Statement{threeStmt},
+						},
+						Else: &BlockStmt{
+							Statements: []Statement{fourStmt},
+						},
+					},
+				},
+			},
+		},
+
+		// If statements and composite literals.
+		{
+			`if (struct{}{}){}`,
+			&IfStmt{
+				Condition: &CompositeLiteral{Type: &StructType{}},
+				Block:     BlockStmt{},
+			},
+		},
+	}.run(t, func(p *Parser) Node { return parseStatement(p) })
+}
+
+func TestParseBlock(t *testing.T) {
+	parserTests{
+		{`{}`, &BlockStmt{}},
+		{
+			`{{{}}}`,
+			&BlockStmt{
+				Statements: []Statement{
+					&BlockStmt{Statements: []Statement{&BlockStmt{}}},
+				},
+			},
+		},
+		{
+			`{ a = b; c = d; }`,
+			&BlockStmt{
+				Statements: []Statement{
+					&Assignment{
+						Op:    token.Equal,
+						Left:  []Expression{a},
+						Right: []Expression{b},
+					},
+					&Assignment{
+						Op:    token.Equal,
+						Left:  []Expression{c},
+						Right: []Expression{d},
+					},
+				},
+			},
+		},
+		{
+			`{ a = b; c = d }`,
+			&BlockStmt{
+				Statements: []Statement{
+					&Assignment{
+						Op:    token.Equal,
+						Left:  []Expression{a},
+						Right: []Expression{b},
+					},
+					&Assignment{
+						Op:    token.Equal,
+						Left:  []Expression{c},
+						Right: []Expression{d},
+					},
+				},
+			},
+		},
+		{
+			`{
+				a = b
+				c = d
+			}`,
+			&BlockStmt{
+				Statements: []Statement{
+					&Assignment{
+						Op:    token.Equal,
+						Left:  []Expression{a},
+						Right: []Expression{b},
+					},
+					&Assignment{
+						Op:    token.Equal,
+						Left:  []Expression{c},
+						Right: []Expression{d},
+					},
+				},
+			},
+		},
+	}.run(t, func(p *Parser) Node { return parseStatement(p) })
+}
+
+func TestParseDeclarationStmt(t *testing.T) {
+	parserTests{
+		{
+			`const a = 5`,
+			&DeclarationStmt{
+				Declarations: Declarations{
+					&ConstSpec{
+						Names:  []Identifier{*a},
+						Values: []Expression{intLit("5")},
+					},
+				},
+			},
+		},
+		{
+			`const a big.Int = 5`,
+			&DeclarationStmt{
+				Declarations: Declarations{
+					&ConstSpec{
+						Type:   bigInt,
+						Names:  []Identifier{*a},
+						Values: []Expression{intLit("5")},
+					},
+				},
+			},
+		},
+		{
+			`var(
+				a, b big.Int = 5, 6
+				c = 7
+				d = 8.0
+			)`,
+			&DeclarationStmt{
+				Declarations: Declarations{
+					&VarSpec{
+						Type:   bigInt,
+						Names:  []Identifier{*a, *b},
+						Values: []Expression{intLit("5"), intLit("6")},
+					},
+					&VarSpec{
+						Names:  []Identifier{*c},
+						Values: []Expression{intLit("7")},
+					},
+					&VarSpec{
+						Names:  []Identifier{*d},
+						Values: []Expression{floatLit("8.0")},
+					},
+				},
+			},
+		},
+	}.run(t, func(p *Parser) Node { return parseStatement(p) })
+}
+
+func TestParseLabeledStmt(t *testing.T) {
+	parserTests{
+		{
+			`here: a = b`,
+			&LabeledStmt{
+				Label: *id("here"),
+				Statement: &Assignment{
+					Op:    token.Equal,
+					Left:  []Expression{a},
+					Right: []Expression{b},
+				},
+			},
+		},
+		{
+			`here: there: a := b`,
+			&LabeledStmt{
+				Label: *id("here"),
+				Statement: &LabeledStmt{
+					Label: *id("there"),
+					Statement: &ShortVarDecl{
+						Left:  []Identifier{*a},
+						Right: []Expression{b},
+					},
+				},
+			},
+		},
+	}.run(t, func(p *Parser) Node { return parseStatement(p) })
+}
+
+func TestParseShortVarDecl(t *testing.T) {
+	parserTests{
+		{
+			`a := 5`,
+			&ShortVarDecl{
+				Left:  []Identifier{*a},
+				Right: []Expression{intLit("5")},
+			},
+		},
+		{
+			`a, b := 5, 6`,
+			&ShortVarDecl{
+				Left:  []Identifier{*a, *b},
+				Right: []Expression{intLit("5"), intLit("6")},
+			},
+		},
+		// Only allow idents on LHS
+
+		// The following is parsed as an expression statement with
+		// a trailing := left for the next parse call.
+		//{`a.b := 1`, parseError{"expected"}},
+		{`a, b.c := 1, 2`, parseError{"expected"}},
+		{`a := b.(type)`, parseError{"type"}},
+		{`a, b := c.(type), 5`, parseError{"type"}},
+		{`a, b := 5, c.(type)`, parseError{"type"}},
+	}.run(t, func(p *Parser) Node { return parseStatement(p) })
+}
+
+func TestParseAssignment(t *testing.T) {
+	parserTests{
+		{
+			`a = b`,
+			&Assignment{
+				Op:    token.Equal,
+				Left:  []Expression{a},
+				Right: []Expression{b},
+			},
+		},
+		{
+			`a += b`,
+			&Assignment{
+				Op:    token.PlusEqual,
+				Left:  []Expression{a},
+				Right: []Expression{b},
+			},
+		},
+		{
+			`a -= b`,
+			&Assignment{
+				Op:    token.MinusEqual,
+				Left:  []Expression{a},
+				Right: []Expression{b},
+			},
+		},
+		{
+			`a |= b`,
+			&Assignment{
+				Op:    token.OrEqual,
+				Left:  []Expression{a},
+				Right: []Expression{b},
+			},
+		},
+		{
+			`a ^= b`,
+			&Assignment{
+				Op:    token.CarrotEqual,
+				Left:  []Expression{a},
+				Right: []Expression{b},
+			},
+		},
+		{
+			`a *= b`,
+			&Assignment{
+				Op:    token.StarEqual,
+				Left:  []Expression{a},
+				Right: []Expression{b},
+			},
+		},
+		{
+			`a /= b`,
+			&Assignment{
+				Op:    token.DivideEqual,
+				Left:  []Expression{a},
+				Right: []Expression{b},
+			},
+		},
+		{
+			`a %= b`,
+			&Assignment{
+				Op:    token.PercentEqual,
+				Left:  []Expression{a},
+				Right: []Expression{b},
+			},
+		},
+		{
+			`a <<= b`,
+			&Assignment{
+				Op:    token.LessLessEqual,
+				Left:  []Expression{a},
+				Right: []Expression{b},
+			},
+		},
+		{
+			`a >>= b`,
+			&Assignment{
+				Op:    token.GreaterGreaterEqual,
+				Left:  []Expression{a},
+				Right: []Expression{b},
+			},
+		},
+		{
+			`a &= b`,
+			&Assignment{
+				Op:    token.AndEqual,
+				Left:  []Expression{a},
+				Right: []Expression{b},
+			},
+		},
+		{
+			`a &^= b`,
+			&Assignment{
+				Op:    token.AndCarrotEqual,
+				Left:  []Expression{a},
+				Right: []Expression{b},
+			},
+		},
+
+		{
+			`a, b = c, d`,
+			&Assignment{
+				Op:    token.Equal,
+				Left:  []Expression{a, b},
+				Right: []Expression{c, d},
+			},
+		},
+		{
+			`a.b, c, d *= 5, 6, 7`,
+			&Assignment{
+				Op:    token.StarEqual,
+				Left:  []Expression{sel(a, b), c, d},
+				Right: []Expression{intLit("5"), intLit("6"), intLit("7")},
+			},
+		},
+	}.run(t, func(p *Parser) Node { return parseStatement(p) })
+}
+
+func TestParseExpressionStmt(t *testing.T) {
+	parserTests{
+		{`a`, &ExpressionStmt{Expression: a}},
+		{`b`, &ExpressionStmt{Expression: b}},
+		{`a.b`, &ExpressionStmt{Expression: sel(a, b)}},
+		{`a[5]`, &ExpressionStmt{Expression: index(a, intLit("5"))}},
+	}.run(t, func(p *Parser) Node { return parseStatement(p) })
+}
+
+func TestParseIncDecStmt(t *testing.T) {
+	inc, dec := token.PlusPlus, token.MinusMinus
+	parserTests{
+		{`a++`, &IncDecStmt{Op: inc, Expression: a}},
+		{`b--`, &IncDecStmt{Op: dec, Expression: b}},
+		{`a[5]++`, &IncDecStmt{Op: inc, Expression: index(a, intLit("5"))}},
+	}.run(t, func(p *Parser) Node { return parseStatement(p) })
+}
+
+func TestParseSendStmt(t *testing.T) {
+	parserTests{
+		{`a <- b`, &SendStmt{Channel: a, Expression: b}},
+		{`a <- 5`, &SendStmt{Channel: a, Expression: intLit("5")}},
+		{
+			`a[6] <- b[7]`,
+			&SendStmt{
+				Channel:    index(a, intLit("6")),
+				Expression: index(b, intLit("7")),
+			},
+		},
+	}.run(t, func(p *Parser) Node { return parseStatement(p) })
 }
 
 func TestParseVarDecl(t *testing.T) {
