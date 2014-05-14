@@ -13,6 +13,7 @@ import (
 
 var (
 	a, b, c, d = id("a"), id("b"), id("c"), id("d")
+	x, y, z    = id("x"), id("y"), id("z")
 	bigInt     = sel(id("big"), id("Int")).(Type)
 )
 
@@ -48,6 +49,172 @@ func sel(e Expression, ids ...*Identifier) Expression {
 		p = &Selector{Parent: p, Name: i}
 	}
 	return p
+}
+
+func TestParseVarDecl(t *testing.T) {
+	parserTests{
+		{
+			`var a big.Int`,
+			Declarations{
+				&VarSpec{Names: []Identifier{*a}, Type: bigInt},
+			},
+		},
+		{
+			`var a int = 5`,
+			Declarations{
+				&VarSpec{
+					Names:  []Identifier{*a},
+					Type:   id("int"),
+					Values: []Expression{intLit("5")},
+				},
+			},
+		},
+		{
+			`var a, b int = 5, 6`,
+			Declarations{
+				&VarSpec{
+					Names:  []Identifier{*a, *b},
+					Type:   id("int"),
+					Values: []Expression{intLit("5"), intLit("6")},
+				},
+			},
+		},
+		{
+			`var (
+				a int = 7
+				b = 3.14
+			)`,
+			Declarations{
+				&VarSpec{
+					Names:  []Identifier{*a},
+					Type:   id("int"),
+					Values: []Expression{intLit("7")},
+				},
+				&VarSpec{
+					Names:  []Identifier{*b},
+					Values: []Expression{floatLit("3.14")},
+				},
+			},
+		},
+		{
+			`var (
+				a int = 7
+				b, c, d = 12, 13, 14
+				x, y, z float64 = 3.0, 4.0, 5.0
+			)`,
+			Declarations{
+				&VarSpec{
+					Names:  []Identifier{*a},
+					Type:   id("int"),
+					Values: []Expression{intLit("7")},
+				},
+				&VarSpec{
+					Names:  []Identifier{*b, *c, *d},
+					Values: []Expression{intLit("12"), intLit("13"), intLit("14")},
+				},
+				&VarSpec{
+					Names:  []Identifier{*x, *y, *z},
+					Type:   id("float64"),
+					Values: []Expression{floatLit("3.0"), floatLit("4.0"), floatLit("5.0")},
+				},
+			},
+		},
+
+		// If there is no type then there must be an expr list.
+		{`var b`, parseError{"expected"}},
+	}.run(t, func(p *Parser) Node { return parseDeclarations(p) })
+}
+
+func TestParseConstDecl(t *testing.T) {
+	parserTests{
+		{
+			`const a`,
+			Declarations{
+				&ConstSpec{Names: []Identifier{*a}},
+			},
+		},
+		{
+			`const a big.Int`,
+			Declarations{
+				&ConstSpec{Names: []Identifier{*a}, Type: bigInt},
+			},
+		},
+		{
+			`const a int = 5`,
+			Declarations{
+				&ConstSpec{
+					Names:  []Identifier{*a},
+					Type:   id("int"),
+					Values: []Expression{intLit("5")},
+				},
+			},
+		},
+		{
+			`const a, b int = 5, 6`,
+			Declarations{
+				&ConstSpec{
+					Names:  []Identifier{*a, *b},
+					Type:   id("int"),
+					Values: []Expression{intLit("5"), intLit("6")},
+				},
+			},
+		},
+		{
+			`const (
+				a int = 7
+				b
+			)`,
+			Declarations{
+				&ConstSpec{
+					Names:  []Identifier{*a},
+					Type:   id("int"),
+					Values: []Expression{intLit("7")},
+				},
+				&ConstSpec{Names: []Identifier{*b}},
+			},
+		},
+		{
+			`const (
+				a int = 7
+				b, c, d
+				x, y, z float64 = 3.0, 4.0, 5.0
+			)`,
+			Declarations{
+				&ConstSpec{
+					Names:  []Identifier{*a},
+					Type:   id("int"),
+					Values: []Expression{intLit("7")},
+				},
+				&ConstSpec{Names: []Identifier{*b, *c, *d}},
+				&ConstSpec{
+					Names:  []Identifier{*x, *y, *z},
+					Type:   id("float64"),
+					Values: []Expression{floatLit("3.0"), floatLit("4.0"), floatLit("5.0")},
+				},
+			},
+		},
+	}.run(t, func(p *Parser) Node { return parseDeclarations(p) })
+}
+
+func TestParseTypeDecl(t *testing.T) {
+	parserTests{
+		{
+			`type a big.Int`,
+			Declarations{
+				&TypeSpec{Name: *a, Type: bigInt},
+			},
+		},
+		{
+			`type (
+				a big.Int
+				b struct{}
+			)`,
+			Declarations{
+				&TypeSpec{Name: *a, Type: bigInt},
+				&TypeSpec{Name: *b, Type: &StructType{}},
+			},
+		},
+	}.run(t, func(p *Parser) Node { return parseDeclarations(p) })
 }
 
 func TestParseType(t *testing.T) {
