@@ -571,6 +571,17 @@ type Expression interface {
 	Loc() token.Location
 }
 
+// A FunctionLiteral is an expression node that represents a function literal.
+type FunctionLiteral struct {
+	startLoc token.Location
+	Signature
+	Body BlockStmt
+}
+
+func (n *FunctionLiteral) Loc() token.Location   { return n.startLoc }
+func (n *FunctionLiteral) Start() token.Location { return n.startLoc }
+func (n *FunctionLiteral) End() token.Location   { return n.Body.End() }
+
 // A CompositeLiteral is an expression node that represents a
 // composite literal.
 type CompositeLiteral struct {

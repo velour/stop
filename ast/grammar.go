@@ -1524,7 +1524,8 @@ func parseOperand(p *Parser, typeSwitch bool) Expression {
 	case token.StringLiteral:
 		return parseStringLiteral(p)
 
-	// BUG(eaburns): Function literal
+	case token.Func:
+		return parseFunctionLiteral(p)
 
 	case token.OpenParen:
 		p.next()
@@ -1543,6 +1544,15 @@ func parseOperand(p *Parser, typeSwitch bool) Expression {
 		return parseType(p)
 	}
 	panic(p.err("operand"))
+}
+
+func parseFunctionLiteral(p *Parser) *FunctionLiteral {
+	p.expect(token.Func)
+	f := &FunctionLiteral{startLoc: p.lex.Start}
+	p.next()
+	f.Signature = parseSignature(p)
+	f.Body = *parseBlock(p)
+	return f
 }
 
 func parseLiteralValue(p *Parser) *CompositeLiteral {

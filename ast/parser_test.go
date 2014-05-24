@@ -1717,6 +1717,108 @@ func TestParseTypeName(t *testing.T) {
 	}.run(t, func(p *Parser) Node { return parseType(p) })
 }
 
+func TestParseFunctionLiteral(t *testing.T) {
+	parserTests{
+		{`func(){}`, &FunctionLiteral{}},
+		{
+			`func()big.Int{}`,
+			&FunctionLiteral{
+				Signature: Signature{
+					ParameterList{},
+					ParameterList{
+						Parameters: []ParameterDecl{
+							{Type: bigInt},
+						},
+					},
+				},
+			},
+		},
+		{
+			`func(a){}`,
+			&FunctionLiteral{
+				Signature: Signature{
+					ParameterList{
+						Parameters: []ParameterDecl{
+							{Type: a},
+						},
+					},
+					ParameterList{},
+				},
+			},
+		},
+		{
+			`func(a b){}`,
+			&FunctionLiteral{
+				Signature: Signature{
+					ParameterList{
+						Parameters: []ParameterDecl{
+							{Type: b, Identifiers: []Identifier{*a}},
+						},
+					},
+					ParameterList{},
+				},
+			},
+		},
+		{
+			`func(a b)big.Int{}`,
+			&FunctionLiteral{
+				Signature: Signature{
+					ParameterList{
+						Parameters: []ParameterDecl{
+							{Type: b, Identifiers: []Identifier{*a}},
+						},
+					},
+					ParameterList{
+						Parameters: []ParameterDecl{
+							{Type: bigInt},
+						},
+					},
+				},
+			},
+		},
+		{
+			`func(){
+				a
+				b
+				c
+			}`,
+			&FunctionLiteral{
+				Body: BlockStmt{
+					Statements: []Statement{aStmt, bStmt, cStmt},
+				},
+			},
+		},
+		{
+			`func(a b)big.Int{
+				a
+				b
+				return c
+			}`,
+			&FunctionLiteral{
+				Signature: Signature{
+					ParameterList{
+						Parameters: []ParameterDecl{
+							{Type: b, Identifiers: []Identifier{*a}},
+						},
+					},
+					ParameterList{
+						Parameters: []ParameterDecl{
+							{Type: bigInt},
+						},
+					},
+				},
+				Body: BlockStmt{
+					Statements: []Statement{
+						aStmt,
+						bStmt,
+						&ReturnStmt{Expressions: []Expression{c}},
+					},
+				},
+			},
+		},
+	}.run(t, func(p *Parser) Node { return parseExpr(p) })
+}
+
 func TestParseCompositeLiteral(t *testing.T) {
 	parserTests{
 		{`struct{ a int }{ a: 4 }`, &CompositeLiteral{
