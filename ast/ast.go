@@ -344,6 +344,33 @@ type Declarations []Declaration
 func (n Declarations) Start() token.Location { return n[0].Start() }
 func (n Declarations) End() token.Location   { return n[len(n)-1].End() }
 
+// A MethodDecl is a declaration node representing a method declaration.
+type MethodDecl struct {
+	comments
+	startLoc     token.Location
+	Receiver     Identifier
+	Pointer      bool
+	BaseTypeName Identifier
+	Name         Identifier
+	Signature
+	Body BlockStmt
+}
+
+func (n *MethodDecl) Start() token.Location { return n.startLoc }
+func (n *MethodDecl) End() token.Location   { return n.Body.End() }
+
+// A FunctionDecl is a declaration node representing a function declaration.
+type FunctionDecl struct {
+	comments
+	startLoc token.Location
+	Name     Identifier
+	Signature
+	Body BlockStmt
+}
+
+func (n *FunctionDecl) Start() token.Location { return n.startLoc }
+func (n *FunctionDecl) End() token.Location   { return n.Body.End() }
+
 // A ConstSpec is a declaration node representing the declaration of
 // a series of constants.
 type ConstSpec struct {

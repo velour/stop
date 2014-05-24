@@ -698,6 +698,43 @@ func parseAssignmentTail(p *Parser, cmnts comments, exprs []Expression, rangeOK 
 	}
 }
 
+func parseTopLevelDecl(p *Parser) Declarations {
+	if p.tok == token.Func {
+		return Declarations{parseFunctionOrMethodDecl(p)}
+	}
+	return parseDeclarations(p)
+}
+
+func parseFunctionOrMethodDecl(p *Parser) Declaration {
+	p.expect(token.Func)
+	cmnts := p.comments()
+	l := p.lex.Start
+	p.next()
+	if p.tok == token.OpenParen {
+		p.next()
+		m := &MethodDecl{comments: cmnts, startLoc: l}
+		m.Receiver = *parseIdentifier(p)
+		if p.tok == token.Star {
+			p.next()
+			m.Pointer = true
+		}
+		m.BaseTypeName = *parseIdentifier(p)
+		p.expect(token.CloseParen)
+		p.next()
+		m.Name = *parseIdentifier(p)
+		m.Signature = parseSignature(p)
+		m.Body = *parseBlock(p)
+		return m
+	}
+	return &FunctionDecl{
+		comments:  cmnts,
+		startLoc:  l,
+		Name:      *parseIdentifier(p),
+		Signature: parseSignature(p),
+		Body:      *parseBlock(p),
+	}
+}
+
 func parseDeclarations(p *Parser) Declarations {
 	switch p.tok {
 	case token.Type:
