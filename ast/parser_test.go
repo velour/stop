@@ -77,6 +77,18 @@ func TestParseStatements(t *testing.T) {
 
 		// Range is disallowed outside of a for loop.
 		{`a := range b`, parseError{"range"}},
+
+		// BUG(eaburns): Semicolons aren't optional unless they are
+		// followed by a close delimiter.
+		{
+			`{continue break}`,
+			&BlockStmt{
+				Statements: []Statement{
+					&ContinueStmt{},
+					&BreakStmt{},
+				},
+			},
+		},
 	}.run(t, func(p *Parser) Node { return parseStatement(p) })
 }
 
@@ -1093,6 +1105,25 @@ func TestParseVarDecl(t *testing.T) {
 
 		// If there is no type then there must be an expr list.
 		{`var b`, parseError{"expected"}},
+
+		// BUG(eaburns): Semicolons aren't optional unless they are
+		// followed by a close delimiter.
+		{
+			`var (
+				a int = 7 b = 3.14
+			)`,
+			Declarations{
+				&VarSpec{
+					Names:  []Identifier{*a},
+					Type:   id("int"),
+					Values: []Expression{intLit("7")},
+				},
+				&VarSpec{
+					Names:  []Identifier{*b},
+					Values: []Expression{floatLit("3.14")},
+				},
+			},
+		},
 	}.run(t, func(p *Parser) Node { return parseDeclarations(p) })
 }
 
@@ -1164,6 +1195,22 @@ func TestParseConstDecl(t *testing.T) {
 				},
 			},
 		},
+
+		// BUG(eaburns): Semicolons aren't optional unless they are
+		// followed by a close delimiter.
+		{
+			`const ( a = b c = d)`,
+			Declarations{
+				&ConstSpec{
+					Names:  []Identifier{*a},
+					Values: []Expression{b},
+				},
+				&ConstSpec{
+					Names:  []Identifier{*c},
+					Values: []Expression{d},
+				},
+			},
+		},
 	}.run(t, func(p *Parser) Node { return parseDeclarations(p) })
 }
 
@@ -1179,6 +1226,18 @@ func TestParseTypeDecl(t *testing.T) {
 			`type (
 				a big.Int
 				b struct{}
+			)`,
+			Declarations{
+				&TypeSpec{Name: *a, Type: bigInt},
+				&TypeSpec{Name: *b, Type: &StructType{}},
+			},
+		},
+
+		// BUG(eaburns): Semicolons aren't optional unless they are
+		// followed by a close delimiter.
+		{
+			`type (
+				a big.Int b struct{}
 			)`,
 			Declarations{
 				&TypeSpec{Name: *a, Type: bigInt},
