@@ -344,6 +344,24 @@ type Declarations []Declaration
 func (n Declarations) Start() token.Location { return n[0].Start() }
 func (n Declarations) End() token.Location   { return n[len(n)-1].End() }
 
+// An ImportDecl is a declaration node representing the declaration of
+// a set of package imports.
+type ImportDecl struct {
+	comments
+	startLoc, endLoc token.Location
+	Imports          []ImportSpec
+}
+
+func (n *ImportDecl) Start() token.Location { return n.startLoc }
+func (n *ImportDecl) End() token.Location   { return n.endLoc }
+
+// An ImportSpec represents the import of a single package.
+type ImportSpec struct {
+	Dot  bool
+	Name *Identifier
+	Path StringLiteral
+}
+
 // A MethodDecl is a declaration node representing a method declaration.
 type MethodDecl struct {
 	comments

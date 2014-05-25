@@ -60,6 +60,93 @@ func sel(e Expression, ids ...*Identifier) Expression {
 	return p
 }
 
+func TestParseImportDecl(t *testing.T) {
+	parserTests{
+		{
+			`import "fmt"`,
+			&ImportDecl{
+				Imports: []ImportSpec{
+					{Path: *strLit("fmt")},
+				},
+			},
+		},
+		{
+			`import . "fmt"`,
+			&ImportDecl{
+				Imports: []ImportSpec{
+					{Dot: true, Path: *strLit("fmt")},
+				},
+			},
+		},
+		{
+			`import f "fmt"`,
+			&ImportDecl{
+				Imports: []ImportSpec{
+					{Name: id("f"), Path: *strLit("fmt")},
+				},
+			},
+		},
+		{
+			`import (
+				"fmt"
+			)`,
+			&ImportDecl{
+				Imports: []ImportSpec{
+					{Path: *strLit("fmt")},
+				},
+			},
+		},
+		{
+			`import (
+				. "fmt"
+			)`,
+			&ImportDecl{
+				Imports: []ImportSpec{
+					{Dot: true, Path: *strLit("fmt")},
+				},
+			},
+		},
+		{
+			`import (
+				f "fmt"
+			)`,
+			&ImportDecl{
+				Imports: []ImportSpec{
+					{Name: id("f"), Path: *strLit("fmt")},
+				},
+			},
+		},
+		{
+			`import (
+				f "fmt"
+				o "os";
+				. "github.com/eaburns/pp"
+				"code.google.com/p/plotinum"
+			)`,
+			&ImportDecl{
+				Imports: []ImportSpec{
+					{Name: id("f"), Path: *strLit("fmt")},
+					{Name: id("o"), Path: *strLit("os")},
+					{Dot: true, Path: *strLit("github.com/eaburns/pp")},
+					{Path: *strLit("code.google.com/p/plotinum")},
+				},
+			},
+		},
+
+		// BUG(eaburns): Semicolons aren't optional unless they are
+		// followed by a close delimiter.
+		{
+			`import ( "fmt" "os" )`,
+			&ImportDecl{
+				Imports: []ImportSpec{
+					{Path: *strLit("fmt")},
+					{Path: *strLit("os")},
+				},
+			},
+		},
+	}.run(t, func(p *Parser) Node { return parseImportDecl(p) })
+}
+
 func TestParseStatements(t *testing.T) {
 	parserTests{
 		{``, nil},

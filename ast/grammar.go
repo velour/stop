@@ -698,6 +698,44 @@ func parseAssignmentTail(p *Parser, cmnts comments, exprs []Expression, rangeOK 
 	}
 }
 
+func parseImportDecl(p *Parser) *ImportDecl {
+	p.expect(token.Import)
+	d := &ImportDecl{comments: p.comments(), startLoc: p.lex.Start}
+	p.next()
+	if p.tok == token.OpenParen {
+		p.next()
+		for p.tok != token.CloseParen {
+			d.Imports = append(d.Imports, parseImportSpec(p))
+			if p.tok == token.Semicolon {
+				p.next()
+			}
+		}
+		p.expect(token.CloseParen)
+		d.endLoc = p.lex.Start
+		p.next()
+		return d
+	}
+	imp := parseImportSpec(p)
+	d.Imports = []ImportSpec{imp}
+	d.endLoc = imp.Path.End()
+	return d
+}
+
+func parseImportSpec(p *Parser) ImportSpec {
+	var s ImportSpec
+	if p.tok == token.Dot {
+		p.next()
+		s.Dot = true
+		s.Path = *parseStringLiteral(p)
+		return s
+	}
+	if p.tok != token.StringLiteral {
+		s.Name = parseIdentifier(p)
+	}
+	s.Path = *parseStringLiteral(p)
+	return s
+}
+
 func parseTopLevelDecl(p *Parser) Declarations {
 	if p.tok == token.Func {
 		return Declarations{parseFunctionOrMethodDecl(p)}
