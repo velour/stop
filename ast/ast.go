@@ -19,6 +19,26 @@ type Node interface {
 	End() token.Location
 }
 
+// SourceFile is a node representing a Go source file.
+type SourceFile struct {
+	comments
+	startLoc, endLoc token.Location
+	PackageName      Identifier
+	Imports          []ImportDecl
+	Declarations
+}
+
+func (n *SourceFile) Start() token.Location { return n.PackageName.Start() }
+func (n *SourceFile) End() token.Location {
+	if l := len(n.Declarations); l > 0 {
+		return n.Declarations[l-1].End()
+	}
+	if l := len(n.Imports); l > 0 {
+		return n.Imports[l-1].End()
+	}
+	return n.PackageName.End()
+}
+
 // A Statement is a node representing a statement.
 type Statement interface {
 	Node

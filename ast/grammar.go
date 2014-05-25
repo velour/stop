@@ -29,9 +29,30 @@ func Parse(p *Parser) (root Node, err error) {
 		}
 
 	}()
-	//	root = parseExpr(p)
-	root = parseDeclarations(p)
-	return
+	return parseSourceFile(p), nil
+}
+
+func parseSourceFile(p *Parser) Node {
+	p.expect(token.Package)
+	s := &SourceFile{comments: p.comments(), startLoc: p.lex.Start}
+	p.next()
+	s.PackageName = *parseIdentifier(p)
+	p.expect(token.Semicolon)
+	p.next()
+
+	for p.tok == token.Import {
+		s.Imports = append(s.Imports, *parseImportDecl(p))
+		p.expect(token.Semicolon)
+		p.next()
+	}
+	for p.tok != token.EOF {
+		decls := parseTopLevelDecl(p)
+		s.Declarations = append(s.Declarations, decls...)
+		p.expect(token.Semicolon)
+		p.next()
+	}
+	s.endLoc = p.lex.Start
+	return s
 }
 
 func parseStatement(p *Parser) Statement {
