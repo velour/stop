@@ -510,7 +510,8 @@ func (n *ChannelType) typeNode()             {}
 
 // An MapType is a type node that represents a map from types to types.
 type MapType struct {
-	Key    Type
+	Key Type
+	// TODO(eaburns): Rename this to Value.
 	Type   Type
 	mapLoc token.Location
 }
