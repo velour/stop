@@ -10,9 +10,6 @@ import (
 
 // Parse returns the root of an abstract syntax tree for the Go language
 // or an error if one is encountered.
-//
-// BUG(eaburns): This is currently just for testing since it doesn't
-// parse the top-level production.
 func Parse(p *Parser) (root Node, err error) {
 	defer func() {
 		r := recover()
@@ -1406,9 +1403,6 @@ var (
 
 	// Binary op precedence for precedence climbing algorithm.
 	// http://www.engr.mun.ca/~theo/Misc/exp_parsing.htm
-	//
-	// BUG(eaburns): Define tokens.NTokens and change
-	// map[token.Token]Whatever to [nTokens]Whatever.
 	precedence = map[token.Token]int{
 		token.OrOr:           1,
 		token.AndAnd:         2,
