@@ -2,6 +2,8 @@ package ast
 
 import (
 	"bytes"
+	"go/parser"
+	stdtoken "go/token"
 	"math/big"
 	"reflect"
 	"regexp"
@@ -9,6 +11,7 @@ import (
 
 	"github.com/eaburns/eq"
 	"github.com/eaburns/pp"
+	"github.com/velour/stop/test"
 	"github.com/velour/stop/token"
 )
 
@@ -2401,4 +2404,24 @@ func TestComments(t *testing.T) {
 		{"// a\na\n// b\n\n// c\nb", [][]string{{"// a"}, {"// c"}}},
 	}
 	tests.run(t)
+}
+
+func BenchmarkParser(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		p := NewParser(token.NewLexer("", test.Prog))
+		_, err := Parse(p)
+		if err != nil {
+			b.Fatalf("parse error: %s", err)
+		}
+	}
+}
+
+func BenchmarkStandardLibraryParser(b *testing.B) {
+	fset := stdtoken.NewFileSet()
+	for i := 0; i < b.N; i++ {
+		_, err := parser.ParseFile(fset, "", test.Prog, 0)
+		if err != nil {
+			b.Fatalf("parse error: %s", err)
+		}
+	}
 }
