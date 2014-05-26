@@ -42,12 +42,18 @@ func parseSourceFile(p *Parser) Node {
 
 	for p.tok == token.Import {
 		s.Imports = append(s.Imports, *parseImportDecl(p))
+		if p.tok == token.EOF {
+			break
+		}
 		p.expect(token.Semicolon)
 		p.next()
 	}
 	for p.tok != token.EOF {
 		decls := parseTopLevelDecl(p)
 		s.Declarations = append(s.Declarations, decls...)
+		if p.tok == token.EOF {
+			break
+		}
 		p.expect(token.Semicolon)
 		p.next()
 	}
@@ -350,10 +356,11 @@ func parseCaseStatements(p *Parser) []Statement {
 	var stmts []Statement
 	for p.tok != token.Case && p.tok != token.Default && p.tok != token.CloseBrace {
 		stmts = append(stmts, parseStatement(p))
-		if p.tok != token.Case && p.tok != token.Default && p.tok != token.CloseBrace {
-			p.expect(token.Semicolon)
-			p.next()
+		if p.tok == token.Case || p.tok == token.Default || p.tok == token.CloseBrace {
+			break
 		}
+		p.expect(token.Semicolon)
+		p.next()
 	}
 	return stmts
 }
@@ -444,10 +451,15 @@ func parseBlock(p *Parser) *BlockStmt {
 	p.next()
 	var stmts []Statement
 	for p.tok != token.CloseBrace {
-		stmts = append(stmts, parseStatement(p))
-		if p.tok == token.Semicolon {
-			p.next()
+		stmt := parseStatement(p)
+		if stmt != nil {
+			stmts = append(stmts, stmt)
 		}
+		if p.tok == token.CloseBrace {
+			break
+		}
+		p.expect(token.Semicolon)
+		p.next()
 	}
 	p.expect(token.CloseBrace)
 	e := p.lex.End
@@ -726,10 +738,13 @@ func parseImportDecl(p *Parser) *ImportDecl {
 	if p.tok == token.OpenParen {
 		p.next()
 		for p.tok != token.CloseParen {
-			d.Imports = append(d.Imports, parseImportSpec(p))
-			if p.tok == token.Semicolon {
-				p.next()
+			imp := parseImportSpec(p)
+			d.Imports = append(d.Imports, imp)
+			if p.tok == token.CloseParen {
+				break
 			}
+			p.expect(token.Semicolon)
+			p.next()
 		}
 		p.expect(token.CloseParen)
 		d.endLoc = p.lex.Start
@@ -821,9 +836,11 @@ func parseVarDecl(p *Parser) Declarations {
 
 	for p.tok != token.CloseParen {
 		decls = append(decls, parseVarSpec(p))
-		if p.tok == token.Semicolon {
-			p.next()
+		if p.tok == token.CloseParen {
+			break
 		}
+		p.expect(token.Semicolon)
+		p.next()
 	}
 	p.next()
 	return decls
@@ -861,10 +878,13 @@ func parseConstDecl(p *Parser) Declarations {
 
 	for p.tok != token.CloseParen {
 		decls = append(decls, parseConstSpec(p))
-		if p.tok == token.Semicolon {
-			p.next()
+		if p.tok == token.CloseParen {
+			break
 		}
+		p.expect(token.Semicolon)
+		p.next()
 	}
+	p.expect(token.CloseParen)
 	p.next()
 	return decls
 }
@@ -911,10 +931,13 @@ func parseTypeDecl(p *Parser) Declarations {
 
 	for p.tok != token.CloseParen {
 		decls = append(decls, parseTypeSpec(p))
-		if p.tok == token.Semicolon {
-			p.next()
+		if p.tok == token.CloseParen {
+			break
 		}
+		p.expect(token.Semicolon)
+		p.next()
 	}
+	p.expect(token.CloseParen)
 	p.next()
 	return decls
 }
@@ -997,10 +1020,11 @@ func parseStructType(p *Parser) *StructType {
 	for p.tok != token.CloseBrace {
 		field := parseFieldDecl(p)
 		st.Fields = append(st.Fields, field)
-		if p.tok != token.CloseBrace {
-			p.expect(token.Semicolon)
-			p.next()
+		if p.tok == token.CloseBrace {
+			break
 		}
+		p.expect(token.Semicolon)
+		p.next()
 	}
 
 	p.expect(token.CloseBrace)
@@ -1085,10 +1109,11 @@ func parseInterfaceType(p *Parser) *InterfaceType {
 		default:
 			it.Methods = append(it.Methods, id)
 		}
-		if p.tok != token.CloseBrace {
-			p.expect(token.Semicolon)
-			p.next()
+		if p.tok == token.CloseBrace {
+			break
 		}
+		p.expect(token.Semicolon)
+		p.next()
 	}
 
 	p.expect(token.CloseBrace)

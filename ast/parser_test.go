@@ -62,6 +62,19 @@ func sel(e Expression, ids ...*Identifier) Expression {
 
 func TestParseSourceFile(t *testing.T) {
 	parserTests{
+		{`package main`, &SourceFile{PackageName: *id("main")}},
+		{
+			`
+				package main
+				import "fmt"
+			`,
+			&SourceFile{
+				PackageName: *id("main"),
+				Imports: []ImportDecl{
+					{Imports: []ImportSpec{{Path: *strLit("fmt")}}},
+				},
+			},
+		},
 		{
 			`
 				package main
@@ -155,11 +168,8 @@ func TestParseImportDecl(t *testing.T) {
 				},
 			},
 		},
-
-		// BUG(eaburns): Semicolons aren't optional unless they are
-		// followed by a close delimiter.
 		{
-			`import ( "fmt" "os" )`,
+			`import ( "fmt"; "os" )`,
 			&ImportDecl{
 				Imports: []ImportSpec{
 					{Path: *strLit("fmt")},
@@ -167,6 +177,7 @@ func TestParseImportDecl(t *testing.T) {
 				},
 			},
 		},
+		{`import ( "fmt" "os" )`, parseError{"Semicolon"}},
 	}.run(t, func(p *Parser) Node { return parseImportDecl(p) })
 }
 
@@ -188,10 +199,8 @@ func TestParseStatements(t *testing.T) {
 		// Range is disallowed outside of a for loop.
 		{`a := range b`, parseError{"range"}},
 
-		// BUG(eaburns): Semicolons aren't optional unless they are
-		// followed by a close delimiter.
 		{
-			`{continue break}`,
+			`{continue; break}`,
 			&BlockStmt{
 				Statements: []Statement{
 					&ContinueStmt{},
@@ -199,6 +208,7 @@ func TestParseStatements(t *testing.T) {
 				},
 			},
 		},
+		{`{continue break}`, parseError{"Semicolon"}},
 	}.run(t, func(p *Parser) Node { return parseStatement(p) })
 }
 
@@ -1381,17 +1391,14 @@ func TestParseTypeDecl(t *testing.T) {
 			},
 		},
 
-		// BUG(eaburns): Semicolons aren't optional unless they are
-		// followed by a close delimiter.
 		{
-			`type (
-				a big.Int b struct{}
-			)`,
+			`type ( a big.Int; b struct{} )`,
 			Declarations{
 				&TypeSpec{Name: *a, Type: bigInt},
 				&TypeSpec{Name: *b, Type: &StructType{}},
 			},
 		},
+		{`type ( a big.Int b struct{} )`, parseError{"Semicolon"}},
 	}.run(t, func(p *Parser) Node { return parseDeclarations(p) })
 }
 
@@ -1527,6 +1534,16 @@ func TestParseStructType(t *testing.T) {
 		// Embedded stars must be type names.
 		{`struct{**big.Int}`, parseError{"expected.*got \\*"}},
 		{`struct{*[]big.Int}`, parseError{"expected.*got \\["}},
+
+		{
+			`struct {a int; b int}`,
+			&StructType{Fields: []FieldDecl{
+				{Identifiers: []Identifier{*a}, Type: id("int")},
+				{Identifiers: []Identifier{*b}, Type: id("int")},
+			},
+			},
+		},
+		{`struct {a int b int}`, parseError{"Semicolon"}},
 	}.run(t, func(p *Parser) Node { return parseType(p) })
 }
 
@@ -1544,6 +1561,17 @@ func TestParseInterfaceType(t *testing.T) {
 
 		// Trailing ;
 		{`interface{a; b; c;}`, &InterfaceType{Methods: []Node{a, b, c}}},
+
+		{
+			`interface{ a(); b()}`,
+			&InterfaceType{
+				Methods: []Node{
+					&Method{Name: *a},
+					&Method{Name: *b},
+				},
+			},
+		},
+		{`interface{ a() b()}`, parseError{"Semicolon"}},
 	}.run(t, func(p *Parser) Node { return parseType(p) })
 }
 
