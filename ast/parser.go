@@ -2,6 +2,7 @@ package ast
 
 import (
 	"fmt"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -19,6 +20,9 @@ type SyntaxError struct {
 	Text string
 	// Start and End give the location of the error.
 	Start, End token.Location
+	// Stack is a human-readable trace of the stack showing the
+	// cause of the syntax error.
+	Stack string
 }
 
 func (e *SyntaxError) Error() string {
@@ -156,12 +160,15 @@ func (s stringStringer) String() string {
 // or a fmt.Stringer.  The syntax error states that the parse wanted
 // the string value of the argument, but got the current token instead.
 func (p *Parser) err(want interface{}, orWant ...interface{}) error {
+	stack := make([]byte, 1024)
+	n := runtime.Stack(stack, false)
 	err := &SyntaxError{
 		Wanted: fmt.Sprintf("%s", want),
 		Got:    p.tok,
 		Text:   p.text(),
 		Start:  p.lex.Start,
 		End:    p.lex.End,
+		Stack:  string(stack[:n]),
 	}
 	for _, w := range orWant {
 		err.Wanted += fmt.Sprintf(" or %s", w)

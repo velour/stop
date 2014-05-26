@@ -16,6 +16,7 @@ import (
 
 var (
 	gv = flag.Bool("gv", false, "displays the tree using graphviz+postscript+gv")
+	v  = flag.Bool("v", false, "display verbose parse errors")
 )
 
 func main() {
@@ -95,6 +96,10 @@ func (es errs) Error() string {
 }
 
 func die(err error) {
-	os.Stdout.WriteString(err.Error() + "\n")
+	str := err.Error()
+	if se, ok := err.(*ast.SyntaxError); *v && ok {
+		str += "\n" + se.Stack
+	}
+	os.Stdout.WriteString(str + "\n")
 	os.Exit(1)
 }
