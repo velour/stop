@@ -83,6 +83,20 @@ func NewParser(lex *token.Lexer) *Parser {
 	return p
 }
 
+func (p *Parser) insertedSemicolon() bool {
+	return p.tok == token.Semicolon && p.lex.Text() != ";"
+}
+
+func (p *Parser) start() token.Location {
+	if p.insertedSemicolon() {
+		// Inserted semicolon starts at the end of the previous token.
+		return p.lex.End
+	}
+	return p.lex.Start
+}
+
+func (p *Parser) end() token.Location { return p.lex.End }
+
 type span struct {
 	start, end token.Location
 }
@@ -93,7 +107,7 @@ func (s *span) End() token.Location   { return s.end }
 
 // Span returns a span for the start and end location of the current token.
 func (p *Parser) span() span {
-	return span{start: p.lex.Start, end: p.lex.End}
+	return span{start: p.start(), end: p.end()}
 }
 
 // Text returns the text of the current token.  The returned value is
@@ -120,7 +134,7 @@ func (p *Parser) next() {
 	p.tok = p.lex.Next()
 	cline := -1
 	for {
-		if cline < p.lex.Start.Line-1 {
+		if cline < p.start().Line-1 {
 			p.cmnts = p.cmnts[:0]
 		}
 		if p.tok != token.Whitespace && p.tok != token.Comment {
@@ -128,7 +142,7 @@ func (p *Parser) next() {
 		}
 		if p.tok == token.Comment {
 			text := p.text()
-			cline = p.lex.End.Line
+			cline = p.end().Line
 			if strings.HasPrefix(text, "//") {
 				// Line comments end on the line following their
 				// text, so subtract one.
@@ -166,8 +180,8 @@ func (p *Parser) err(want interface{}, orWant ...interface{}) error {
 		Wanted: fmt.Sprintf("%s", want),
 		Got:    p.tok,
 		Text:   p.text(),
-		Start:  p.lex.Start,
-		End:    p.lex.End,
+		Start:  p.start(),
+		End:    p.end(),
 		Stack:  string(stack[:n]),
 	}
 	for _, w := range orWant {
