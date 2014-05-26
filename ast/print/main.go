@@ -61,7 +61,6 @@ func dot(root ast.Node) {
 	defer os.Remove(ps)
 
 	pl, err := pipeline.New(
-		exec.Command("tee", "out.dot"),
 		exec.Command("dot", "-o"+ps, "-Tps"),
 		exec.Command("gv", ps),
 	)
