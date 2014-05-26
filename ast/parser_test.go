@@ -62,6 +62,19 @@ func sel(e Expression, ids ...*Identifier) Expression {
 
 func TestParseSourceFile(t *testing.T) {
 	parserTests{
+		{`package main`, &SourceFile{PackageName: *id("main")}},
+		{
+			`
+				package main
+				import "fmt"
+			`,
+			&SourceFile{
+				PackageName: *id("main"),
+				Imports: []ImportDecl{
+					{Imports: []ImportSpec{{Path: *strLit("fmt")}}},
+				},
+			},
+		},
 		{
 			`
 				package main
