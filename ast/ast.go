@@ -19,6 +19,26 @@ type Node interface {
 	End() token.Location
 }
 
+// SourceFile is a node representing a Go source file.
+type SourceFile struct {
+	comments
+	startLoc, endLoc token.Location
+	PackageName      Identifier
+	Imports          []ImportDecl
+	Declarations
+}
+
+func (n *SourceFile) Start() token.Location { return n.PackageName.Start() }
+func (n *SourceFile) End() token.Location {
+	if l := len(n.Declarations); l > 0 {
+		return n.Declarations[l-1].End()
+	}
+	if l := len(n.Imports); l > 0 {
+		return n.Imports[l-1].End()
+	}
+	return n.PackageName.End()
+}
+
 // A Statement is a node representing a statement.
 type Statement interface {
 	Node
@@ -344,6 +364,51 @@ type Declarations []Declaration
 func (n Declarations) Start() token.Location { return n[0].Start() }
 func (n Declarations) End() token.Location   { return n[len(n)-1].End() }
 
+// An ImportDecl is a declaration node representing the declaration of
+// a set of package imports.
+type ImportDecl struct {
+	comments
+	startLoc, endLoc token.Location
+	Imports          []ImportSpec
+}
+
+func (n *ImportDecl) Start() token.Location { return n.startLoc }
+func (n *ImportDecl) End() token.Location   { return n.endLoc }
+
+// An ImportSpec represents the import of a single package.
+type ImportSpec struct {
+	Dot  bool
+	Name *Identifier
+	Path StringLiteral
+}
+
+// A MethodDecl is a declaration node representing a method declaration.
+type MethodDecl struct {
+	comments
+	startLoc     token.Location
+	Receiver     Identifier
+	Pointer      bool
+	BaseTypeName Identifier
+	Name         Identifier
+	Signature
+	Body BlockStmt
+}
+
+func (n *MethodDecl) Start() token.Location { return n.startLoc }
+func (n *MethodDecl) End() token.Location   { return n.Body.End() }
+
+// A FunctionDecl is a declaration node representing a function declaration.
+type FunctionDecl struct {
+	comments
+	startLoc token.Location
+	Name     Identifier
+	Signature
+	Body BlockStmt
+}
+
+func (n *FunctionDecl) Start() token.Location { return n.startLoc }
+func (n *FunctionDecl) End() token.Location   { return n.Body.End() }
+
 // A ConstSpec is a declaration node representing the declaration of
 // a series of constants.
 type ConstSpec struct {
@@ -570,6 +635,17 @@ type Expression interface {
 	// expression may be used.  Loc is used for error reporting.
 	Loc() token.Location
 }
+
+// A FunctionLiteral is an expression node that represents a function literal.
+type FunctionLiteral struct {
+	startLoc token.Location
+	Signature
+	Body BlockStmt
+}
+
+func (n *FunctionLiteral) Loc() token.Location   { return n.startLoc }
+func (n *FunctionLiteral) Start() token.Location { return n.startLoc }
+func (n *FunctionLiteral) End() token.Location   { return n.Body.End() }
 
 // A CompositeLiteral is an expression node that represents a
 // composite literal.

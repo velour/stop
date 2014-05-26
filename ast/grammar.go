@@ -29,9 +29,30 @@ func Parse(p *Parser) (root Node, err error) {
 		}
 
 	}()
-	//	root = parseExpr(p)
-	root = parseDeclarations(p)
-	return
+	return parseSourceFile(p), nil
+}
+
+func parseSourceFile(p *Parser) Node {
+	p.expect(token.Package)
+	s := &SourceFile{comments: p.comments(), startLoc: p.lex.Start}
+	p.next()
+	s.PackageName = *parseIdentifier(p)
+	p.expect(token.Semicolon)
+	p.next()
+
+	for p.tok == token.Import {
+		s.Imports = append(s.Imports, *parseImportDecl(p))
+		p.expect(token.Semicolon)
+		p.next()
+	}
+	for p.tok != token.EOF {
+		decls := parseTopLevelDecl(p)
+		s.Declarations = append(s.Declarations, decls...)
+		p.expect(token.Semicolon)
+		p.next()
+	}
+	s.endLoc = p.lex.Start
+	return s
 }
 
 func parseStatement(p *Parser) Statement {
@@ -695,6 +716,81 @@ func parseAssignmentTail(p *Parser, cmnts comments, exprs []Expression, rangeOK 
 		Op:       op,
 		Left:     exprs,
 		Right:    parseExpressionList(p),
+	}
+}
+
+func parseImportDecl(p *Parser) *ImportDecl {
+	p.expect(token.Import)
+	d := &ImportDecl{comments: p.comments(), startLoc: p.lex.Start}
+	p.next()
+	if p.tok == token.OpenParen {
+		p.next()
+		for p.tok != token.CloseParen {
+			d.Imports = append(d.Imports, parseImportSpec(p))
+			if p.tok == token.Semicolon {
+				p.next()
+			}
+		}
+		p.expect(token.CloseParen)
+		d.endLoc = p.lex.Start
+		p.next()
+		return d
+	}
+	imp := parseImportSpec(p)
+	d.Imports = []ImportSpec{imp}
+	d.endLoc = imp.Path.End()
+	return d
+}
+
+func parseImportSpec(p *Parser) ImportSpec {
+	var s ImportSpec
+	if p.tok == token.Dot {
+		p.next()
+		s.Dot = true
+		s.Path = *parseStringLiteral(p)
+		return s
+	}
+	if p.tok != token.StringLiteral {
+		s.Name = parseIdentifier(p)
+	}
+	s.Path = *parseStringLiteral(p)
+	return s
+}
+
+func parseTopLevelDecl(p *Parser) Declarations {
+	if p.tok == token.Func {
+		return Declarations{parseFunctionOrMethodDecl(p)}
+	}
+	return parseDeclarations(p)
+}
+
+func parseFunctionOrMethodDecl(p *Parser) Declaration {
+	p.expect(token.Func)
+	cmnts := p.comments()
+	l := p.lex.Start
+	p.next()
+	if p.tok == token.OpenParen {
+		p.next()
+		m := &MethodDecl{comments: cmnts, startLoc: l}
+		m.Receiver = *parseIdentifier(p)
+		if p.tok == token.Star {
+			p.next()
+			m.Pointer = true
+		}
+		m.BaseTypeName = *parseIdentifier(p)
+		p.expect(token.CloseParen)
+		p.next()
+		m.Name = *parseIdentifier(p)
+		m.Signature = parseSignature(p)
+		m.Body = *parseBlock(p)
+		return m
+	}
+	return &FunctionDecl{
+		comments:  cmnts,
+		startLoc:  l,
+		Name:      *parseIdentifier(p),
+		Signature: parseSignature(p),
+		Body:      *parseBlock(p),
 	}
 }
 
@@ -1524,7 +1620,8 @@ func parseOperand(p *Parser, typeSwitch bool) Expression {
 	case token.StringLiteral:
 		return parseStringLiteral(p)
 
-	// BUG(eaburns): Function literal
+	case token.Func:
+		return parseFunctionLiteral(p)
 
 	case token.OpenParen:
 		p.next()
@@ -1543,6 +1640,15 @@ func parseOperand(p *Parser, typeSwitch bool) Expression {
 		return parseType(p)
 	}
 	panic(p.err("operand"))
+}
+
+func parseFunctionLiteral(p *Parser) *FunctionLiteral {
+	p.expect(token.Func)
+	f := &FunctionLiteral{startLoc: p.lex.Start}
+	p.next()
+	f.Signature = parseSignature(p)
+	f.Body = *parseBlock(p)
+	return f
 }
 
 func parseLiteralValue(p *Parser) *CompositeLiteral {

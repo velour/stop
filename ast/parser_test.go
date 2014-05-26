@@ -60,6 +60,116 @@ func sel(e Expression, ids ...*Identifier) Expression {
 	return p
 }
 
+func TestParseSourceFile(t *testing.T) {
+	parserTests{
+		{
+			`
+				package main
+				import "fmt"
+				func main() {}
+			`,
+			&SourceFile{
+				PackageName: *id("main"),
+				Imports: []ImportDecl{
+					{Imports: []ImportSpec{{Path: *strLit("fmt")}}},
+				},
+				Declarations: Declarations{
+					&FunctionDecl{
+						Name: *id("main"),
+					},
+				},
+			},
+		},
+	}.run(t, func(p *Parser) Node { return parseSourceFile(p) })
+}
+
+func TestParseImportDecl(t *testing.T) {
+	parserTests{
+		{
+			`import "fmt"`,
+			&ImportDecl{
+				Imports: []ImportSpec{
+					{Path: *strLit("fmt")},
+				},
+			},
+		},
+		{
+			`import . "fmt"`,
+			&ImportDecl{
+				Imports: []ImportSpec{
+					{Dot: true, Path: *strLit("fmt")},
+				},
+			},
+		},
+		{
+			`import f "fmt"`,
+			&ImportDecl{
+				Imports: []ImportSpec{
+					{Name: id("f"), Path: *strLit("fmt")},
+				},
+			},
+		},
+		{
+			`import (
+				"fmt"
+			)`,
+			&ImportDecl{
+				Imports: []ImportSpec{
+					{Path: *strLit("fmt")},
+				},
+			},
+		},
+		{
+			`import (
+				. "fmt"
+			)`,
+			&ImportDecl{
+				Imports: []ImportSpec{
+					{Dot: true, Path: *strLit("fmt")},
+				},
+			},
+		},
+		{
+			`import (
+				f "fmt"
+			)`,
+			&ImportDecl{
+				Imports: []ImportSpec{
+					{Name: id("f"), Path: *strLit("fmt")},
+				},
+			},
+		},
+		{
+			`import (
+				f "fmt"
+				o "os";
+				. "github.com/eaburns/pp"
+				"code.google.com/p/plotinum"
+			)`,
+			&ImportDecl{
+				Imports: []ImportSpec{
+					{Name: id("f"), Path: *strLit("fmt")},
+					{Name: id("o"), Path: *strLit("os")},
+					{Dot: true, Path: *strLit("github.com/eaburns/pp")},
+					{Path: *strLit("code.google.com/p/plotinum")},
+				},
+			},
+		},
+
+		// BUG(eaburns): Semicolons aren't optional unless they are
+		// followed by a close delimiter.
+		{
+			`import ( "fmt" "os" )`,
+			&ImportDecl{
+				Imports: []ImportSpec{
+					{Path: *strLit("fmt")},
+					{Path: *strLit("os")},
+				},
+			},
+		},
+	}.run(t, func(p *Parser) Node { return parseImportDecl(p) })
+}
+
 func TestParseStatements(t *testing.T) {
 	parserTests{
 		{``, nil},
@@ -1034,6 +1144,79 @@ func TestParseSendStmt(t *testing.T) {
 	}.run(t, func(p *Parser) Node { return parseStatement(p) })
 }
 
+func TestParseMethodDecl(t *testing.T) {
+	parserTests{
+		{
+			`func (a b) method(c, d big.Int) big.Int { return c }`,
+			Declarations{
+				&MethodDecl{
+					Receiver:     *a,
+					BaseTypeName: *b,
+					Name:         *id("method"),
+					Signature: Signature{
+						Parameters: ParameterList{
+							Parameters: []ParameterDecl{
+								{Type: bigInt, Identifiers: []Identifier{*c, *d}},
+							},
+						},
+						Result: ParameterList{
+							Parameters: []ParameterDecl{{Type: bigInt}},
+						},
+					},
+					Body: BlockStmt{
+						Statements: []Statement{
+							&ReturnStmt{
+								Expressions: []Expression{c},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			`func (a *b) method() {}`,
+			Declarations{
+				&MethodDecl{
+					Receiver:     *a,
+					Pointer:      true,
+					BaseTypeName: *b,
+					Name:         *id("method"),
+				},
+			},
+		},
+	}.run(t, func(p *Parser) Node { return parseTopLevelDecl(p) })
+}
+
+func TestParseFunctionDecl(t *testing.T) {
+	parserTests{
+		{
+			`func function(a, b big.Int) big.Int { return a }`,
+			Declarations{
+				&FunctionDecl{
+					Name: *id("function"),
+					Signature: Signature{
+						Parameters: ParameterList{
+							Parameters: []ParameterDecl{
+								{Type: bigInt, Identifiers: []Identifier{*a, *b}},
+							},
+						},
+						Result: ParameterList{
+							Parameters: []ParameterDecl{{Type: bigInt}},
+						},
+					},
+					Body: BlockStmt{
+						Statements: []Statement{
+							&ReturnStmt{
+								Expressions: []Expression{a},
+							},
+						},
+					},
+				},
+			},
+		},
+	}.run(t, func(p *Parser) Node { return parseTopLevelDecl(p) })
+}
+
 func TestParseVarDecl(t *testing.T) {
 	parserTests{
 		{
@@ -1105,26 +1288,7 @@ func TestParseVarDecl(t *testing.T) {
 
 		// If there is no type then there must be an expr list.
 		{`var b`, parseError{"expected"}},
-
-		// BUG(eaburns): Semicolons aren't optional unless they are
-		// followed by a close delimiter.
-		{
-			`var (
-				a int = 7 b = 3.14
-			)`,
-			Declarations{
-				&VarSpec{
-					Names:  []Identifier{*a},
-					Type:   id("int"),
-					Values: []Expression{intLit("7")},
-				},
-				&VarSpec{
-					Names:  []Identifier{*b},
-					Values: []Expression{floatLit("3.14")},
-				},
-			},
-		},
-	}.run(t, func(p *Parser) Node { return parseDeclarations(p) })
+	}.run(t, func(p *Parser) Node { return parseTopLevelDecl(p) })
 }
 
 func TestParseConstDecl(t *testing.T) {
@@ -1195,23 +1359,7 @@ func TestParseConstDecl(t *testing.T) {
 				},
 			},
 		},
-
-		// BUG(eaburns): Semicolons aren't optional unless they are
-		// followed by a close delimiter.
-		{
-			`const ( a = b c = d)`,
-			Declarations{
-				&ConstSpec{
-					Names:  []Identifier{*a},
-					Values: []Expression{b},
-				},
-				&ConstSpec{
-					Names:  []Identifier{*c},
-					Values: []Expression{d},
-				},
-			},
-		},
-	}.run(t, func(p *Parser) Node { return parseDeclarations(p) })
+	}.run(t, func(p *Parser) Node { return parseTopLevelDecl(p) })
 }
 
 func TestParseTypeDecl(t *testing.T) {
@@ -1715,6 +1863,108 @@ func TestParseTypeName(t *testing.T) {
 		{`a.b`, sel(a, b)},
 		{`α.b`, sel(id("α"), b)},
 	}.run(t, func(p *Parser) Node { return parseType(p) })
+}
+
+func TestParseFunctionLiteral(t *testing.T) {
+	parserTests{
+		{`func(){}`, &FunctionLiteral{}},
+		{
+			`func()big.Int{}`,
+			&FunctionLiteral{
+				Signature: Signature{
+					ParameterList{},
+					ParameterList{
+						Parameters: []ParameterDecl{
+							{Type: bigInt},
+						},
+					},
+				},
+			},
+		},
+		{
+			`func(a){}`,
+			&FunctionLiteral{
+				Signature: Signature{
+					ParameterList{
+						Parameters: []ParameterDecl{
+							{Type: a},
+						},
+					},
+					ParameterList{},
+				},
+			},
+		},
+		{
+			`func(a b){}`,
+			&FunctionLiteral{
+				Signature: Signature{
+					ParameterList{
+						Parameters: []ParameterDecl{
+							{Type: b, Identifiers: []Identifier{*a}},
+						},
+					},
+					ParameterList{},
+				},
+			},
+		},
+		{
+			`func(a b)big.Int{}`,
+			&FunctionLiteral{
+				Signature: Signature{
+					ParameterList{
+						Parameters: []ParameterDecl{
+							{Type: b, Identifiers: []Identifier{*a}},
+						},
+					},
+					ParameterList{
+						Parameters: []ParameterDecl{
+							{Type: bigInt},
+						},
+					},
+				},
+			},
+		},
+		{
+			`func(){
+				a
+				b
+				c
+			}`,
+			&FunctionLiteral{
+				Body: BlockStmt{
+					Statements: []Statement{aStmt, bStmt, cStmt},
+				},
+			},
+		},
+		{
+			`func(a b)big.Int{
+				a
+				b
+				return c
+			}`,
+			&FunctionLiteral{
+				Signature: Signature{
+					ParameterList{
+						Parameters: []ParameterDecl{
+							{Type: b, Identifiers: []Identifier{*a}},
+						},
+					},
+					ParameterList{
+						Parameters: []ParameterDecl{
+							{Type: bigInt},
+						},
+					},
+				},
+				Body: BlockStmt{
+					Statements: []Statement{
+						aStmt,
+						bStmt,
+						&ReturnStmt{Expressions: []Expression{c}},
+					},
+				},
+			},
+		},
+	}.run(t, func(p *Parser) Node { return parseExpr(p) })
 }
 
 func TestParseCompositeLiteral(t *testing.T) {
