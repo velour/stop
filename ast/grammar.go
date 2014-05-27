@@ -10,9 +10,6 @@ import (
 
 // Parse returns the root of an abstract syntax tree for the Go language
 // or an error if one is encountered.
-//
-// BUG(eaburns): This is currently just for testing since it doesn't
-// parse the top-level production.
 func Parse(p *Parser) (root Node, err error) {
 	defer func() {
 		r := recover()
@@ -34,7 +31,7 @@ func Parse(p *Parser) (root Node, err error) {
 
 func parseSourceFile(p *Parser) Node {
 	p.expect(token.Package)
-	s := &SourceFile{comments: p.comments(), startLoc: p.lex.Start}
+	s := &SourceFile{comments: p.comments(), startLoc: p.start()}
 	p.next()
 	s.PackageName = *parseIdentifier(p)
 	p.expect(token.Semicolon)
@@ -57,7 +54,7 @@ func parseSourceFile(p *Parser) Node {
 		p.expect(token.Semicolon)
 		p.next()
 	}
-	s.endLoc = p.lex.Start
+	s.endLoc = p.start()
 	return s
 }
 
@@ -85,7 +82,7 @@ func parseStatement(p *Parser) Statement {
 		return parseGoto(p)
 
 	case token.Fallthrough:
-		c, s, e := p.comments(), p.lex.Start, p.lex.End
+		c, s, e := p.comments(), p.start(), p.end()
 		p.next()
 		return &FallthroughStmt{
 			comments: c,
@@ -118,7 +115,7 @@ func parseSelect(p *Parser) Statement {
 	p.expect(token.Select)
 	s := &Select{
 		comments: p.comments(),
-		startLoc: p.lex.Start,
+		startLoc: p.start(),
 	}
 	p.next()
 	p.expect(token.OpenBrace)
@@ -127,7 +124,7 @@ func parseSelect(p *Parser) Statement {
 		s.Cases = append(s.Cases, parseCommCase(p))
 	}
 	p.expect(token.CloseBrace)
-	s.endLoc = p.lex.Start
+	s.endLoc = p.start()
 	p.next()
 	return s
 }
@@ -204,7 +201,7 @@ func parseRecvStmtTail(p *Parser, cmnts comments, left []Expression) Statement {
 
 func parseSwitch(p *Parser) Statement {
 	p.expect(token.Switch)
-	loc := p.lex.Start
+	loc := p.start()
 	cmnts := p.comments()
 	p.next()
 
@@ -287,7 +284,7 @@ func parseExprSwitchBlock(p *Parser, loc token.Location, cmnts comments,
 		sw.Cases = append(sw.Cases, parseExprCase(p))
 	}
 	p.expect(token.CloseBrace)
-	sw.endLoc = p.lex.Start
+	sw.endLoc = p.start()
 	p.next()
 	return sw
 }
@@ -323,7 +320,7 @@ func parseTypeSwitchBlock(p *Parser, loc token.Location, cmnts comments,
 		sw.Cases = append(sw.Cases, parseTypeCase(p))
 	}
 	p.expect(token.CloseBrace)
-	sw.endLoc = p.lex.Start
+	sw.endLoc = p.start()
 	p.next()
 	return sw
 }
@@ -372,7 +369,7 @@ type rangeClause struct {
 }
 
 func parseFor(p *Parser) Statement {
-	f := &ForStmt{comments: p.comments(), startLoc: p.lex.Start}
+	f := &ForStmt{comments: p.comments(), startLoc: p.start()}
 	p.expect(token.For)
 	p.next()
 
@@ -412,7 +409,7 @@ func parseFor(p *Parser) Statement {
 }
 
 func parseIf(p *Parser) Statement {
-	ifst := &IfStmt{comments: p.comments(), startLoc: p.lex.Start}
+	ifst := &IfStmt{comments: p.comments(), startLoc: p.start()}
 	p.expect(token.If)
 	p.next()
 
@@ -447,7 +444,7 @@ func parseIf(p *Parser) Statement {
 
 func parseBlock(p *Parser) *BlockStmt {
 	p.expect(token.OpenBrace)
-	c, s := p.comments(), p.lex.Start
+	c, s := p.comments(), p.start()
 	p.next()
 	var stmts []Statement
 	for p.tok != token.CloseBrace {
@@ -462,7 +459,7 @@ func parseBlock(p *Parser) *BlockStmt {
 		p.next()
 	}
 	p.expect(token.CloseBrace)
-	e := p.lex.End
+	e := p.end()
 	p.next()
 	return &BlockStmt{
 		comments:   c,
@@ -474,7 +471,7 @@ func parseBlock(p *Parser) *BlockStmt {
 
 func parseGo(p *Parser) Statement {
 	p.expect(token.Go)
-	c, s := p.comments(), p.lex.Start
+	c, s := p.comments(), p.start()
 	p.next()
 	return &GoStmt{
 		comments:   c,
@@ -485,7 +482,7 @@ func parseGo(p *Parser) Statement {
 
 func parseDefer(p *Parser) Statement {
 	p.expect(token.Defer)
-	c, s := p.comments(), p.lex.Start
+	c, s := p.comments(), p.start()
 	p.next()
 	return &DeferStmt{
 		comments:   c,
@@ -496,7 +493,7 @@ func parseDefer(p *Parser) Statement {
 
 func parseReturn(p *Parser) Statement {
 	p.expect(token.Return)
-	c, s, e := p.comments(), p.lex.Start, p.lex.End
+	c, s, e := p.comments(), p.start(), p.end()
 	p.next()
 	var exprs []Expression
 	if expressionFirst[p.tok] {
@@ -513,7 +510,7 @@ func parseReturn(p *Parser) Statement {
 
 func parseGoto(p *Parser) Statement {
 	p.expect(token.Goto)
-	c, s := p.comments(), p.lex.Start
+	c, s := p.comments(), p.start()
 	p.next()
 	return &GotoStmt{
 		comments: c,
@@ -524,7 +521,7 @@ func parseGoto(p *Parser) Statement {
 
 func parseContinue(p *Parser) Statement {
 	p.expect(token.Continue)
-	c, s := p.comments(), p.lex.Start
+	c, s := p.comments(), p.start()
 	p.next()
 	var l *Identifier
 	if p.tok == token.Identifier {
@@ -539,7 +536,7 @@ func parseContinue(p *Parser) Statement {
 
 func parseBreak(p *Parser) Statement {
 	p.expect(token.Break)
-	c, s := p.comments(), p.lex.Start
+	c, s := p.comments(), p.start()
 	p.next()
 	var l *Identifier
 	if p.tok == token.Identifier {
@@ -624,7 +621,7 @@ func parseSimpleStmt(p *Parser, opts options) (st Statement) {
 		}
 
 	case p.tok == token.MinusMinus || p.tok == token.PlusPlus:
-		op, opEnd := p.tok, p.lex.End
+		op, opEnd := p.tok, p.end()
 		p.next()
 		return &IncDecStmt{
 			comments:   cmnts,
@@ -733,7 +730,7 @@ func parseAssignmentTail(p *Parser, cmnts comments, exprs []Expression, rangeOK 
 
 func parseImportDecl(p *Parser) *ImportDecl {
 	p.expect(token.Import)
-	d := &ImportDecl{comments: p.comments(), startLoc: p.lex.Start}
+	d := &ImportDecl{comments: p.comments(), startLoc: p.start()}
 	p.next()
 	if p.tok == token.OpenParen {
 		p.next()
@@ -747,7 +744,7 @@ func parseImportDecl(p *Parser) *ImportDecl {
 			p.next()
 		}
 		p.expect(token.CloseParen)
-		d.endLoc = p.lex.Start
+		d.endLoc = p.start()
 		p.next()
 		return d
 	}
@@ -782,7 +779,7 @@ func parseTopLevelDecl(p *Parser) Declarations {
 func parseFunctionOrMethodDecl(p *Parser) Declaration {
 	p.expect(token.Func)
 	cmnts := p.comments()
-	l := p.lex.Start
+	l := p.start()
 	p.next()
 	if p.tok == token.OpenParen {
 		p.next()
@@ -970,7 +967,7 @@ func parseType(p *Parser) Type {
 		return parseTypeName(p)
 
 	case token.Star:
-		starLoc := p.lex.Start
+		starLoc := p.start()
 		p.next()
 		return &Star{Target: parseType(p), starLoc: starLoc}
 
@@ -981,7 +978,7 @@ func parseType(p *Parser) Type {
 		return parseStructType(p)
 
 	case token.Func:
-		l := p.lex.Start
+		l := p.start()
 		p.next()
 		return &FunctionType{
 			Signature: parseSignature(p),
@@ -1012,7 +1009,7 @@ func parseType(p *Parser) Type {
 
 func parseStructType(p *Parser) *StructType {
 	p.expect(token.Struct)
-	st := &StructType{keywordLoc: p.lex.Start}
+	st := &StructType{keywordLoc: p.start()}
 	p.next()
 	p.expect(token.OpenBrace)
 	p.next()
@@ -1028,7 +1025,7 @@ func parseStructType(p *Parser) *StructType {
 	}
 
 	p.expect(token.CloseBrace)
-	st.closeLoc = p.lex.Start
+	st.closeLoc = p.start()
 	p.next()
 	return st
 }
@@ -1038,7 +1035,7 @@ func parseFieldDecl(p *Parser) FieldDecl {
 
 	d := FieldDecl{}
 	if p.tok == token.Star {
-		l := p.lex.Start
+		l := p.start()
 		p.next()
 		d.Type = &Star{Target: parseTypeName(p), starLoc: l}
 		goto tag
@@ -1047,7 +1044,7 @@ func parseFieldDecl(p *Parser) FieldDecl {
 	id = parseIdentifier(p)
 	switch p.tok {
 	case token.Dot:
-		l := p.lex.Start
+		l := p.start()
 		p.next()
 		d.Type = &Selector{
 			Parent: id,
@@ -1083,7 +1080,7 @@ tag:
 
 func parseInterfaceType(p *Parser) *InterfaceType {
 	p.expect(token.Interface)
-	it := &InterfaceType{keywordLoc: p.lex.Start}
+	it := &InterfaceType{keywordLoc: p.start()}
 	p.next()
 	p.expect(token.OpenBrace)
 	p.next()
@@ -1098,7 +1095,7 @@ func parseInterfaceType(p *Parser) *InterfaceType {
 			})
 
 		case token.Dot:
-			l := p.lex.Start
+			l := p.start()
 			p.next()
 			it.Methods = append(it.Methods, &Selector{
 				Parent: id,
@@ -1117,7 +1114,7 @@ func parseInterfaceType(p *Parser) *InterfaceType {
 	}
 
 	p.expect(token.CloseBrace)
-	it.closeLoc = p.lex.Start
+	it.closeLoc = p.start()
 	p.next()
 	return it
 }
@@ -1168,11 +1165,11 @@ func parseSignature(p *Parser) Signature {
 // 	| Identifier
 func parseParameterList(p *Parser) ParameterList {
 	p.expect(token.OpenParen)
-	pl := ParameterList{openLoc: p.lex.Start}
+	pl := ParameterList{openLoc: p.start()}
 	p.next()
 	parseParameterListTail(p, &pl, nil)
 	p.expect(token.CloseParen)
-	pl.closeLoc = p.lex.Start
+	pl.closeLoc = p.start()
 	p.next()
 	return pl
 }
@@ -1180,7 +1177,7 @@ func parseParameterList(p *Parser) ParameterList {
 func parseParameterListTail(p *Parser, pl *ParameterList, idents []Identifier) {
 	switch {
 	case p.tok == token.CloseParen:
-		pl.closeLoc = p.lex.Start
+		pl.closeLoc = p.start()
 		pl.Parameters = typeNameDecls(idents)
 		return
 
@@ -1195,7 +1192,7 @@ func parseParameterListTail(p *Parser, pl *ParameterList, idents []Identifier) {
 			return
 
 		case p.tok == token.Dot:
-			l := p.lex.Start
+			l := p.start()
 			p.next()
 			t := &Selector{
 				Parent: id,
@@ -1305,7 +1302,7 @@ func typeNameDecls(idents []Identifier) []ParameterDecl {
 }
 
 func parseChannelType(p *Parser) Type {
-	ch := &ChannelType{Send: true, Receive: true, startLoc: p.lex.Start}
+	ch := &ChannelType{Send: true, Receive: true, startLoc: p.start()}
 	if p.tok == token.LessMinus {
 		ch.Send = false
 		p.next()
@@ -1322,7 +1319,7 @@ func parseChannelType(p *Parser) Type {
 
 func parseMapType(p *Parser) Type {
 	p.expect(token.Map)
-	m := &MapType{mapLoc: p.lex.Start}
+	m := &MapType{mapLoc: p.start()}
 	p.next()
 	p.expect(token.OpenBracket)
 	p.next()
@@ -1337,7 +1334,7 @@ func parseMapType(p *Parser) Type {
 // array with a size specified a "..." token, otherwise it will require a size.
 func parseArrayOrSliceType(p *Parser, dotDotDot bool) Type {
 	p.expect(token.OpenBracket)
-	openLoc := p.lex.Start
+	openLoc := p.start()
 	p.next()
 
 	if p.tok == token.CloseBracket {
@@ -1361,7 +1358,7 @@ func parseTypeName(p *Parser) Type {
 	p.expect(token.Identifier)
 	n := parseIdentifier(p)
 	if p.tok == token.Dot {
-		l := p.lex.Start
+		l := p.start()
 		p.next()
 		return &Selector{
 			Parent: n,
@@ -1406,9 +1403,6 @@ var (
 
 	// Binary op precedence for precedence climbing algorithm.
 	// http://www.engr.mun.ca/~theo/Misc/exp_parsing.htm
-	//
-	// BUG(eaburns): Define tokens.NTokens and change
-	// map[token.Token]Whatever to [nTokens]Whatever.
 	precedence = map[token.Token]int{
 		token.OrOr:           1,
 		token.AndAnd:         2,
@@ -1466,7 +1460,7 @@ func parseBinaryExpr(p *Parser, prec int, typeSwitch bool) Expression {
 		if !ok || pr < prec {
 			return left
 		}
-		op, opLoc := p.tok, p.lex.Start
+		op, opLoc := p.tok, p.start()
 		p.next()
 		right := parseBinaryExpr(p, pr+1, false)
 		left = &BinaryOp{
@@ -1480,7 +1474,7 @@ func parseBinaryExpr(p *Parser, prec int, typeSwitch bool) Expression {
 
 func parseUnaryExpr(p *Parser, typeSwitch bool) Expression {
 	if unary[p.tok] {
-		op, opLoc := p.tok, p.lex.Start
+		op, opLoc := p.tok, p.start()
 		p.next()
 		operand := parseUnaryExpr(p, false)
 		if op == token.Star {
@@ -1522,7 +1516,7 @@ func parsePrimaryExpr(p *Parser, typeSwitch bool) Expression {
 
 func parseSliceOrIndex(p *Parser, left Expression) Expression {
 	p.expect(token.OpenBracket)
-	openLoc := p.lex.Start
+	openLoc := p.start()
 	p.next()
 
 	if p.tok == token.Colon {
@@ -1537,7 +1531,7 @@ func parseSliceOrIndex(p *Parser, left Expression) Expression {
 	case token.CloseBracket:
 		index := &Index{Expression: left, Index: e, openLoc: openLoc}
 		p.expect(token.CloseBracket)
-		index.closeLoc = p.lex.End
+		index.closeLoc = p.end()
 		p.next()
 		return index
 
@@ -1567,14 +1561,14 @@ func parseSliceHighMax(p *Parser, left, low Expression) *Slice {
 		}
 	}
 	p.expect(token.CloseBracket)
-	sl.closeLoc = p.lex.Start
+	sl.closeLoc = p.start()
 	p.next()
 	return sl
 }
 
 func parseCall(p *Parser, left Expression) Expression {
 	p.expect(token.OpenParen)
-	c := &Call{Function: left, openLoc: p.lex.Start}
+	c := &Call{Function: left, openLoc: p.start()}
 	p.next()
 	if p.tok != token.CloseParen {
 		c.Arguments = parseExpressionList(p)
@@ -1584,7 +1578,7 @@ func parseCall(p *Parser, left Expression) Expression {
 		}
 	}
 	p.expect(token.CloseParen)
-	c.closeLoc = p.lex.End
+	c.closeLoc = p.end()
 	p.next()
 	return c
 }
@@ -1669,7 +1663,7 @@ func parseOperand(p *Parser, typeSwitch bool) Expression {
 
 func parseFunctionLiteral(p *Parser) *FunctionLiteral {
 	p.expect(token.Func)
-	f := &FunctionLiteral{startLoc: p.lex.Start}
+	f := &FunctionLiteral{startLoc: p.start()}
 	p.next()
 	f.Signature = parseSignature(p)
 	f.Body = *parseBlock(p)
@@ -1678,7 +1672,7 @@ func parseFunctionLiteral(p *Parser) *FunctionLiteral {
 
 func parseLiteralValue(p *Parser) *CompositeLiteral {
 	p.expect(token.OpenBrace)
-	v := &CompositeLiteral{openLoc: p.lex.Start}
+	v := &CompositeLiteral{openLoc: p.start()}
 	p.next()
 
 	for p.tok != token.CloseBrace {
@@ -1691,7 +1685,7 @@ func parseLiteralValue(p *Parser) *CompositeLiteral {
 	}
 
 	p.expect(token.CloseBrace)
-	v.closeLoc = p.lex.Start
+	v.closeLoc = p.start()
 	p.next()
 	return v
 }
@@ -1718,7 +1712,7 @@ func parseElement(p *Parser) Element {
 
 func parseSelectorOrTypeAssertion(p *Parser, left Expression, typeSwitch bool) Expression {
 	p.expect(token.Dot)
-	dotLoc := p.lex.Start
+	dotLoc := p.start()
 	p.next()
 
 	switch p.tok {
@@ -1731,7 +1725,7 @@ func parseSelectorOrTypeAssertion(p *Parser, left Expression, typeSwitch bool) E
 			t.Type = parseType(p)
 		}
 		p.expect(token.CloseParen)
-		t.closeLoc = p.lex.Start
+		t.closeLoc = p.start()
 		p.next()
 		return t
 
@@ -1761,8 +1755,8 @@ func parseIntegerLiteral(p *Parser) Expression {
 	panic(&MalformedLiteral{
 		Type:  "integer literal",
 		Text:  p.text(),
-		Start: p.lex.Start,
-		End:   p.lex.End,
+		Start: p.start(),
+		End:   p.end(),
 	})
 }
 
@@ -1778,8 +1772,8 @@ func parseFloatLiteral(p *Parser) Expression {
 	panic(&MalformedLiteral{
 		Type:  "float literal",
 		Text:  p.text(),
-		Start: p.lex.Start,
-		End:   p.lex.End,
+		Start: p.start(),
+		End:   p.end(),
 	})
 }
 
@@ -1801,8 +1795,8 @@ func parseImaginaryLiteral(p *Parser) Expression {
 	panic(&MalformedLiteral{
 		Type:  "imaginary literal",
 		Text:  p.text(),
-		Start: p.lex.Start,
-		End:   p.lex.End,
+		Start: p.start(),
+		End:   p.end(),
 	})
 }
 
@@ -1843,8 +1837,8 @@ func parseRuneLiteral(p *Parser) Expression {
 		panic(&MalformedLiteral{
 			Type:  "rune literal",
 			Text:  p.text(),
-			Start: p.lex.Start,
-			End:   p.lex.End,
+			Start: p.start(),
+			End:   p.end(),
 		})
 	}
 	l := &RuneLiteral{Value: r, span: p.span()}

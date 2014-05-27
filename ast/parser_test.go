@@ -2,6 +2,8 @@ package ast
 
 import (
 	"bytes"
+	"go/parser"
+	stdtoken "go/token"
 	"math/big"
 	"reflect"
 	"regexp"
@@ -9,6 +11,7 @@ import (
 
 	"github.com/eaburns/eq"
 	"github.com/eaburns/pp"
+	"github.com/velour/stop/test"
 	"github.com/velour/stop/token"
 )
 
@@ -177,7 +180,7 @@ func TestParseImportDecl(t *testing.T) {
 				},
 			},
 		},
-		{`import ( "fmt" "os" )`, parseError{"Semicolon"}},
+		{`import ( "fmt" "os" )`, parseError{";"}},
 	}.run(t, func(p *Parser) Node { return parseImportDecl(p) })
 }
 
@@ -208,7 +211,7 @@ func TestParseStatements(t *testing.T) {
 				},
 			},
 		},
-		{`{continue break}`, parseError{"Semicolon"}},
+		{`{continue break}`, parseError{";"}},
 	}.run(t, func(p *Parser) Node { return parseStatement(p) })
 }
 
@@ -351,9 +354,9 @@ func TestParseSelect(t *testing.T) {
 		{`select{ case a, a() := <- b: c() }`, parseError{":="}},
 
 		// Only a receive expression can appear in a receive statement.
-		{`select{ case a := b: c() }`, parseError{"LessMinus"}},
-		{`select{ case a = b: c() }`, parseError{"LessMinus"}},
-		{`select{ case a, b = *d: c() }`, parseError{"LessMinus"}},
+		{`select{ case a := b: c() }`, parseError{"<-"}},
+		{`select{ case a = b: c() }`, parseError{"<-"}},
+		{`select{ case a, b = *d: c() }`, parseError{"<-"}},
 	}.run(t, func(p *Parser) Node { return parseStatement(p) })
 }
 
@@ -1398,7 +1401,7 @@ func TestParseTypeDecl(t *testing.T) {
 				&TypeSpec{Name: *b, Type: &StructType{}},
 			},
 		},
-		{`type ( a big.Int b struct{} )`, parseError{"Semicolon"}},
+		{`type ( a big.Int b struct{} )`, parseError{";"}},
 	}.run(t, func(p *Parser) Node { return parseDeclarations(p) })
 }
 
@@ -1543,7 +1546,7 @@ func TestParseStructType(t *testing.T) {
 			},
 			},
 		},
-		{`struct {a int b int}`, parseError{"Semicolon"}},
+		{`struct {a int b int}`, parseError{";"}},
 	}.run(t, func(p *Parser) Node { return parseType(p) })
 }
 
@@ -1571,7 +1574,7 @@ func TestParseInterfaceType(t *testing.T) {
 				},
 			},
 		},
-		{`interface{ a() b()}`, parseError{"Semicolon"}},
+		{`interface{ a() b()}`, parseError{";"}},
 	}.run(t, func(p *Parser) Node { return parseType(p) })
 }
 
@@ -2154,8 +2157,8 @@ func TestParsePrimaryExpr(t *testing.T) {
 		{`a[:b:]`, parseError{"expected operand"}},
 		{`a[::b]`, parseError{"expected operand"}},
 		{`a[5`, parseError{"expected"}},
-		{`a.`, parseError{"expected.*OpenParen or Identifier"}},
-		{`a[4`, parseError{"expected.*CloseBracket or Colon"}},
+		{`a.`, parseError{"expected.*\\( or Identifier"}},
+		{`a[4`, parseError{"expected.*\\] or :"}},
 
 		// Disallow type switch guards outside of a type switch.
 		{`a.(type)`, parseError{"type"}},
@@ -2401,4 +2404,24 @@ func TestComments(t *testing.T) {
 		{"// a\na\n// b\n\n// c\nb", [][]string{{"// a"}, {"// c"}}},
 	}
 	tests.run(t)
+}
+
+func BenchmarkParser(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		p := NewParser(token.NewLexer("", test.Prog))
+		_, err := Parse(p)
+		if err != nil {
+			b.Fatalf("parse error: %s", err)
+		}
+	}
+}
+
+func BenchmarkStandardLibraryParser(b *testing.B) {
+	fset := stdtoken.NewFileSet()
+	for i := 0; i < b.N; i++ {
+		_, err := parser.ParseFile(fset, "", test.Prog, 0)
+		if err != nil {
+			b.Fatalf("parse error: %s", err)
+		}
+	}
 }
