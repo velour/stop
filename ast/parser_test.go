@@ -63,6 +63,253 @@ func sel(e Expression, ids ...*Identifier) Expression {
 	return p
 }
 
+// These are freebie examples given to us right from the Go spec itself.
+func TestParseSpecExamples(t *testing.T) {
+	t1, t2, t3, t4 := id("T1"), id("T2"), id("T3"), id("T4")
+	parserTests{
+		{`type T1 string`, Declarations{&TypeSpec{Name: *t1, Type: id("string")}}},
+		{`type T2 T1`, Declarations{&TypeSpec{Name: *t2, Type: t1}}},
+		{`type T3 []T1`, Declarations{&TypeSpec{Name: *t3, Type: &SliceType{Type: t1}}}},
+		{`type T4 T3`, Declarations{&TypeSpec{Name: *t4, Type: t3}}},
+	}.run(t, func(p *Parser) Node { return parseDeclarations(p) })
+
+	parserTests{
+		{`[32]byte`, &ArrayType{Size: intLit("32"), Type: id("byte")}},
+		{
+			`[2*N] struct { x, y int32 }`,
+			&ArrayType{
+				Size: binOp(token.Star, intLit("2"), id("N")),
+				Type: &StructType{
+					Fields: []FieldDecl{
+						{Identifiers: []Identifier{*x, *y}, Type: id("int32")},
+					},
+				},
+			},
+		},
+		{
+			`[1000]*float64`,
+			&ArrayType{Size: intLit("1000"), Type: &Star{Target: id("float64")}},
+		},
+		{
+			`[3][5]int`,
+			&ArrayType{
+				Size: intLit("3"),
+				Type: &ArrayType{Size: intLit("5"), Type: id("int")},
+			},
+		},
+		{
+			`[2][2][2]float64`,
+			&ArrayType{
+				Size: intLit("2"),
+				Type: &ArrayType{
+					Size: intLit("2"),
+					Type: &ArrayType{
+						Size: intLit("2"),
+						Type: id("float64"),
+					},
+				},
+			},
+		},
+		{
+			`[2]([2]([2]float64))`,
+			&ArrayType{
+				Size: intLit("2"),
+				Type: &ArrayType{
+					Size: intLit("2"),
+					Type: &ArrayType{
+						Size: intLit("2"),
+						Type: id("float64"),
+					},
+				},
+			},
+		},
+		{`struct {}`, &StructType{}},
+		{
+			`struct {
+				x, y int
+				u float32
+				_ float32  // padding
+				A *[]int
+				F func()
+			}`,
+			&StructType{
+				Fields: []FieldDecl{
+					{Identifiers: []Identifier{*x, *y}, Type: id("int")},
+					{Identifiers: []Identifier{*id("u")}, Type: id("float32")},
+					{Identifiers: []Identifier{*id("_")}, Type: id("float32")},
+					{
+						Identifiers: []Identifier{*id("A")},
+						Type:        &Star{Target: &SliceType{Type: id("int")}},
+					},
+					{
+						Identifiers: []Identifier{*id("F")},
+						Type:        &FunctionType{},
+					},
+				},
+			},
+		},
+		{
+			`struct {
+				T1        // field name is T1
+				*T2       // field name is T2
+				P.T3      // field name is T3
+				*P.T4     // field name is T4
+				x, y int  // field names are x and y
+			}`,
+			&StructType{
+				Fields: []FieldDecl{
+					{Type: t1},
+					{Type: &Star{Target: t2}},
+					{Type: sel(id("P"), t3).(Type)},
+					{Type: &Star{Target: sel(id("P"), t4).(Type)}},
+					{Identifiers: []Identifier{*x, *y}, Type: id("int")},
+				},
+			},
+		},
+		{
+			// Illegal, but it should parse.
+			`struct {
+				T     // conflicts with anonymous field *T and *P.T
+				*T    // conflicts with anonymous field T and *P.T
+				*P.T  // conflicts with anonymous field T and *T
+			}`,
+			&StructType{
+				Fields: []FieldDecl{
+					{Type: id("T")},
+					{Type: &Star{Target: id("T")}},
+					{Type: &Star{Target: sel(id("P"), id("T")).(Type)}},
+				},
+			},
+		},
+		{
+			`struct {
+				microsec  uint64 "field 1"
+				serverIP6 uint64 "field 2"
+				process   string "field 3"
+			}`,
+			&StructType{
+				Fields: []FieldDecl{
+					{
+						Identifiers: []Identifier{*id("microsec")},
+						Type:        id("uint64"),
+						Tag:         strLit("field 1"),
+					},
+					{
+						Identifiers: []Identifier{*id("serverIP6")},
+						Type:        id("uint64"),
+						Tag:         strLit("field 2"),
+					},
+					{
+						Identifiers: []Identifier{*id("process")},
+						Type:        id("string"),
+						Tag:         strLit("field 3"),
+					},
+				},
+			},
+		},
+		{`*Point`, &Star{Target: id("Point")}},
+		{`*[4]int`, &Star{Target: &ArrayType{Size: intLit("4"), Type: id("int")}}},
+		{`func()`, &FunctionType{}},
+		{
+			`func(x int) int`,
+			&FunctionType{Signature: Signature{
+				Parameters: ParameterList{Parameters: []ParameterDecl{
+					{Identifiers: []Identifier{*x}, Type: id("int")},
+				}},
+				Result: ParameterList{Parameters: []ParameterDecl{
+					{Type: id("int")},
+				}},
+			}},
+		},
+		{
+			`func(a, _ int, z float32) bool`,
+			&FunctionType{Signature: Signature{
+				Parameters: ParameterList{Parameters: []ParameterDecl{
+					{Identifiers: []Identifier{*a, *id("_")}, Type: id("int")},
+					{Identifiers: []Identifier{*z}, Type: id("float32")},
+				}},
+				Result: ParameterList{Parameters: []ParameterDecl{
+					{Type: id("bool")},
+				}},
+			}},
+		},
+		{
+			`func(a, b int, z float32) (bool)`,
+			&FunctionType{Signature: Signature{
+				Parameters: ParameterList{Parameters: []ParameterDecl{
+					{Identifiers: []Identifier{*a, *b}, Type: id("int")},
+					{Identifiers: []Identifier{*z}, Type: id("float32")},
+				}},
+				Result: ParameterList{Parameters: []ParameterDecl{
+					{Type: id("bool")},
+				}},
+			}},
+		},
+		{
+			`func(prefix string, values ...int)`,
+			&FunctionType{Signature: Signature{
+				Parameters: ParameterList{Parameters: []ParameterDecl{
+					{Identifiers: []Identifier{*id("prefix")}, Type: id("string")},
+					{
+						Identifiers: []Identifier{*id("values")},
+						DotDotDot:   true,
+						Type:        id("int"),
+					},
+				}},
+			}},
+		},
+		{
+			`func(a, b int, z float64, opt ...interface{}) (success bool)`,
+			&FunctionType{Signature: Signature{
+				Parameters: ParameterList{Parameters: []ParameterDecl{
+					{Identifiers: []Identifier{*a, *b}, Type: id("int")},
+					{Identifiers: []Identifier{*z}, Type: id("float64")},
+					{
+						Identifiers: []Identifier{*id("opt")},
+						DotDotDot:   true,
+						Type:        &InterfaceType{},
+					},
+				}},
+				Result: ParameterList{Parameters: []ParameterDecl{
+					{Identifiers: []Identifier{*id("success")}, Type: id("bool")},
+				}},
+			}},
+		},
+		{
+			`func(int, int, float64) (float64, *[]int)`,
+			&FunctionType{Signature: Signature{
+				Parameters: ParameterList{Parameters: []ParameterDecl{
+					{Type: id("int")}, {Type: id("int")}, {Type: id("float64")},
+				}},
+				Result: ParameterList{Parameters: []ParameterDecl{
+					{Type: id("float64")},
+					{Type: &Star{Target: &SliceType{Type: id("int")}}},
+				}},
+			}},
+		},
+		{
+			`func(n int) func(p *T)`,
+			&FunctionType{Signature: Signature{
+				Parameters: ParameterList{Parameters: []ParameterDecl{
+					{Identifiers: []Identifier{*id("n")}, Type: id("int")},
+				}},
+				Result: ParameterList{Parameters: []ParameterDecl{
+					{
+						Type: &FunctionType{Signature: Signature{
+							Parameters: ParameterList{Parameters: []ParameterDecl{
+								{
+									Identifiers: []Identifier{*id("p")},
+									Type:        &Star{Target: id("T")},
+								},
+							}},
+						}},
+					},
+				}},
+			}},
+		},
+	}.run(t, func(p *Parser) Node { return parseType(p) })
+}
+
 func TestParseSourceFile(t *testing.T) {
 	parserTests{
 		{`package main`, &SourceFile{PackageName: *id("main")}},
