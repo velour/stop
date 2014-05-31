@@ -467,6 +467,7 @@ func (n *StructType) typeNode()             {}
 
 // A FieldDecl is a node representing a struct field declaration.
 type FieldDecl struct {
+	// BUG(eaburns): Rename this to Names. Same with any other "Identifiers" fields.
 	Identifiers []Identifier
 	Type        Type
 	Tag         *StringLiteral
