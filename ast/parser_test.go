@@ -72,12 +72,183 @@ func sel(e Expression, ids ...*Identifier) Expression {
 
 // These are freebie examples given to us right from the Go spec itself.
 func TestParseSpecExamples(t *testing.T) {
-	t1, t2, t3, t4 := id("T1"), id("T2"), id("T3"), id("T4")
+	t0, t1, t2, t3, t4, t5 := id("T0"), id("T1"), id("T2"), id("T3"), id("T4"), id("T5")
 	parserTests{
 		{`type T1 string`, Declarations{&TypeSpec{Name: *t1, Type: id("string")}}},
 		{`type T2 T1`, Declarations{&TypeSpec{Name: *t2, Type: t1}}},
 		{`type T3 []T1`, Declarations{&TypeSpec{Name: *t3, Type: &SliceType{Type: t1}}}},
 		{`type T4 T3`, Declarations{&TypeSpec{Name: *t4, Type: t3}}},
+		{
+			`type Lock interface {
+				Lock()
+				Unlock()
+			}`,
+			Declarations{
+				&TypeSpec{
+					Name: *id("Lock"),
+					Type: &InterfaceType{Methods: []Node{
+						&Method{Name: *id("Lock")},
+						&Method{Name: *id("Unlock")},
+					}},
+				},
+			},
+		},
+		{
+			`type ReadWrite interface {
+				Read(b Buffer) bool
+				Write(b Buffer) bool
+			}`,
+			Declarations{
+				&TypeSpec{
+					Name: *id("ReadWrite"),
+					Type: &InterfaceType{Methods: []Node{
+						&Method{
+							Name: *id("Read"),
+							Signature: Signature{
+								Parameters: ParameterList{Parameters: []ParameterDecl{
+									{Identifiers: ids("b"), Type: id("Buffer")},
+								}},
+								Result: ParameterList{Parameters: []ParameterDecl{
+									{Type: id("bool")},
+								}},
+							},
+						},
+						&Method{
+							Name: *id("Write"),
+							Signature: Signature{
+								Parameters: ParameterList{Parameters: []ParameterDecl{
+									{Identifiers: ids("b"), Type: id("Buffer")},
+								}},
+								Result: ParameterList{Parameters: []ParameterDecl{
+									{Type: id("bool")},
+								}},
+							},
+						},
+					}},
+				},
+			},
+		},
+		{
+			`type File interface {
+				ReadWrite
+				Lock
+				Close()
+			}`,
+			Declarations{
+				&TypeSpec{
+					Name: *id("File"),
+					Type: &InterfaceType{Methods: []Node{
+						id("ReadWrite"),
+						id("Lock"),
+						&Method{Name: *id("Close")},
+					}},
+				},
+			},
+		},
+		{
+			`type (
+				T0 []string
+				T1 []string
+				T2 struct{ a, b int }
+				T3 struct{ a, c int }
+				T4 func(int, float64) *T0
+				T5 func(x int, y float64) *[]string
+			)`,
+			Declarations{
+				&TypeSpec{Name: *t0, Type: &SliceType{Type: id("string")}},
+				&TypeSpec{Name: *t1, Type: &SliceType{Type: id("string")}},
+				&TypeSpec{
+					Name: *t2,
+					Type: &StructType{Fields: []FieldDecl{
+						{Identifiers: ids("a", "b"), Type: id("int")},
+					}},
+				},
+				&TypeSpec{
+					Name: *t3,
+					Type: &StructType{Fields: []FieldDecl{
+						{Identifiers: ids("a", "c"), Type: id("int")},
+					}},
+				},
+				&TypeSpec{
+					Name: *t4,
+					Type: &FunctionType{Signature: Signature{
+						Parameters: ParameterList{Parameters: []ParameterDecl{
+							{Type: id("int")}, {Type: id("float64")},
+						}},
+						Result: ParameterList{Parameters: []ParameterDecl{
+							{Type: &Star{Target: t0}},
+						}},
+					}},
+				},
+				&TypeSpec{
+					Name: *t5,
+					Type: &FunctionType{Signature: Signature{
+						Parameters: ParameterList{Parameters: []ParameterDecl{
+							{Identifiers: ids("x"), Type: id("int")},
+							{Identifiers: ids("y"), Type: id("float64")},
+						}},
+						Result: ParameterList{Parameters: []ParameterDecl{
+							{Type: &Star{Target: &SliceType{Type: id("string")}}},
+						}},
+					}},
+				},
+			},
+		},
+		{
+			`const Pi float64 = 3.14159265358979323846`,
+			Declarations{
+				&ConstSpec{
+					Type:   id("float64"),
+					Names:  ids("Pi"),
+					Values: []Expression{floatLit("3.14159265358979323846")},
+				},
+			},
+		},
+		{
+			`const zero = 0.0`,
+			Declarations{
+				&ConstSpec{
+					Names:  ids("zero"),
+					Values: []Expression{floatLit("0.0")},
+				},
+			},
+		},
+		{
+			`const (
+				size int64 = 1024
+				eof        = -1
+			)`,
+			Declarations{
+				&ConstSpec{
+					Type:   id("int64"),
+					Names:  ids("size"),
+					Values: []Expression{intLit("1024")},
+				},
+				&ConstSpec{
+					Names:  ids("eof"),
+					Values: []Expression{unOp(token.Minus, intLit("1"))},
+				},
+			},
+		},
+		{
+			`const a, b, c = 3, 4, "foo"`,
+			Declarations{
+				&ConstSpec{
+					Names:  ids("a", "b", "c"),
+					Values: []Expression{intLit("3"), intLit("4"), strLit("foo")},
+				},
+			},
+		},
+		{
+			`const u, v float32 = 0, 3`,
+			Declarations{
+				&ConstSpec{
+					Type:   id("float32"),
+					Names:  ids("u", "v"),
+					Values: []Expression{intLit("0"), intLit("3")},
+				},
+			},
+		},
 	}.run(t, func(p *Parser) Node { return parseDeclarations(p) })
 
 	parserTests{
@@ -313,6 +484,82 @@ func TestParseSpecExamples(t *testing.T) {
 					},
 				}},
 			}},
+		},
+		{
+			`interface {
+				Read(b Buffer) bool
+				Write(b Buffer) bool
+				Close()
+			}`,
+			&InterfaceType{Methods: []Node{
+				&Method{
+					Name: *id("Read"),
+					Signature: Signature{
+						Parameters: ParameterList{Parameters: []ParameterDecl{
+							{Identifiers: ids("b"), Type: id("Buffer")},
+						}},
+						Result: ParameterList{Parameters: []ParameterDecl{
+							{Type: id("bool")},
+						}},
+					},
+				},
+				&Method{
+					Name: *id("Write"),
+					Signature: Signature{
+						Parameters: ParameterList{Parameters: []ParameterDecl{
+							{Identifiers: ids("b"), Type: id("Buffer")},
+						}},
+						Result: ParameterList{Parameters: []ParameterDecl{
+							{Type: id("bool")},
+						}},
+					},
+				},
+				&Method{Name: *id("Close")},
+			}},
+		},
+		{`interface{}`, &InterfaceType{}},
+		{`map[string]int`, &MapType{Key: id("string"), Value: id("int")}},
+		{
+			`map[*T]struct{ x, y float64 }`,
+			&MapType{
+				Key: &Star{Target: id("T")},
+				Value: &StructType{Fields: []FieldDecl{
+					{Identifiers: ids("x", "y"), Type: id("float64")},
+				}},
+			},
+		},
+		{`map[string]interface{}`, &MapType{Key: id("string"), Value: &InterfaceType{}}},
+		{`chan T`, &ChannelType{Send: true, Receive: true, Type: id("T")}},
+		{`chan<- float64`, &ChannelType{Send: true, Type: id("float64")}},
+		{`<-chan int`, &ChannelType{Receive: true, Type: id("int")}},
+		{
+			`chan<- chan int`,
+			&ChannelType{
+				Send: true,
+				Type: &ChannelType{Send: true, Receive: true, Type: id("int")},
+			},
+		},
+		{
+			`chan<- <-chan int`,
+			&ChannelType{
+				Send: true,
+				Type: &ChannelType{Receive: true, Type: id("int")},
+			},
+		},
+		{
+			`<-chan <-chan int`,
+			&ChannelType{
+				Receive: true,
+				Type:    &ChannelType{Receive: true, Type: id("int")},
+			},
+		},
+		{
+			`chan (<-chan int)`,
+			&ChannelType{
+				Send:    true,
+				Receive: true,
+				Type:    &ChannelType{Receive: true, Type: id("int")},
+			},
 		},
 	}.run(t, func(p *Parser) Node { return parseType(p) })
 }
