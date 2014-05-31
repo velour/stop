@@ -467,15 +467,14 @@ func (n *StructType) typeNode()             {}
 
 // A FieldDecl is a node representing a struct field declaration.
 type FieldDecl struct {
-	// BUG(eaburns): Rename this to Names. Same with any other "Identifiers" fields.
-	Identifiers []Identifier
-	Type        Type
-	Tag         *StringLiteral
+	Names []Identifier
+	Type  Type
+	Tag   *StringLiteral
 }
 
 func (n *FieldDecl) Start() token.Location {
-	if len(n.Identifiers) > 0 {
-		return n.Identifiers[0].Start()
+	if len(n.Names) > 0 {
+		return n.Names[0].Start()
 	}
 	return n.Type.Start()
 }
@@ -547,15 +546,15 @@ func (n *ParameterList) End() token.Location   { return n.closeLoc }
 // A ParameterDecl is a node representing the declaration of a set
 // of parameters of a common type.
 type ParameterDecl struct {
-	Type        Type
-	Identifiers []Identifier
+	Type  Type
+	Names []Identifier
 	// DotDotDot is true if the final identifier was followed by a "...".
 	DotDotDot bool
 }
 
 func (n *ParameterDecl) Start() token.Location {
-	if len(n.Identifiers) > 0 {
-		return n.Identifiers[0].Start()
+	if len(n.Names) > 0 {
+		return n.Names[0].Start()
 	}
 	return n.Type.Start()
 }

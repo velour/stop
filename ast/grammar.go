@@ -1063,11 +1063,11 @@ func parseFieldDecl(p *Parser) FieldDecl {
 		return d
 	}
 
-	d.Identifiers = []Identifier{*id}
+	d.Names = []Identifier{*id}
 	for p.tok == token.Comma {
 		p.next()
 		id := parseIdentifier(p)
-		d.Identifiers = append(d.Identifiers, *id)
+		d.Names = append(d.Names, *id)
 	}
 	d.Type = parseType(p)
 
@@ -1206,7 +1206,7 @@ func parseParameterListTail(p *Parser, pl *ParameterList, idents []Identifier) {
 
 		default:
 			idents = append(idents, *id)
-			d := ParameterDecl{Identifiers: idents}
+			d := ParameterDecl{Names: idents}
 			if p.tok == token.DotDotDot {
 				d.DotDotDot = true
 				p.next()
@@ -1276,7 +1276,7 @@ func parseDeclParameterList(p *Parser, pl *ParameterList) {
 	d := ParameterDecl{}
 	for {
 		id := parseIdentifier(p)
-		d.Identifiers = append(d.Identifiers, *id)
+		d.Names = append(d.Names, *id)
 
 		if p.tok != token.Comma {
 			break
