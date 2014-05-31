@@ -1661,7 +1661,7 @@ func TestParseType(t *testing.T) {
 		{`[](a)`, &SliceType{Type: a}},
 		{`[]*(a)`, &SliceType{Type: &Star{Target: a}}},
 		{`*[](a)`, &Star{Target: &SliceType{Type: a}}},
-		{`map[a]b`, &MapType{Key: a, Type: b}},
+		{`map[a]b`, &MapType{Key: a, Value: b}},
 
 		{`[]func()`, &SliceType{Type: &FunctionType{}}},
 		{
@@ -2090,11 +2090,11 @@ func TestParseChannelType(t *testing.T) {
 
 func TestParseMapType(t *testing.T) {
 	parserTests{
-		{`map[int]a`, &MapType{Key: id("int"), Type: a}},
-		{`map[*int]a.b`, &MapType{Key: &Star{Target: id("int")}, Type: sel(a, b).(Type)}},
+		{`map[int]a`, &MapType{Key: id("int"), Value: a}},
+		{`map[*int]a.b`, &MapType{Key: &Star{Target: id("int")}, Value: sel(a, b).(Type)}},
 		{`map[*int]map[string]int]`, &MapType{
-			Key:  &Star{Target: id("int")},
-			Type: &MapType{Key: id("string"), Type: id("int")},
+			Key:   &Star{Target: id("int")},
+			Value: &MapType{Key: id("string"), Value: id("int")},
 		}},
 	}.run(t, func(p *Parser) Node { return parseType(p) })
 }
