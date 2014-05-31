@@ -45,7 +45,14 @@ func floatLit(s string) *FloatLiteral {
 	return &FloatLiteral{Value: &r}
 }
 
-func id(s string) *Identifier                         { return &Identifier{Name: s} }
+func id(s string) *Identifier { return &Identifier{Name: s} }
+func ids(ss ...string) []Identifier {
+	ids := make([]Identifier, len(ss))
+	for i, s := range ss {
+		ids[i] = *id(s)
+	}
+	return ids
+}
 func unOp(op token.Token, l Expression) *UnaryOp      { return &UnaryOp{Op: op, Operand: l} }
 func binOp(op token.Token, l, r Expression) *BinaryOp { return &BinaryOp{Op: op, Left: l, Right: r} }
 func call(f Expression, ddd bool, args ...Expression) *Call {
@@ -81,7 +88,7 @@ func TestParseSpecExamples(t *testing.T) {
 				Size: binOp(token.Star, intLit("2"), id("N")),
 				Type: &StructType{
 					Fields: []FieldDecl{
-						{Identifiers: []Identifier{*x, *y}, Type: id("int32")},
+						{Identifiers: ids("x", "y"), Type: id("int32")},
 					},
 				},
 			},
@@ -134,15 +141,15 @@ func TestParseSpecExamples(t *testing.T) {
 			}`,
 			&StructType{
 				Fields: []FieldDecl{
-					{Identifiers: []Identifier{*x, *y}, Type: id("int")},
-					{Identifiers: []Identifier{*id("u")}, Type: id("float32")},
-					{Identifiers: []Identifier{*id("_")}, Type: id("float32")},
+					{Identifiers: ids("x", "y"), Type: id("int")},
+					{Identifiers: ids("u"), Type: id("float32")},
+					{Identifiers: ids("_"), Type: id("float32")},
 					{
-						Identifiers: []Identifier{*id("A")},
+						Identifiers: ids("A"),
 						Type:        &Star{Target: &SliceType{Type: id("int")}},
 					},
 					{
-						Identifiers: []Identifier{*id("F")},
+						Identifiers: ids("F"),
 						Type:        &FunctionType{},
 					},
 				},
@@ -162,7 +169,7 @@ func TestParseSpecExamples(t *testing.T) {
 					{Type: &Star{Target: t2}},
 					{Type: sel(id("P"), t3).(Type)},
 					{Type: &Star{Target: sel(id("P"), t4).(Type)}},
-					{Identifiers: []Identifier{*x, *y}, Type: id("int")},
+					{Identifiers: ids("x", "y"), Type: id("int")},
 				},
 			},
 		},
@@ -190,17 +197,17 @@ func TestParseSpecExamples(t *testing.T) {
 			&StructType{
 				Fields: []FieldDecl{
 					{
-						Identifiers: []Identifier{*id("microsec")},
+						Identifiers: ids("microsec"),
 						Type:        id("uint64"),
 						Tag:         strLit("field 1"),
 					},
 					{
-						Identifiers: []Identifier{*id("serverIP6")},
+						Identifiers: ids("serverIP6"),
 						Type:        id("uint64"),
 						Tag:         strLit("field 2"),
 					},
 					{
-						Identifiers: []Identifier{*id("process")},
+						Identifiers: ids("process"),
 						Type:        id("string"),
 						Tag:         strLit("field 3"),
 					},
@@ -214,7 +221,7 @@ func TestParseSpecExamples(t *testing.T) {
 			`func(x int) int`,
 			&FunctionType{Signature: Signature{
 				Parameters: ParameterList{Parameters: []ParameterDecl{
-					{Identifiers: []Identifier{*x}, Type: id("int")},
+					{Identifiers: ids("x"), Type: id("int")},
 				}},
 				Result: ParameterList{Parameters: []ParameterDecl{
 					{Type: id("int")},
@@ -225,8 +232,8 @@ func TestParseSpecExamples(t *testing.T) {
 			`func(a, _ int, z float32) bool`,
 			&FunctionType{Signature: Signature{
 				Parameters: ParameterList{Parameters: []ParameterDecl{
-					{Identifiers: []Identifier{*a, *id("_")}, Type: id("int")},
-					{Identifiers: []Identifier{*z}, Type: id("float32")},
+					{Identifiers: ids("a", "_"), Type: id("int")},
+					{Identifiers: ids("z"), Type: id("float32")},
 				}},
 				Result: ParameterList{Parameters: []ParameterDecl{
 					{Type: id("bool")},
@@ -237,8 +244,8 @@ func TestParseSpecExamples(t *testing.T) {
 			`func(a, b int, z float32) (bool)`,
 			&FunctionType{Signature: Signature{
 				Parameters: ParameterList{Parameters: []ParameterDecl{
-					{Identifiers: []Identifier{*a, *b}, Type: id("int")},
-					{Identifiers: []Identifier{*z}, Type: id("float32")},
+					{Identifiers: ids("a", "b"), Type: id("int")},
+					{Identifiers: ids("z"), Type: id("float32")},
 				}},
 				Result: ParameterList{Parameters: []ParameterDecl{
 					{Type: id("bool")},
@@ -249,9 +256,9 @@ func TestParseSpecExamples(t *testing.T) {
 			`func(prefix string, values ...int)`,
 			&FunctionType{Signature: Signature{
 				Parameters: ParameterList{Parameters: []ParameterDecl{
-					{Identifiers: []Identifier{*id("prefix")}, Type: id("string")},
+					{Identifiers: ids("prefix"), Type: id("string")},
 					{
-						Identifiers: []Identifier{*id("values")},
+						Identifiers: ids("values"),
 						DotDotDot:   true,
 						Type:        id("int"),
 					},
@@ -262,16 +269,16 @@ func TestParseSpecExamples(t *testing.T) {
 			`func(a, b int, z float64, opt ...interface{}) (success bool)`,
 			&FunctionType{Signature: Signature{
 				Parameters: ParameterList{Parameters: []ParameterDecl{
-					{Identifiers: []Identifier{*a, *b}, Type: id("int")},
-					{Identifiers: []Identifier{*z}, Type: id("float64")},
+					{Identifiers: ids("a", "b"), Type: id("int")},
+					{Identifiers: ids("z"), Type: id("float64")},
 					{
-						Identifiers: []Identifier{*id("opt")},
+						Identifiers: ids("opt"),
 						DotDotDot:   true,
 						Type:        &InterfaceType{},
 					},
 				}},
 				Result: ParameterList{Parameters: []ParameterDecl{
-					{Identifiers: []Identifier{*id("success")}, Type: id("bool")},
+					{Identifiers: ids("success"), Type: id("bool")},
 				}},
 			}},
 		},
@@ -291,14 +298,14 @@ func TestParseSpecExamples(t *testing.T) {
 			`func(n int) func(p *T)`,
 			&FunctionType{Signature: Signature{
 				Parameters: ParameterList{Parameters: []ParameterDecl{
-					{Identifiers: []Identifier{*id("n")}, Type: id("int")},
+					{Identifiers: ids("n"), Type: id("int")},
 				}},
 				Result: ParameterList{Parameters: []ParameterDecl{
 					{
 						Type: &FunctionType{Signature: Signature{
 							Parameters: ParameterList{Parameters: []ParameterDecl{
 								{
-									Identifiers: []Identifier{*id("p")},
+									Identifiers: ids("p"),
 									Type:        &Star{Target: id("T")},
 								},
 							}},
@@ -638,7 +645,7 @@ func TestParseSwitch(t *testing.T) {
 			`switch a := b; c {}`,
 			&ExprSwitch{
 				Initialization: &ShortVarDecl{
-					Left:  []Identifier{*a},
+					Left:  ids("a"),
 					Right: []Expression{b},
 				},
 				Expression: c,
@@ -648,7 +655,7 @@ func TestParseSwitch(t *testing.T) {
 			`switch a, b := b, a; c {}`,
 			&ExprSwitch{
 				Initialization: &ShortVarDecl{
-					Left:  []Identifier{*a, *b},
+					Left:  ids("a", "b"),
 					Right: []Expression{b, a},
 				},
 				Expression: c,
@@ -658,7 +665,7 @@ func TestParseSwitch(t *testing.T) {
 			`switch a, b := b, a; a(b, c) {}`,
 			&ExprSwitch{
 				Initialization: &ShortVarDecl{
-					Left:  []Identifier{*a, *b},
+					Left:  ids("a", "b"),
 					Right: []Expression{b, a},
 				},
 				Expression: call(a, false, b, c),
@@ -891,7 +898,7 @@ func TestParseFor(t *testing.T) {
 			`for a := 1; b; a++ { c }`,
 			&ForStmt{
 				Initialization: &ShortVarDecl{
-					Left:  []Identifier{*a},
+					Left:  ids("a"),
 					Right: []Expression{intLit("1")},
 				},
 				Condition: b,
@@ -911,7 +918,7 @@ func TestParseFor(t *testing.T) {
 			`for a := 1; ; a++ { c }`,
 			&ForStmt{
 				Initialization: &ShortVarDecl{
-					Left:  []Identifier{*a},
+					Left:  ids("a"),
 					Right: []Expression{intLit("1")},
 				},
 				Post:  &IncDecStmt{Op: token.PlusPlus, Expression: a},
@@ -922,7 +929,7 @@ func TestParseFor(t *testing.T) {
 			`for a := 1; b; { c }`,
 			&ForStmt{
 				Initialization: &ShortVarDecl{
-					Left:  []Identifier{*a},
+					Left:  ids("a"),
 					Right: []Expression{intLit("1")},
 				},
 				Condition: b,
@@ -939,7 +946,7 @@ func TestParseFor(t *testing.T) {
 			`for a := range b { c }`,
 			&ForStmt{
 				Range: &ShortVarDecl{
-					Left:  []Identifier{*a},
+					Left:  ids("a"),
 					Right: []Expression{b},
 				},
 				Block: BlockStmt{Statements: []Statement{cStmt}},
@@ -949,7 +956,7 @@ func TestParseFor(t *testing.T) {
 			`for a, b := range c { d }`,
 			&ForStmt{
 				Range: &ShortVarDecl{
-					Left:  []Identifier{*a, *b},
+					Left:  ids("a", "b"),
 					Right: []Expression{c},
 				},
 				Block: BlockStmt{Statements: []Statement{dStmt}},
@@ -1152,7 +1159,7 @@ func TestParseDeclarationStmt(t *testing.T) {
 			&DeclarationStmt{
 				Declarations: Declarations{
 					&ConstSpec{
-						Names:  []Identifier{*a},
+						Names:  ids("a"),
 						Values: []Expression{intLit("5")},
 					},
 				},
@@ -1164,7 +1171,7 @@ func TestParseDeclarationStmt(t *testing.T) {
 				Declarations: Declarations{
 					&ConstSpec{
 						Type:   bigInt,
-						Names:  []Identifier{*a},
+						Names:  ids("a"),
 						Values: []Expression{intLit("5")},
 					},
 				},
@@ -1180,15 +1187,15 @@ func TestParseDeclarationStmt(t *testing.T) {
 				Declarations: Declarations{
 					&VarSpec{
 						Type:   bigInt,
-						Names:  []Identifier{*a, *b},
+						Names:  ids("a", "b"),
 						Values: []Expression{intLit("5"), intLit("6")},
 					},
 					&VarSpec{
-						Names:  []Identifier{*c},
+						Names:  ids("c"),
 						Values: []Expression{intLit("7")},
 					},
 					&VarSpec{
-						Names:  []Identifier{*d},
+						Names:  ids("d"),
 						Values: []Expression{floatLit("8.0")},
 					},
 				},
@@ -1217,7 +1224,7 @@ func TestParseLabeledStmt(t *testing.T) {
 				Statement: &LabeledStmt{
 					Label: *id("there"),
 					Statement: &ShortVarDecl{
-						Left:  []Identifier{*a},
+						Left:  ids("a"),
 						Right: []Expression{b},
 					},
 				},
@@ -1231,14 +1238,14 @@ func TestParseShortVarDecl(t *testing.T) {
 		{
 			`a := 5`,
 			&ShortVarDecl{
-				Left:  []Identifier{*a},
+				Left:  ids("a"),
 				Right: []Expression{intLit("5")},
 			},
 		},
 		{
 			`a, b := 5, 6`,
 			&ShortVarDecl{
-				Left:  []Identifier{*a, *b},
+				Left:  ids("a", "b"),
 				Right: []Expression{intLit("5"), intLit("6")},
 			},
 		},
@@ -1416,7 +1423,7 @@ func TestParseMethodDecl(t *testing.T) {
 					Signature: Signature{
 						Parameters: ParameterList{
 							Parameters: []ParameterDecl{
-								{Type: bigInt, Identifiers: []Identifier{*c, *d}},
+								{Type: bigInt, Identifiers: ids("c", "d")},
 							},
 						},
 						Result: ParameterList{
@@ -1457,7 +1464,7 @@ func TestParseFunctionDecl(t *testing.T) {
 					Signature: Signature{
 						Parameters: ParameterList{
 							Parameters: []ParameterDecl{
-								{Type: bigInt, Identifiers: []Identifier{*a, *b}},
+								{Type: bigInt, Identifiers: ids("a", "b")},
 							},
 						},
 						Result: ParameterList{
@@ -1482,14 +1489,14 @@ func TestParseVarDecl(t *testing.T) {
 		{
 			`var a big.Int`,
 			Declarations{
-				&VarSpec{Names: []Identifier{*a}, Type: bigInt},
+				&VarSpec{Names: ids("a"), Type: bigInt},
 			},
 		},
 		{
 			`var a int = 5`,
 			Declarations{
 				&VarSpec{
-					Names:  []Identifier{*a},
+					Names:  ids("a"),
 					Type:   id("int"),
 					Values: []Expression{intLit("5")},
 				},
@@ -1499,7 +1506,7 @@ func TestParseVarDecl(t *testing.T) {
 			`var a, b int = 5, 6`,
 			Declarations{
 				&VarSpec{
-					Names:  []Identifier{*a, *b},
+					Names:  ids("a", "b"),
 					Type:   id("int"),
 					Values: []Expression{intLit("5"), intLit("6")},
 				},
@@ -1512,12 +1519,12 @@ func TestParseVarDecl(t *testing.T) {
 			)`,
 			Declarations{
 				&VarSpec{
-					Names:  []Identifier{*a},
+					Names:  ids("a"),
 					Type:   id("int"),
 					Values: []Expression{intLit("7")},
 				},
 				&VarSpec{
-					Names:  []Identifier{*b},
+					Names:  ids("b"),
 					Values: []Expression{floatLit("3.14")},
 				},
 			},
@@ -1530,16 +1537,16 @@ func TestParseVarDecl(t *testing.T) {
 			)`,
 			Declarations{
 				&VarSpec{
-					Names:  []Identifier{*a},
+					Names:  ids("a"),
 					Type:   id("int"),
 					Values: []Expression{intLit("7")},
 				},
 				&VarSpec{
-					Names:  []Identifier{*b, *c, *d},
+					Names:  ids("b", "c", "d"),
 					Values: []Expression{intLit("12"), intLit("13"), intLit("14")},
 				},
 				&VarSpec{
-					Names:  []Identifier{*x, *y, *z},
+					Names:  ids("x", "y", "z"),
 					Type:   id("float64"),
 					Values: []Expression{floatLit("3.0"), floatLit("4.0"), floatLit("5.0")},
 				},
@@ -1556,20 +1563,20 @@ func TestParseConstDecl(t *testing.T) {
 		{
 			`const a`,
 			Declarations{
-				&ConstSpec{Names: []Identifier{*a}},
+				&ConstSpec{Names: ids("a")},
 			},
 		},
 		{
 			`const a big.Int`,
 			Declarations{
-				&ConstSpec{Names: []Identifier{*a}, Type: bigInt},
+				&ConstSpec{Names: ids("a"), Type: bigInt},
 			},
 		},
 		{
 			`const a int = 5`,
 			Declarations{
 				&ConstSpec{
-					Names:  []Identifier{*a},
+					Names:  ids("a"),
 					Type:   id("int"),
 					Values: []Expression{intLit("5")},
 				},
@@ -1579,7 +1586,7 @@ func TestParseConstDecl(t *testing.T) {
 			`const a, b int = 5, 6`,
 			Declarations{
 				&ConstSpec{
-					Names:  []Identifier{*a, *b},
+					Names:  ids("a", "b"),
 					Type:   id("int"),
 					Values: []Expression{intLit("5"), intLit("6")},
 				},
@@ -1592,11 +1599,11 @@ func TestParseConstDecl(t *testing.T) {
 			)`,
 			Declarations{
 				&ConstSpec{
-					Names:  []Identifier{*a},
+					Names:  ids("a"),
 					Type:   id("int"),
 					Values: []Expression{intLit("7")},
 				},
-				&ConstSpec{Names: []Identifier{*b}},
+				&ConstSpec{Names: ids("b")},
 			},
 		},
 		{
@@ -1607,13 +1614,13 @@ func TestParseConstDecl(t *testing.T) {
 			)`,
 			Declarations{
 				&ConstSpec{
-					Names:  []Identifier{*a},
+					Names:  ids("a"),
 					Type:   id("int"),
 					Values: []Expression{intLit("7")},
 				},
-				&ConstSpec{Names: []Identifier{*b, *c, *d}},
+				&ConstSpec{Names: ids("b", "c", "d")},
 				&ConstSpec{
-					Names:  []Identifier{*x, *y, *z},
+					Names:  ids("x", "y", "z"),
 					Type:   id("float64"),
 					Values: []Expression{floatLit("3.0"), floatLit("4.0"), floatLit("5.0")},
 				},
@@ -1713,15 +1720,15 @@ func TestParseStructType(t *testing.T) {
 			{Type: c},
 		}}},
 		{`struct{a, b c}`, &StructType{Fields: []FieldDecl{
-			{Identifiers: []Identifier{*a, *b}, Type: c},
+			{Identifiers: ids("a", "b"), Type: c},
 		}}},
 		{`struct{a b; c}`, &StructType{Fields: []FieldDecl{
-			{Identifiers: []Identifier{*a}, Type: b},
+			{Identifiers: ids("a"), Type: b},
 			{Type: c},
 		}}},
 		{`struct{a; b c}`, &StructType{Fields: []FieldDecl{
 			{Type: a},
-			{Identifiers: []Identifier{*b}, Type: c},
+			{Identifiers: ids("b"), Type: c},
 		}}},
 		{`struct{big.Int}`, &StructType{Fields: []FieldDecl{
 			{Type: bigInt},
@@ -1732,11 +1739,11 @@ func TestParseStructType(t *testing.T) {
 		}}},
 		{`struct{big.Int; a b}`, &StructType{Fields: []FieldDecl{
 			{Type: bigInt},
-			{Identifiers: []Identifier{*a}, Type: b},
+			{Identifiers: ids("a"), Type: b},
 		}}},
 		{`struct{big.Int; a big.Int}`, &StructType{Fields: []FieldDecl{
 			{Type: bigInt},
-			{Identifiers: []Identifier{*a}, Type: bigInt},
+			{Identifiers: ids("a"), Type: bigInt},
 		}}},
 		{`struct{*big.Int}`, &StructType{Fields: []FieldDecl{
 			{Type: &Star{Target: bigInt}},
@@ -1768,7 +1775,7 @@ func TestParseStructType(t *testing.T) {
 			{Type: b},
 		}}},
 		{`struct{a b "your it"}`, &StructType{Fields: []FieldDecl{
-			{Identifiers: []Identifier{*a}, Type: b, Tag: strLit("your it")},
+			{Identifiers: ids("a"), Type: b, Tag: strLit("your it")},
 		}}},
 
 		// Trailing ;
@@ -1788,8 +1795,8 @@ func TestParseStructType(t *testing.T) {
 		{
 			`struct {a int; b int}`,
 			&StructType{Fields: []FieldDecl{
-				{Identifiers: []Identifier{*a}, Type: id("int")},
-				{Identifiers: []Identifier{*b}, Type: id("int")},
+				{Identifiers: ids("a"), Type: id("int")},
+				{Identifiers: ids("b"), Type: id("int")},
 			},
 			},
 		},
@@ -1983,38 +1990,38 @@ func TestParseParameterList(t *testing.T) {
 		{
 			`(a, b c)`,
 			&ParameterList{Parameters: []ParameterDecl{
-				{Identifiers: []Identifier{*a, *b}, Type: c},
+				{Identifiers: ids("a", "b"), Type: c},
 			}},
 		},
 		{
 			`(a, b ...c)`,
 			&ParameterList{Parameters: []ParameterDecl{
-				{Identifiers: []Identifier{*a, *b}, Type: c, DotDotDot: true},
+				{Identifiers: ids("a", "b"), Type: c, DotDotDot: true},
 			}},
 		},
 		{
 			`(a, b big.Int)`,
 			&ParameterList{Parameters: []ParameterDecl{
-				{Identifiers: []Identifier{*a, *b}, Type: bigInt.(Type)},
+				{Identifiers: ids("a", "b"), Type: bigInt.(Type)},
 			}},
 		},
 		{
 			`(a, b []int)`,
 			&ParameterList{Parameters: []ParameterDecl{
-				{Identifiers: []Identifier{*a, *b}, Type: &SliceType{Type: id("int")}},
+				{Identifiers: ids("a", "b"), Type: &SliceType{Type: id("int")}},
 			}},
 		},
 		{
 			`(a, b ...[]int)`,
 			&ParameterList{Parameters: []ParameterDecl{
-				{Identifiers: []Identifier{*a, *b}, Type: &SliceType{Type: id("int")}, DotDotDot: true},
+				{Identifiers: ids("a", "b"), Type: &SliceType{Type: id("int")}, DotDotDot: true},
 			}},
 		},
 		{
 			`(a, b []int, c, d ...[]int)`,
 			&ParameterList{Parameters: []ParameterDecl{
-				{Identifiers: []Identifier{*a, *b}, Type: &SliceType{Type: id("int")}},
-				{Identifiers: []Identifier{*c, *d}, Type: &SliceType{Type: id("int")}, DotDotDot: true},
+				{Identifiers: ids("a", "b"), Type: &SliceType{Type: id("int")}},
+				{Identifiers: ids("c", "d"), Type: &SliceType{Type: id("int")}, DotDotDot: true},
 			}},
 		},
 
@@ -2038,14 +2045,14 @@ func TestParseParameterList(t *testing.T) {
 		{
 			`(a, b []int,)`,
 			&ParameterList{Parameters: []ParameterDecl{
-				{Identifiers: []Identifier{*a, *b}, Type: &SliceType{Type: id("int")}},
+				{Identifiers: ids("a", "b"), Type: &SliceType{Type: id("int")}},
 			}},
 		},
 		{
 			`(a, b []int, c, d ...[]int,)`,
 			&ParameterList{Parameters: []ParameterDecl{
-				{Identifiers: []Identifier{*a, *b}, Type: &SliceType{Type: id("int")}},
-				{Identifiers: []Identifier{*c, *d}, Type: &SliceType{Type: id("int")}, DotDotDot: true},
+				{Identifiers: ids("a", "b"), Type: &SliceType{Type: id("int")}},
+				{Identifiers: ids("c", "d"), Type: &SliceType{Type: id("int")}, DotDotDot: true},
 			}},
 		},
 
@@ -2053,8 +2060,8 @@ func TestParseParameterList(t *testing.T) {
 		{
 			`(int float64, float64 int)`,
 			&ParameterList{Parameters: []ParameterDecl{
-				{Identifiers: []Identifier{*id("int")}, Type: id("float64")},
-				{Identifiers: []Identifier{*id("float64")}, Type: id("int")},
+				{Identifiers: ids("int"), Type: id("float64")},
+				{Identifiers: ids("float64"), Type: id("int")},
 			}},
 		},
 
@@ -2178,7 +2185,7 @@ func TestParseFunctionLiteral(t *testing.T) {
 				Signature: Signature{
 					ParameterList{
 						Parameters: []ParameterDecl{
-							{Type: b, Identifiers: []Identifier{*a}},
+							{Type: b, Identifiers: ids("a")},
 						},
 					},
 					ParameterList{},
@@ -2191,7 +2198,7 @@ func TestParseFunctionLiteral(t *testing.T) {
 				Signature: Signature{
 					ParameterList{
 						Parameters: []ParameterDecl{
-							{Type: b, Identifiers: []Identifier{*a}},
+							{Type: b, Identifiers: ids("a")},
 						},
 					},
 					ParameterList{
@@ -2224,7 +2231,7 @@ func TestParseFunctionLiteral(t *testing.T) {
 				Signature: Signature{
 					ParameterList{
 						Parameters: []ParameterDecl{
-							{Type: b, Identifiers: []Identifier{*a}},
+							{Type: b, Identifiers: ids("a")},
 						},
 					},
 					ParameterList{
@@ -2249,7 +2256,7 @@ func TestParseCompositeLiteral(t *testing.T) {
 	parserTests{
 		{`struct{ a int }{ a: 4 }`, &CompositeLiteral{
 			Type: &StructType{Fields: []FieldDecl{
-				{Identifiers: []Identifier{*a}, Type: id("int")},
+				{Identifiers: ids("a"), Type: id("int")},
 			}},
 			Elements: []Element{
 				{Key: a, Value: intLit("4")},
@@ -2257,7 +2264,7 @@ func TestParseCompositeLiteral(t *testing.T) {
 		}},
 		{`struct{ a, b int }{ a: 4, b: 5}`, &CompositeLiteral{
 			Type: &StructType{Fields: []FieldDecl{
-				{Identifiers: []Identifier{*a, *b}, Type: id("int")},
+				{Identifiers: ids("a", "b"), Type: id("int")},
 			}},
 			Elements: []Element{
 				{Key: a, Value: intLit("4")},
@@ -2266,7 +2273,7 @@ func TestParseCompositeLiteral(t *testing.T) {
 		}},
 		{`struct{ a []int }{ a: { 4, 5 } }`, &CompositeLiteral{
 			Type: &StructType{Fields: []FieldDecl{
-				{Identifiers: []Identifier{*a}, Type: &SliceType{Type: id("int")}},
+				{Identifiers: ids("a"), Type: &SliceType{Type: id("int")}},
 			}},
 			Elements: []Element{
 				{Key: a, Value: &CompositeLiteral{
@@ -2293,7 +2300,7 @@ func TestParseCompositeLiteral(t *testing.T) {
 		// Trailing ,
 		{`struct{ a, b int }{ a: 4, b: 5,}`, &CompositeLiteral{
 			Type: &StructType{Fields: []FieldDecl{
-				{Identifiers: []Identifier{*a, *b}, Type: id("int")},
+				{Identifiers: ids("a", "b"), Type: id("int")},
 			}},
 			Elements: []Element{
 				{Key: a, Value: intLit("4")},
@@ -2340,7 +2347,7 @@ func TestParseConversionExpr(t *testing.T) {
 	parserTests{
 		{`(int)(a)`, call(id("int"), false, a)},
 		{`(struct{x int})(a)`, call(&StructType{
-			Fields: []FieldDecl{{Identifiers: []Identifier{*id("x")}, Type: id("int")}},
+			Fields: []FieldDecl{{Identifiers: ids("x"), Type: id("int")}},
 		}, false, a)},
 		{`(chan <- a)(b)`, call(&ChannelType{Send: true, Type: a}, false, b)},
 		{`chan <- a(b)`, call(&ChannelType{Send: true, Type: a}, false, b)},
