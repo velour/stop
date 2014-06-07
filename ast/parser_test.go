@@ -1,7 +1,6 @@
 package ast
 
 import (
-	"bytes"
 	"go/parser"
 	stdtoken "go/token"
 	"math/big"
@@ -3004,7 +3003,7 @@ func (test parserTest) run(t *testing.T, production func(*Parser) Node) {
 	n, err := parse(NewParser(token.NewLexer("", test.text)), production)
 	if pe, ok := test.node.(parseError); ok {
 		if err == nil {
-			t.Errorf("parse(%s): expected error matching %s, got\n%s", test.text, pe.re, str(n))
+			t.Errorf("parse(%s): expected error matching %s, got\n%s", test.text, pe.re, pp.MustString(n))
 		} else if !regexp.MustCompile(pe.re).MatchString(err.Error()) {
 			t.Errorf("parse(%s): expected an error matching %s, got %s", test.text, pe.re, err.Error())
 		}
@@ -3014,7 +3013,7 @@ func (test parserTest) run(t *testing.T, production func(*Parser) Node) {
 		t.Errorf("parse(%s): unexpected error: %s", test.text, err.Error())
 	}
 	if !eq.Deep(n, test.node) {
-		t.Errorf("parse(%s): %s,\nexpected: %s", test.text, str(n), str(test.node))
+		t.Errorf("parse(%s): %s,\nexpected: %s", test.text, pp.MustString(n), pp.MustString(test.node))
 	}
 }
 
@@ -3036,14 +3035,6 @@ func parse(p *Parser, production func(*Parser) Node) (n Node, err error) {
 	}()
 	n = production(p)
 	return n, err
-}
-
-func str(u interface{}) string {
-	buf := bytes.NewBuffer(nil)
-	if err := pp.Print(buf, u); err != nil {
-		panic(err)
-	}
-	return buf.String()
 }
 
 // A special AST Node, denoting that a test expects to have a parse error.
