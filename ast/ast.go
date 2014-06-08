@@ -524,29 +524,15 @@ type FunctionType struct {
 func (n *FunctionType) Loc() token.Location { return n.funcLoc }
 func (n *FunctionType) typeNode()           {}
 
-// A Signature is a node representing a parameter list and result types.
+// A Signature is a node representing parameter and result declarations.
 type Signature struct {
-	Parameters ParameterList
-	Results    ParameterList
+	Parameters []ParameterDecl
+	Results    []ParameterDecl
+	start, end token.Location
 }
 
-func (n *Signature) Start() token.Location { return n.Parameters.Start() }
-func (n *Signature) End() token.Location {
-	if len(n.Results.Parameters) != 0 {
-		return n.Results.End()
-	}
-	return n.Parameters.End()
-}
-
-// A ParameterList is a node representing a, possibly empty,
-// parenthesized list of parameters.
-type ParameterList struct {
-	Parameters        []ParameterDecl
-	openLoc, closeLoc token.Location
-}
-
-func (n *ParameterList) Start() token.Location { return n.openLoc }
-func (n *ParameterList) End() token.Location   { return n.closeLoc }
+func (n *Signature) Start() token.Location { return n.start }
+func (n *Signature) End() token.Location   { return n.end }
 
 // A ParameterDecl is a node representing the declaration of a single parameter.
 type ParameterDecl struct {

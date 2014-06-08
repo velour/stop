@@ -1134,16 +1134,24 @@ func parseInterfaceType(p *Parser) *InterfaceType {
 }
 
 func parseSignature(p *Parser) Signature {
-	s := Signature{Parameters: parseParameterList(p)}
+	p.expect(token.OpenParen)
+	s := Signature{start: p.start()}
+	p.next()
+	s.Parameters = parseParameterList(p)
+	p.expect(token.CloseParen)
+	s.end = p.start()
+	p.next()
+
 	if p.tok == token.OpenParen {
+		p.next()
 		s.Results = parseParameterList(p)
+		p.expect(token.CloseParen)
+		s.end = p.start()
+		p.next()
 	} else if typeFirst[p.tok] {
 		t := parseType(p)
-		s.Results = ParameterList{
-			Parameters: []ParameterDecl{{Type: t}},
-			openLoc:    t.Start(),
-			closeLoc:   t.End(),
-		}
+		s.Results = []ParameterDecl{{Type: t}}
+		s.end = t.End()
 	}
 	return s
 }
@@ -1177,23 +1185,14 @@ func parseSignature(p *Parser) Signature {
 // IdentifierList =
 // 	| Identifier “,” IdentifierList
 // 	| Identifier
-func parseParameterList(p *Parser) ParameterList {
-	p.expect(token.OpenParen)
-	pl := ParameterList{openLoc: p.start()}
-	p.next()
-	parseParameterListTail(p, &pl, nil)
-	p.expect(token.CloseParen)
-	pl.closeLoc = p.start()
-	p.next()
-	return pl
+func parseParameterList(p *Parser) []ParameterDecl {
+	return parseParameterListTail(p, nil)
 }
 
-func parseParameterListTail(p *Parser, pl *ParameterList, ids []*Identifier) {
+func parseParameterListTail(p *Parser, ids []*Identifier) []ParameterDecl {
 	switch {
 	case p.tok == token.CloseParen:
-		pl.closeLoc = p.start()
-		pl.Parameters = typeNameDecls(ids)
-		return
+		return typeNameDecls(ids)
 
 	case p.tok == token.Identifier:
 		id := parseIdentifier(p)
@@ -1202,8 +1201,7 @@ func parseParameterListTail(p *Parser, pl *ParameterList, ids []*Identifier) {
 			p.next()
 			fallthrough
 		case p.tok == token.CloseParen:
-			parseParameterListTail(p, pl, append(ids, id))
-			return
+			return parseParameterListTail(p, append(ids, id))
 
 		case p.tok == token.Dot:
 			l := p.start()
@@ -1213,51 +1211,44 @@ func parseParameterListTail(p *Parser, pl *ParameterList, ids []*Identifier) {
 				Name:   parseIdentifier(p),
 				dotLoc: l,
 			}
-			d := ParameterDecl{Type: t}
-			pl.Parameters = append(typeNameDecls(ids), d)
-			parseTypeParameterList(p, pl)
-			return
+			ps := append(typeNameDecls(ids), ParameterDecl{Type: t})
+			return parseTypeParameterList(p, ps)
 
 		default:
 			ids = append(ids, id)
 			if p.tok == token.DotDotDot {
 				p.next()
 				typ := parseType(p)
-				pl.Parameters = distributeParm(ids, typ, true)
-				return
+				return distributeParm(ids, typ, true)
 			}
 			typ := parseType(p)
-			pl.Parameters = distributeParm(ids, typ, false)
-			parseDeclParameterList(p, pl)
-			return
+			return parseDeclParameterList(p, distributeParm(ids, typ, false))
 		}
 
 	case p.tok == token.DotDotDot:
 		p.next()
 		d := ParameterDecl{Type: parseType(p), DotDotDot: true}
-		pl.Parameters = append(typeNameDecls(ids), d)
-		return
+		return append(typeNameDecls(ids), d)
 
 	case typeFirst[p.tok]:
 		d := ParameterDecl{Type: parseType(p)}
-		pl.Parameters = append(typeNameDecls(ids), d)
-		parseTypeParameterList(p, pl)
-		return
+		ps := append(typeNameDecls(ids), d)
+		return parseTypeParameterList(p, ps)
 	}
 
 	panic(p.err(")", "...", "identifier", "type"))
 }
 
-func parseTypeParameterList(p *Parser, pl *ParameterList) {
+func parseTypeParameterList(p *Parser, ps []ParameterDecl) []ParameterDecl {
 	if p.tok == token.CloseParen {
-		return
+		return ps
 	}
 	p.expect(token.Comma)
 	p.next()
 
 	// Allow trailing comma.
 	if p.tok == token.CloseParen {
-		return
+		return ps
 	}
 
 	d := ParameterDecl{}
@@ -1266,23 +1257,23 @@ func parseTypeParameterList(p *Parser, pl *ParameterList) {
 		p.next()
 	}
 	d.Type = parseType(p)
-	pl.Parameters = append(pl.Parameters, d)
+	ps = append(ps, d)
 	if !d.DotDotDot {
-		parseTypeParameterList(p, pl)
+		return parseTypeParameterList(p, ps)
 	}
-	return
+	return ps
 }
 
-func parseDeclParameterList(p *Parser, pl *ParameterList) {
+func parseDeclParameterList(p *Parser, ps []ParameterDecl) []ParameterDecl {
 	if p.tok == token.CloseParen {
-		return
+		return ps
 	}
 	p.expect(token.Comma)
 	p.next()
 
 	// Allow trailing comma.
 	if p.tok == token.CloseParen {
-		return
+		return ps
 	}
 
 	var ids []*Identifier
@@ -1301,9 +1292,7 @@ func parseDeclParameterList(p *Parser, pl *ParameterList) {
 	}
 	typ := parseType(p)
 	ds := distributeParm(ids, typ, ddd)
-	pl.Parameters = append(pl.Parameters, ds...)
-	parseDeclParameterList(p, pl)
-	return
+	return parseDeclParameterList(p, append(ps, ds...))
 }
 
 func distributeParm(ids []*Identifier, typ Type, ddd bool) []ParameterDecl {
