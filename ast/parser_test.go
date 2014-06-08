@@ -102,23 +102,15 @@ var specDeclarationTests = parserTests{
 					&Method{
 						Name: *id("Read"),
 						Signature: Signature{
-							Parameters: ParameterList{Parameters: []ParameterDecl{
-								{Names: ids("b"), Type: id("Buffer")},
-							}},
-							Result: ParameterList{Parameters: []ParameterDecl{
-								{Type: id("bool")},
-							}},
+							Parameters: []ParameterDecl{{Name: b, Type: id("Buffer")}},
+							Results:    []ParameterDecl{{Type: id("bool")}},
 						},
 					},
 					&Method{
 						Name: *id("Write"),
 						Signature: Signature{
-							Parameters: ParameterList{Parameters: []ParameterDecl{
-								{Names: ids("b"), Type: id("Buffer")},
-							}},
-							Result: ParameterList{Parameters: []ParameterDecl{
-								{Type: id("bool")},
-							}},
+							Parameters: []ParameterDecl{{Name: b, Type: id("Buffer")}},
+							Results:    []ParameterDecl{{Type: id("bool")}},
 						},
 					},
 				}},
@@ -157,36 +149,38 @@ var specDeclarationTests = parserTests{
 			&TypeSpec{
 				Name: *t2,
 				Type: &StructType{Fields: []FieldDecl{
-					{Names: ids("a", "b"), Type: id("int")},
+					{Name: a, Type: id("int")},
+					{Name: b, Type: id("int")},
 				}},
 			},
 			&TypeSpec{
 				Name: *t3,
 				Type: &StructType{Fields: []FieldDecl{
-					{Names: ids("a", "c"), Type: id("int")},
+					{Name: a, Type: id("int")},
+					{Name: c, Type: id("int")},
 				}},
 			},
 			&TypeSpec{
 				Name: *t4,
 				Type: &FunctionType{Signature: Signature{
-					Parameters: ParameterList{Parameters: []ParameterDecl{
+					Parameters: []ParameterDecl{
 						{Type: id("int")}, {Type: id("float64")},
-					}},
-					Result: ParameterList{Parameters: []ParameterDecl{
+					},
+					Results: []ParameterDecl{
 						{Type: &Star{Target: t0}},
-					}},
+					},
 				}},
 			},
 			&TypeSpec{
 				Name: *t5,
 				Type: &FunctionType{Signature: Signature{
-					Parameters: ParameterList{Parameters: []ParameterDecl{
-						{Names: ids("x"), Type: id("int")},
-						{Names: ids("y"), Type: id("float64")},
-					}},
-					Result: ParameterList{Parameters: []ParameterDecl{
+					Parameters: []ParameterDecl{
+						{Name: x, Type: id("int")},
+						{Name: y, Type: id("float64")},
+					},
+					Results: []ParameterDecl{
 						{Type: &Star{Target: &SliceType{Type: id("string")}}},
-					}},
+					},
 				}},
 			},
 		},
@@ -378,7 +372,8 @@ var specDeclarationTests = parserTests{
 			&TypeSpec{
 				Name: *id("Point"),
 				Type: &StructType{Fields: []FieldDecl{
-					{Names: ids("x", "y"), Type: id("float64")},
+					{Name: x, Type: id("float64")},
+					{Name: y, Type: id("float64")},
 				}},
 			},
 			&TypeSpec{Name: *id("Polar"), Type: id("Point")},
@@ -393,14 +388,9 @@ var specDeclarationTests = parserTests{
 			&TypeSpec{
 				Name: *id("TreeNode"),
 				Type: &StructType{Fields: []FieldDecl{
-					{
-						Names: ids("left", "right"),
-						Type:  &Star{Target: id("TreeNode")},
-					},
-					{
-						Names: ids("value"),
-						Type:  &Star{Target: id("Comparable")},
-					},
+					{Name: id("left"), Type: &Star{Target: id("TreeNode")}},
+					{Name: id("right"), Type: &Star{Target: id("TreeNode")}},
+					{Name: id("value"), Type: &Star{Target: id("Comparable")}},
 				}},
 			},
 		},
@@ -418,31 +408,25 @@ var specDeclarationTests = parserTests{
 					&Method{
 						Name: *id("BlockSize"),
 						Signature: Signature{
-							Result: ParameterList{Parameters: []ParameterDecl{
-								{Type: id("int")},
-							}},
+							Results: []ParameterDecl{{Type: id("int")}},
 						},
 					},
 					&Method{
 						Name: *id("Encrypt"),
 						Signature: Signature{
-							Parameters: ParameterList{Parameters: []ParameterDecl{
-								{
-									Names: ids("src", "dst"),
-									Type:  &SliceType{Type: id("byte")},
-								},
-							}},
+							Parameters: []ParameterDecl{
+								{Name: id("src"), Type: &SliceType{Type: id("byte")}},
+								{Name: id("dst"), Type: &SliceType{Type: id("byte")}},
+							},
 						},
 					},
 					&Method{
 						Name: *id("Decrypt"),
 						Signature: Signature{
-							Parameters: ParameterList{Parameters: []ParameterDecl{
-								{
-									Names: ids("src", "dst"),
-									Type:  &SliceType{Type: id("byte")},
-								},
-							}},
+							Parameters: []ParameterDecl{
+								{Name: id("src"), Type: &SliceType{Type: id("byte")}},
+								{Name: id("dst"), Type: &SliceType{Type: id("byte")}},
+							},
 						},
 					},
 				}},
@@ -459,7 +443,8 @@ var specTypeTests = parserTests{
 			Size: binOp(token.Star, intLit("2"), id("N")),
 			Type: &StructType{
 				Fields: []FieldDecl{
-					{Names: ids("x", "y"), Type: id("int32")},
+					{Name: x, Type: id("int32")},
+					{Name: y, Type: id("int32")},
 				},
 			},
 		},
@@ -512,17 +497,12 @@ var specTypeTests = parserTests{
 			}`,
 		&StructType{
 			Fields: []FieldDecl{
-				{Names: ids("x", "y"), Type: id("int")},
-				{Names: ids("u"), Type: id("float32")},
-				{Names: ids("_"), Type: id("float32")},
-				{
-					Names: ids("A"),
-					Type:  &Star{Target: &SliceType{Type: id("int")}},
-				},
-				{
-					Names: ids("F"),
-					Type:  &FunctionType{},
-				},
+				{Name: x, Type: id("int")},
+				{Name: y, Type: id("int")},
+				{Name: id("u"), Type: id("float32")},
+				{Name: id("_"), Type: id("float32")},
+				{Name: id("A"), Type: &Star{Target: &SliceType{Type: id("int")}}},
+				{Name: id("F"), Type: &FunctionType{}},
 			},
 		},
 	},
@@ -540,7 +520,8 @@ var specTypeTests = parserTests{
 				{Type: &Star{Target: t2}},
 				{Type: sel(id("P"), t3).(Type)},
 				{Type: &Star{Target: sel(id("P"), t4).(Type)}},
-				{Names: ids("x", "y"), Type: id("int")},
+				{Name: x, Type: id("int")},
+				{Name: y, Type: id("int")},
 			},
 		},
 	},
@@ -568,19 +549,19 @@ var specTypeTests = parserTests{
 		&StructType{
 			Fields: []FieldDecl{
 				{
-					Names: ids("microsec"),
-					Type:  id("uint64"),
-					Tag:   strLit("field 1"),
+					Name: id("microsec"),
+					Type: id("uint64"),
+					Tag:  strLit("field 1"),
 				},
 				{
-					Names: ids("serverIP6"),
-					Type:  id("uint64"),
-					Tag:   strLit("field 2"),
+					Name: id("serverIP6"),
+					Type: id("uint64"),
+					Tag:  strLit("field 2"),
 				},
 				{
-					Names: ids("process"),
-					Type:  id("string"),
-					Tag:   strLit("field 3"),
+					Name: id("process"),
+					Type: id("string"),
+					Tag:  strLit("field 3"),
 				},
 			},
 		},
@@ -591,98 +572,78 @@ var specTypeTests = parserTests{
 	{
 		`func(x int) int`,
 		&FunctionType{Signature: Signature{
-			Parameters: ParameterList{Parameters: []ParameterDecl{
-				{Names: ids("x"), Type: id("int")},
-			}},
-			Result: ParameterList{Parameters: []ParameterDecl{
-				{Type: id("int")},
-			}},
+			Parameters: []ParameterDecl{{Name: x, Type: id("int")}},
+			Results:    []ParameterDecl{{Type: id("int")}},
 		}},
 	},
 	{
 		`func(a, _ int, z float32) bool`,
 		&FunctionType{Signature: Signature{
-			Parameters: ParameterList{Parameters: []ParameterDecl{
-				{Names: ids("a", "_"), Type: id("int")},
-				{Names: ids("z"), Type: id("float32")},
-			}},
-			Result: ParameterList{Parameters: []ParameterDecl{
-				{Type: id("bool")},
-			}},
+			Parameters: []ParameterDecl{
+				{Name: a, Type: id("int")},
+				{Name: id("_"), Type: id("int")},
+				{Name: z, Type: id("float32")},
+			},
+			Results: []ParameterDecl{{Type: id("bool")}},
 		}},
 	},
 	{
 		`func(a, b int, z float32) (bool)`,
 		&FunctionType{Signature: Signature{
-			Parameters: ParameterList{Parameters: []ParameterDecl{
-				{Names: ids("a", "b"), Type: id("int")},
-				{Names: ids("z"), Type: id("float32")},
-			}},
-			Result: ParameterList{Parameters: []ParameterDecl{
-				{Type: id("bool")},
-			}},
+			Parameters: []ParameterDecl{
+				{Name: a, Type: id("int")},
+				{Name: b, Type: id("int")},
+				{Name: z, Type: id("float32")},
+			},
+			Results: []ParameterDecl{{Type: id("bool")}},
 		}},
 	},
 	{
 		`func(prefix string, values ...int)`,
 		&FunctionType{Signature: Signature{
-			Parameters: ParameterList{Parameters: []ParameterDecl{
-				{Names: ids("prefix"), Type: id("string")},
-				{
-					Names:     ids("values"),
-					DotDotDot: true,
-					Type:      id("int"),
-				},
-			}},
+			Parameters: []ParameterDecl{
+				{Name: id("prefix"), Type: id("string")},
+				{Name: id("values"), DotDotDot: true, Type: id("int")},
+			},
 		}},
 	},
 	{
 		`func(a, b int, z float64, opt ...interface{}) (success bool)`,
 		&FunctionType{Signature: Signature{
-			Parameters: ParameterList{Parameters: []ParameterDecl{
-				{Names: ids("a", "b"), Type: id("int")},
-				{Names: ids("z"), Type: id("float64")},
-				{
-					Names:     ids("opt"),
-					DotDotDot: true,
-					Type:      &InterfaceType{},
-				},
-			}},
-			Result: ParameterList{Parameters: []ParameterDecl{
-				{Names: ids("success"), Type: id("bool")},
-			}},
+			Parameters: []ParameterDecl{
+				{Name: a, Type: id("int")},
+				{Name: b, Type: id("int")},
+				{Name: z, Type: id("float64")},
+				{Name: id("opt"), DotDotDot: true, Type: &InterfaceType{}},
+			},
+			Results: []ParameterDecl{{Name: id("success"), Type: id("bool")}},
 		}},
 	},
 	{
 		`func(int, int, float64) (float64, *[]int)`,
 		&FunctionType{Signature: Signature{
-			Parameters: ParameterList{Parameters: []ParameterDecl{
+			Parameters: []ParameterDecl{
 				{Type: id("int")}, {Type: id("int")}, {Type: id("float64")},
-			}},
-			Result: ParameterList{Parameters: []ParameterDecl{
+			},
+			Results: []ParameterDecl{
 				{Type: id("float64")},
 				{Type: &Star{Target: &SliceType{Type: id("int")}}},
-			}},
+			},
 		}},
 	},
 	{
 		`func(n int) func(p *T)`,
 		&FunctionType{Signature: Signature{
-			Parameters: ParameterList{Parameters: []ParameterDecl{
-				{Names: ids("n"), Type: id("int")},
-			}},
-			Result: ParameterList{Parameters: []ParameterDecl{
+			Parameters: []ParameterDecl{{Name: id("n"), Type: id("int")}},
+			Results: []ParameterDecl{
 				{
 					Type: &FunctionType{Signature: Signature{
-						Parameters: ParameterList{Parameters: []ParameterDecl{
-							{
-								Names: ids("p"),
-								Type:  &Star{Target: id("T")},
-							},
-						}},
+						Parameters: []ParameterDecl{
+							{Name: id("p"), Type: &Star{Target: id("T")}},
+						},
 					}},
 				},
-			}},
+			},
 		}},
 	},
 	{
@@ -695,23 +656,15 @@ var specTypeTests = parserTests{
 			&Method{
 				Name: *id("Read"),
 				Signature: Signature{
-					Parameters: ParameterList{Parameters: []ParameterDecl{
-						{Names: ids("b"), Type: id("Buffer")},
-					}},
-					Result: ParameterList{Parameters: []ParameterDecl{
-						{Type: id("bool")},
-					}},
+					Parameters: []ParameterDecl{{Name: b, Type: id("Buffer")}},
+					Results:    []ParameterDecl{{Type: id("bool")}},
 				},
 			},
 			&Method{
 				Name: *id("Write"),
 				Signature: Signature{
-					Parameters: ParameterList{Parameters: []ParameterDecl{
-						{Names: ids("b"), Type: id("Buffer")},
-					}},
-					Result: ParameterList{Parameters: []ParameterDecl{
-						{Type: id("bool")},
-					}},
+					Parameters: []ParameterDecl{{Name: b, Type: id("Buffer")}},
+					Results:    []ParameterDecl{{Type: id("bool")}},
 				},
 			},
 			&Method{Name: *id("Close")},
@@ -724,7 +677,8 @@ var specTypeTests = parserTests{
 		&MapType{
 			Key: &Star{Target: id("T")},
 			Value: &StructType{Fields: []FieldDecl{
-				{Names: ids("x", "y"), Type: id("float64")},
+				{Name: x, Type: id("float64")},
+				{Name: y, Type: id("float64")},
 			}},
 		},
 	},
@@ -1873,14 +1827,11 @@ func TestParseMethodDecl(t *testing.T) {
 					BaseTypeName: *b,
 					Name:         *id("method"),
 					Signature: Signature{
-						Parameters: ParameterList{
-							Parameters: []ParameterDecl{
-								{Type: bigInt, Names: ids("c", "d")},
-							},
+						Parameters: []ParameterDecl{
+							{Name: c, Type: bigInt},
+							{Name: d, Type: bigInt},
 						},
-						Result: ParameterList{
-							Parameters: []ParameterDecl{{Type: bigInt}},
-						},
+						Results: []ParameterDecl{{Type: bigInt}},
 					},
 					Body: BlockStmt{
 						Statements: []Statement{
@@ -1914,14 +1865,11 @@ func TestParseFunctionDecl(t *testing.T) {
 				&FunctionDecl{
 					Name: *id("function"),
 					Signature: Signature{
-						Parameters: ParameterList{
-							Parameters: []ParameterDecl{
-								{Type: bigInt, Names: ids("a", "b")},
-							},
+						Parameters: []ParameterDecl{
+							{Name: a, Type: bigInt},
+							{Name: b, Type: bigInt},
 						},
-						Result: ParameterList{
-							Parameters: []ParameterDecl{{Type: bigInt}},
-						},
+						Results: []ParameterDecl{{Type: bigInt}},
 					},
 					Body: BlockStmt{
 						Statements: []Statement{
@@ -2127,10 +2075,9 @@ func TestParseType(t *testing.T) {
 			`[]func()<-chan int`,
 			&SliceType{
 				Type: &FunctionType{Signature: Signature{
-					ParameterList{},
-					ParameterList{Parameters: []ParameterDecl{
+					Results: []ParameterDecl{
 						{Type: &ChannelType{Receive: true, Type: id("int")}},
-					}},
+					},
 				}},
 			},
 		},
@@ -2141,8 +2088,7 @@ func TestParseType(t *testing.T) {
 					&Method{
 						Name: *c,
 						Signature: Signature{
-							ParameterList{},
-							ParameterList{Parameters: []ParameterDecl{
+							Results: []ParameterDecl{
 								{Type: &ChannelType{
 									Receive: true,
 									Type: &ArrayType{
@@ -2150,7 +2096,7 @@ func TestParseType(t *testing.T) {
 										Type: bigInt,
 									},
 								}},
-							}},
+							},
 						},
 					},
 				}},
@@ -2172,15 +2118,16 @@ func TestParseStructType(t *testing.T) {
 			{Type: c},
 		}}},
 		{`struct{a, b c}`, &StructType{Fields: []FieldDecl{
-			{Names: ids("a", "b"), Type: c},
+			{Name: a, Type: c},
+			{Name: b, Type: c},
 		}}},
 		{`struct{a b; c}`, &StructType{Fields: []FieldDecl{
-			{Names: ids("a"), Type: b},
+			{Name: a, Type: b},
 			{Type: c},
 		}}},
 		{`struct{a; b c}`, &StructType{Fields: []FieldDecl{
 			{Type: a},
-			{Names: ids("b"), Type: c},
+			{Name: b, Type: c},
 		}}},
 		{`struct{big.Int}`, &StructType{Fields: []FieldDecl{
 			{Type: bigInt},
@@ -2191,11 +2138,11 @@ func TestParseStructType(t *testing.T) {
 		}}},
 		{`struct{big.Int; a b}`, &StructType{Fields: []FieldDecl{
 			{Type: bigInt},
-			{Names: ids("a"), Type: b},
+			{Name: a, Type: b},
 		}}},
 		{`struct{big.Int; a big.Int}`, &StructType{Fields: []FieldDecl{
 			{Type: bigInt},
-			{Names: ids("a"), Type: bigInt},
+			{Name: a, Type: bigInt},
 		}}},
 		{`struct{*big.Int}`, &StructType{Fields: []FieldDecl{
 			{Type: &Star{Target: bigInt}},
@@ -2227,7 +2174,11 @@ func TestParseStructType(t *testing.T) {
 			{Type: b},
 		}}},
 		{`struct{a b "your it"}`, &StructType{Fields: []FieldDecl{
-			{Names: ids("a"), Type: b, Tag: strLit("your it")},
+			{Name: a, Type: b, Tag: strLit("your it")},
+		}}},
+		{`struct{a, b c "your it"}`, &StructType{Fields: []FieldDecl{
+			{Name: a, Type: c, Tag: strLit("your it")},
+			{Name: b, Type: c, Tag: strLit("your it")},
 		}}},
 
 		// Trailing ;
@@ -2247,8 +2198,8 @@ func TestParseStructType(t *testing.T) {
 		{
 			`struct {a int; b int}`,
 			&StructType{Fields: []FieldDecl{
-				{Names: ids("a"), Type: id("int")},
-				{Names: ids("b"), Type: id("int")},
+				{Name: a, Type: id("int")},
+				{Name: b, Type: id("int")},
 			},
 			},
 		},
@@ -2290,59 +2241,36 @@ func TestParseFunctionType(t *testing.T) {
 		{
 			`func(a) b`,
 			&FunctionType{Signature: Signature{
-				ParameterList{Parameters: []ParameterDecl{
-					{Type: a},
-				}},
-				ParameterList{Parameters: []ParameterDecl{
-					{Type: b},
-				}},
+				Parameters: []ParameterDecl{{Type: a}},
+				Results:    []ParameterDecl{{Type: b}},
 			}},
 		},
 		{
 			`func(...a) b`,
 			&FunctionType{Signature: Signature{
-				ParameterList{Parameters: []ParameterDecl{
-					{Type: a, DotDotDot: true},
-				}},
-				ParameterList{Parameters: []ParameterDecl{
-					{Type: b},
-				}},
+				Parameters: []ParameterDecl{{Type: a, DotDotDot: true}},
+				Results:    []ParameterDecl{{Type: b}},
 			}},
 		},
 		{
 			`func(a, b) c`,
 			&FunctionType{Signature: Signature{
-				ParameterList{Parameters: []ParameterDecl{
-					{Type: a},
-					{Type: b},
-				}},
-				ParameterList{Parameters: []ParameterDecl{
-					{Type: c},
-				}},
+				Parameters: []ParameterDecl{{Type: a}, {Type: b}},
+				Results:    []ParameterDecl{{Type: c}},
 			}},
 		},
 		{
 			`func(a) (b, c)`,
 			&FunctionType{Signature: Signature{
-				ParameterList{Parameters: []ParameterDecl{
-					{Type: a},
-				}},
-				ParameterList{Parameters: []ParameterDecl{
-					{Type: b},
-					{Type: c},
-				}},
+				Parameters: []ParameterDecl{{Type: a}},
+				Results:    []ParameterDecl{{Type: b}, {Type: c}},
 			}},
 		},
 		{
 			`func(...a) (b, c)`,
 			&FunctionType{Signature: Signature{
-				ParameterList{Parameters: []ParameterDecl{
-					{Type: a, DotDotDot: true},
-				}},
-				ParameterList{Parameters: []ParameterDecl{
-					{Type: b},
-					{Type: c},
-				}},
+				Parameters: []ParameterDecl{{Type: a, DotDotDot: true}},
+				Results:    []ParameterDecl{{Type: b}, {Type: c}},
 			}},
 		},
 
@@ -2350,26 +2278,21 @@ func TestParseFunctionType(t *testing.T) {
 		{
 			`func(a) (b, ...c)`,
 			&FunctionType{Signature: Signature{
-				ParameterList{Parameters: []ParameterDecl{
-					{Type: a},
-				}},
-				ParameterList{Parameters: []ParameterDecl{
-					{Type: b},
-					{Type: c, DotDotDot: true},
-				}},
+				Parameters: []ParameterDecl{{Type: a}},
+				Results:    []ParameterDecl{{Type: b}, {Type: c, DotDotDot: true}},
 			}},
 		},
 	}.run(t, func(p *Parser) Node { return parseType(p) })
 }
 
+// Tests parameter list parsing via parseSignature, because there is no AST node for
+// a parameter list itself.
 func TestParseParameterList(t *testing.T) {
 	parserTests{
-		{`()`, &ParameterList{}},
-
 		// Parameter declarations without any identifiers.
 		{
 			`(a, b, c)`,
-			&ParameterList{Parameters: []ParameterDecl{
+			&Signature{Parameters: []ParameterDecl{
 				{Type: a},
 				{Type: b},
 				{Type: c},
@@ -2377,7 +2300,7 @@ func TestParseParameterList(t *testing.T) {
 		},
 		{
 			`(a, b, ...c)`,
-			&ParameterList{Parameters: []ParameterDecl{
+			&Signature{Parameters: []ParameterDecl{
 				{Type: a},
 				{Type: b},
 				{Type: c, DotDotDot: true},
@@ -2385,7 +2308,7 @@ func TestParseParameterList(t *testing.T) {
 		},
 		{
 			`(a, b, big.Int)`,
-			&ParameterList{Parameters: []ParameterDecl{
+			&Signature{Parameters: []ParameterDecl{
 				{Type: a},
 				{Type: b},
 				{Type: bigInt.(Type)},
@@ -2393,7 +2316,7 @@ func TestParseParameterList(t *testing.T) {
 		},
 		{
 			`(a, b, ...big.Int)`,
-			&ParameterList{Parameters: []ParameterDecl{
+			&Signature{Parameters: []ParameterDecl{
 				{Type: a},
 				{Type: b},
 				{Type: bigInt.(Type), DotDotDot: true},
@@ -2401,7 +2324,7 @@ func TestParseParameterList(t *testing.T) {
 		},
 		{
 			`(a, b, []c)`,
-			&ParameterList{Parameters: []ParameterDecl{
+			&Signature{Parameters: []ParameterDecl{
 				{Type: a},
 				{Type: b},
 				{Type: &SliceType{Type: c}},
@@ -2409,7 +2332,7 @@ func TestParseParameterList(t *testing.T) {
 		},
 		{
 			`(a, b, ...[]c)`,
-			&ParameterList{Parameters: []ParameterDecl{
+			&Signature{Parameters: []ParameterDecl{
 				{Type: a},
 				{Type: b},
 				{Type: &SliceType{Type: c}, DotDotDot: true},
@@ -2417,7 +2340,7 @@ func TestParseParameterList(t *testing.T) {
 		},
 		{
 			`([]a, b, c)`,
-			&ParameterList{Parameters: []ParameterDecl{
+			&Signature{Parameters: []ParameterDecl{
 				{Type: &SliceType{Type: a}},
 				{Type: b},
 				{Type: c},
@@ -2425,7 +2348,7 @@ func TestParseParameterList(t *testing.T) {
 		},
 		{
 			`([]a, b, ...c)`,
-			&ParameterList{Parameters: []ParameterDecl{
+			&Signature{Parameters: []ParameterDecl{
 				{Type: &SliceType{Type: a}},
 				{Type: b},
 				{Type: c, DotDotDot: true},
@@ -2433,7 +2356,7 @@ func TestParseParameterList(t *testing.T) {
 		},
 		{
 			`(...a)`,
-			&ParameterList{Parameters: []ParameterDecl{
+			&Signature{Parameters: []ParameterDecl{
 				{Type: a, DotDotDot: true},
 			}},
 		},
@@ -2441,46 +2364,53 @@ func TestParseParameterList(t *testing.T) {
 		// Parameter declarations with identifiers
 		{
 			`(a, b c)`,
-			&ParameterList{Parameters: []ParameterDecl{
-				{Names: ids("a", "b"), Type: c},
+			&Signature{Parameters: []ParameterDecl{
+				{Name: a, Type: c},
+				{Name: b, Type: c},
 			}},
 		},
 		{
 			`(a, b ...c)`,
-			&ParameterList{Parameters: []ParameterDecl{
-				{Names: ids("a", "b"), Type: c, DotDotDot: true},
+			&Signature{Parameters: []ParameterDecl{
+				{Name: a, Type: c},
+				{Name: b, Type: c, DotDotDot: true},
 			}},
 		},
 		{
 			`(a, b big.Int)`,
-			&ParameterList{Parameters: []ParameterDecl{
-				{Names: ids("a", "b"), Type: bigInt.(Type)},
+			&Signature{Parameters: []ParameterDecl{
+				{Name: a, Type: bigInt.(Type)},
+				{Name: b, Type: bigInt.(Type)},
 			}},
 		},
 		{
 			`(a, b []int)`,
-			&ParameterList{Parameters: []ParameterDecl{
-				{Names: ids("a", "b"), Type: &SliceType{Type: id("int")}},
+			&Signature{Parameters: []ParameterDecl{
+				{Name: a, Type: &SliceType{Type: id("int")}},
+				{Name: b, Type: &SliceType{Type: id("int")}},
 			}},
 		},
 		{
 			`(a, b ...[]int)`,
-			&ParameterList{Parameters: []ParameterDecl{
-				{Names: ids("a", "b"), Type: &SliceType{Type: id("int")}, DotDotDot: true},
+			&Signature{Parameters: []ParameterDecl{
+				{Name: a, Type: &SliceType{Type: id("int")}},
+				{Name: b, Type: &SliceType{Type: id("int")}, DotDotDot: true},
 			}},
 		},
 		{
 			`(a, b []int, c, d ...[]int)`,
-			&ParameterList{Parameters: []ParameterDecl{
-				{Names: ids("a", "b"), Type: &SliceType{Type: id("int")}},
-				{Names: ids("c", "d"), Type: &SliceType{Type: id("int")}, DotDotDot: true},
+			&Signature{Parameters: []ParameterDecl{
+				{Name: a, Type: &SliceType{Type: id("int")}},
+				{Name: b, Type: &SliceType{Type: id("int")}},
+				{Name: c, Type: &SliceType{Type: id("int")}},
+				{Name: d, Type: &SliceType{Type: id("int")}, DotDotDot: true},
 			}},
 		},
 
 		// Trailing comma is OK.
 		{
 			`(a, b, c,)`,
-			&ParameterList{Parameters: []ParameterDecl{
+			&Signature{Parameters: []ParameterDecl{
 				{Type: a},
 				{Type: b},
 				{Type: c},
@@ -2488,7 +2418,7 @@ func TestParseParameterList(t *testing.T) {
 		},
 		{
 			`(a, []b, c,)`,
-			&ParameterList{Parameters: []ParameterDecl{
+			&Signature{Parameters: []ParameterDecl{
 				{Type: a},
 				{Type: &SliceType{Type: b}},
 				{Type: c},
@@ -2496,24 +2426,27 @@ func TestParseParameterList(t *testing.T) {
 		},
 		{
 			`(a, b []int,)`,
-			&ParameterList{Parameters: []ParameterDecl{
-				{Names: ids("a", "b"), Type: &SliceType{Type: id("int")}},
+			&Signature{Parameters: []ParameterDecl{
+				{Name: a, Type: &SliceType{Type: id("int")}},
+				{Name: b, Type: &SliceType{Type: id("int")}},
 			}},
 		},
 		{
 			`(a, b []int, c, d ...[]int,)`,
-			&ParameterList{Parameters: []ParameterDecl{
-				{Names: ids("a", "b"), Type: &SliceType{Type: id("int")}},
-				{Names: ids("c", "d"), Type: &SliceType{Type: id("int")}, DotDotDot: true},
+			&Signature{Parameters: []ParameterDecl{
+				{Name: a, Type: &SliceType{Type: id("int")}},
+				{Name: b, Type: &SliceType{Type: id("int")}},
+				{Name: c, Type: &SliceType{Type: id("int")}},
+				{Name: d, Type: &SliceType{Type: id("int")}, DotDotDot: true},
 			}},
 		},
 
 		// Strange, but OK.
 		{
 			`(int float64, float64 int)`,
-			&ParameterList{Parameters: []ParameterDecl{
-				{Names: ids("int"), Type: id("float64")},
-				{Names: ids("float64"), Type: id("int")},
+			&Signature{Parameters: []ParameterDecl{
+				{Name: id("int"), Type: id("float64")},
+				{Name: id("float64"), Type: id("int")},
 			}},
 		},
 
@@ -2527,8 +2460,8 @@ func TestParseParameterList(t *testing.T) {
 		{`([]a, b c)`, parseError{""}},
 		{`(a b, c, d)`, parseError{""}},
 	}.run(t, func(p *Parser) Node {
-		parms := parseParameterList(p)
-		return &parms
+		s := parseSignature(p)
+		return &s
 	})
 }
 
@@ -2609,12 +2542,7 @@ func TestParseFunctionLiteral(t *testing.T) {
 			`func()big.Int{}`,
 			&FunctionLiteral{
 				Signature: Signature{
-					ParameterList{},
-					ParameterList{
-						Parameters: []ParameterDecl{
-							{Type: bigInt},
-						},
-					},
+					Results: []ParameterDecl{{Type: bigInt}},
 				},
 			},
 		},
@@ -2622,12 +2550,7 @@ func TestParseFunctionLiteral(t *testing.T) {
 			`func(a){}`,
 			&FunctionLiteral{
 				Signature: Signature{
-					ParameterList{
-						Parameters: []ParameterDecl{
-							{Type: a},
-						},
-					},
-					ParameterList{},
+					Parameters: []ParameterDecl{{Type: a}},
 				},
 			},
 		},
@@ -2635,12 +2558,7 @@ func TestParseFunctionLiteral(t *testing.T) {
 			`func(a b){}`,
 			&FunctionLiteral{
 				Signature: Signature{
-					ParameterList{
-						Parameters: []ParameterDecl{
-							{Type: b, Names: ids("a")},
-						},
-					},
-					ParameterList{},
+					Parameters: []ParameterDecl{{Name: a, Type: b}},
 				},
 			},
 		},
@@ -2648,16 +2566,8 @@ func TestParseFunctionLiteral(t *testing.T) {
 			`func(a b)big.Int{}`,
 			&FunctionLiteral{
 				Signature: Signature{
-					ParameterList{
-						Parameters: []ParameterDecl{
-							{Type: b, Names: ids("a")},
-						},
-					},
-					ParameterList{
-						Parameters: []ParameterDecl{
-							{Type: bigInt},
-						},
-					},
+					Parameters: []ParameterDecl{{Name: a, Type: b}},
+					Results:    []ParameterDecl{{Type: bigInt}},
 				},
 			},
 		},
@@ -2681,16 +2591,8 @@ func TestParseFunctionLiteral(t *testing.T) {
 			}`,
 			&FunctionLiteral{
 				Signature: Signature{
-					ParameterList{
-						Parameters: []ParameterDecl{
-							{Type: b, Names: ids("a")},
-						},
-					},
-					ParameterList{
-						Parameters: []ParameterDecl{
-							{Type: bigInt},
-						},
-					},
+					Parameters: []ParameterDecl{{Name: a, Type: b}},
+					Results:    []ParameterDecl{{Type: bigInt}},
 				},
 				Body: BlockStmt{
 					Statements: []Statement{
@@ -2708,7 +2610,7 @@ func TestParseCompositeLiteral(t *testing.T) {
 	parserTests{
 		{`struct{ a int }{ a: 4 }`, &CompositeLiteral{
 			Type: &StructType{Fields: []FieldDecl{
-				{Names: ids("a"), Type: id("int")},
+				{Name: a, Type: id("int")},
 			}},
 			Elements: []Element{
 				{Key: a, Value: intLit("4")},
@@ -2716,7 +2618,8 @@ func TestParseCompositeLiteral(t *testing.T) {
 		}},
 		{`struct{ a, b int }{ a: 4, b: 5}`, &CompositeLiteral{
 			Type: &StructType{Fields: []FieldDecl{
-				{Names: ids("a", "b"), Type: id("int")},
+				{Name: a, Type: id("int")},
+				{Name: b, Type: id("int")},
 			}},
 			Elements: []Element{
 				{Key: a, Value: intLit("4")},
@@ -2725,7 +2628,7 @@ func TestParseCompositeLiteral(t *testing.T) {
 		}},
 		{`struct{ a []int }{ a: { 4, 5 } }`, &CompositeLiteral{
 			Type: &StructType{Fields: []FieldDecl{
-				{Names: ids("a"), Type: &SliceType{Type: id("int")}},
+				{Name: a, Type: &SliceType{Type: id("int")}},
 			}},
 			Elements: []Element{
 				{Key: a, Value: &CompositeLiteral{
@@ -2752,7 +2655,8 @@ func TestParseCompositeLiteral(t *testing.T) {
 		// Trailing ,
 		{`struct{ a, b int }{ a: 4, b: 5,}`, &CompositeLiteral{
 			Type: &StructType{Fields: []FieldDecl{
-				{Names: ids("a", "b"), Type: id("int")},
+				{Name: a, Type: id("int")},
+				{Name: b, Type: id("int")},
 			}},
 			Elements: []Element{
 				{Key: a, Value: intLit("4")},
@@ -2799,7 +2703,7 @@ func TestParseConversionExpr(t *testing.T) {
 	parserTests{
 		{`(int)(a)`, call(id("int"), false, a)},
 		{`(struct{x int})(a)`, call(&StructType{
-			Fields: []FieldDecl{{Names: ids("x"), Type: id("int")}},
+			Fields: []FieldDecl{{Name: x, Type: id("int")}},
 		}, false, a)},
 		{`(chan <- a)(b)`, call(&ChannelType{Send: true, Type: a}, false, b)},
 		{`chan <- a(b)`, call(&ChannelType{Send: true, Type: a}, false, b)},

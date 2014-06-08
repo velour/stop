@@ -1015,8 +1015,8 @@ func parseStructType(p *Parser) *StructType {
 	p.next()
 
 	for p.tok != token.CloseBrace {
-		field := parseFieldDecl(p)
-		st.Fields = append(st.Fields, field)
+		fields := parseFieldDecl(p)
+		st.Fields = append(st.Fields, fields...)
 		if p.tok == token.CloseBrace {
 			break
 		}
@@ -1030,14 +1030,16 @@ func parseStructType(p *Parser) *StructType {
 	return st
 }
 
-func parseFieldDecl(p *Parser) FieldDecl {
+func parseFieldDecl(p *Parser) []FieldDecl {
 	var id *Identifier
+	var ids []*Identifier
+	var typ Type
+	var tag *StringLiteral
 
-	d := FieldDecl{}
 	if p.tok == token.Star {
 		l := p.start()
 		p.next()
-		d.Type = &Star{Target: parseTypeName(p), starLoc: l}
+		typ = &Star{Target: parseTypeName(p), starLoc: l}
 		goto tag
 	}
 
@@ -1046,7 +1048,7 @@ func parseFieldDecl(p *Parser) FieldDecl {
 	case token.Dot:
 		l := p.start()
 		p.next()
-		d.Type = &Selector{
+		typ = &Selector{
 			Parent: id,
 			Name:   parseIdentifier(p),
 			dotLoc: l,
@@ -1054,28 +1056,40 @@ func parseFieldDecl(p *Parser) FieldDecl {
 		goto tag
 
 	case token.StringLiteral:
-		d.Tag = parseStringLiteral(p)
+		tag = parseStringLiteral(p)
 		fallthrough
 	case token.Semicolon:
 		fallthrough
 	case token.CloseBrace:
-		d.Type = id
-		return d
+		typ = id
+		return distributeField(ids, typ, tag)
 	}
 
-	d.Names = []Identifier{*id}
+	ids = append(ids, id)
 	for p.tok == token.Comma {
 		p.next()
-		id := parseIdentifier(p)
-		d.Names = append(d.Names, *id)
+		ids = append(ids, parseIdentifier(p))
 	}
-	d.Type = parseType(p)
+	typ = parseType(p)
 
 tag:
 	if p.tok == token.StringLiteral {
-		d.Tag = parseStringLiteral(p)
+		tag = parseStringLiteral(p)
 	}
-	return d
+	return distributeField(ids, typ, tag)
+}
+
+func distributeField(ids []*Identifier, typ Type, tag *StringLiteral) []FieldDecl {
+	if len(ids) == 0 {
+		return []FieldDecl{{Type: typ, Tag: tag}}
+	}
+	ds := make([]FieldDecl, len(ids))
+	for i, id := range ids {
+		ds[i].Name = id
+		ds[i].Type = typ
+		ds[i].Tag = tag
+	}
+	return ds
 }
 
 func parseInterfaceType(p *Parser) *InterfaceType {
@@ -1120,16 +1134,24 @@ func parseInterfaceType(p *Parser) *InterfaceType {
 }
 
 func parseSignature(p *Parser) Signature {
-	s := Signature{Parameters: parseParameterList(p)}
+	p.expect(token.OpenParen)
+	s := Signature{start: p.start()}
+	p.next()
+	s.Parameters = parseParameterList(p)
+	p.expect(token.CloseParen)
+	s.end = p.start()
+	p.next()
+
 	if p.tok == token.OpenParen {
-		s.Result = parseParameterList(p)
+		p.next()
+		s.Results = parseParameterList(p)
+		p.expect(token.CloseParen)
+		s.end = p.start()
+		p.next()
 	} else if typeFirst[p.tok] {
 		t := parseType(p)
-		s.Result = ParameterList{
-			Parameters: []ParameterDecl{{Type: t}},
-			openLoc:    t.Start(),
-			closeLoc:   t.End(),
-		}
+		s.Results = []ParameterDecl{{Type: t}}
+		s.end = t.End()
 	}
 	return s
 }
@@ -1163,23 +1185,14 @@ func parseSignature(p *Parser) Signature {
 // IdentifierList =
 // 	| Identifier “,” IdentifierList
 // 	| Identifier
-func parseParameterList(p *Parser) ParameterList {
-	p.expect(token.OpenParen)
-	pl := ParameterList{openLoc: p.start()}
-	p.next()
-	parseParameterListTail(p, &pl, nil)
-	p.expect(token.CloseParen)
-	pl.closeLoc = p.start()
-	p.next()
-	return pl
+func parseParameterList(p *Parser) []ParameterDecl {
+	return parseParameterListTail(p, nil)
 }
 
-func parseParameterListTail(p *Parser, pl *ParameterList, idents []Identifier) {
+func parseParameterListTail(p *Parser, ids []*Identifier) []ParameterDecl {
 	switch {
 	case p.tok == token.CloseParen:
-		pl.closeLoc = p.start()
-		pl.Parameters = typeNameDecls(idents)
-		return
+		return typeNameDecls(ids)
 
 	case p.tok == token.Identifier:
 		id := parseIdentifier(p)
@@ -1188,8 +1201,7 @@ func parseParameterListTail(p *Parser, pl *ParameterList, idents []Identifier) {
 			p.next()
 			fallthrough
 		case p.tok == token.CloseParen:
-			parseParameterListTail(p, pl, append(idents, *id))
-			return
+			return parseParameterListTail(p, append(ids, id))
 
 		case p.tok == token.Dot:
 			l := p.start()
@@ -1199,52 +1211,44 @@ func parseParameterListTail(p *Parser, pl *ParameterList, idents []Identifier) {
 				Name:   parseIdentifier(p),
 				dotLoc: l,
 			}
-			d := ParameterDecl{Type: t}
-			pl.Parameters = append(typeNameDecls(idents), d)
-			parseTypeParameterList(p, pl)
-			return
+			ps := append(typeNameDecls(ids), ParameterDecl{Type: t})
+			return parseTypeParameterList(p, ps)
 
 		default:
-			idents = append(idents, *id)
-			d := ParameterDecl{Names: idents}
+			ids = append(ids, id)
 			if p.tok == token.DotDotDot {
-				d.DotDotDot = true
 				p.next()
+				typ := parseType(p)
+				return distributeParm(ids, typ, true)
 			}
-			d.Type = parseType(p)
-			pl.Parameters = []ParameterDecl{d}
-			if !d.DotDotDot {
-				parseDeclParameterList(p, pl)
-			}
-			return
+			typ := parseType(p)
+			return parseDeclParameterList(p, distributeParm(ids, typ, false))
 		}
 
 	case p.tok == token.DotDotDot:
 		p.next()
 		d := ParameterDecl{Type: parseType(p), DotDotDot: true}
-		pl.Parameters = append(typeNameDecls(idents), d)
-		return
+		return append(typeNameDecls(ids), d)
 
 	case typeFirst[p.tok]:
 		d := ParameterDecl{Type: parseType(p)}
-		pl.Parameters = append(typeNameDecls(idents), d)
-		parseTypeParameterList(p, pl)
-		return
+		ps := append(typeNameDecls(ids), d)
+		return parseTypeParameterList(p, ps)
 	}
 
 	panic(p.err(")", "...", "identifier", "type"))
 }
 
-func parseTypeParameterList(p *Parser, pl *ParameterList) {
+func parseTypeParameterList(p *Parser, ps []ParameterDecl) []ParameterDecl {
 	if p.tok == token.CloseParen {
-		return
+		return ps
 	}
 	p.expect(token.Comma)
 	p.next()
 
 	// Allow trailing comma.
 	if p.tok == token.CloseParen {
-		return
+		return ps
 	}
 
 	d := ParameterDecl{}
@@ -1253,50 +1257,58 @@ func parseTypeParameterList(p *Parser, pl *ParameterList) {
 		p.next()
 	}
 	d.Type = parseType(p)
-	pl.Parameters = append(pl.Parameters, d)
+	ps = append(ps, d)
 	if !d.DotDotDot {
-		parseTypeParameterList(p, pl)
+		return parseTypeParameterList(p, ps)
 	}
-	return
+	return ps
 }
 
-func parseDeclParameterList(p *Parser, pl *ParameterList) {
+func parseDeclParameterList(p *Parser, ps []ParameterDecl) []ParameterDecl {
 	if p.tok == token.CloseParen {
-		return
+		return ps
 	}
-
 	p.expect(token.Comma)
 	p.next()
 
 	// Allow trailing comma.
 	if p.tok == token.CloseParen {
-		return
+		return ps
 	}
 
-	d := ParameterDecl{}
+	var ids []*Identifier
 	for {
-		id := parseIdentifier(p)
-		d.Names = append(d.Names, *id)
-
+		ids = append(ids, parseIdentifier(p))
 		if p.tok != token.Comma {
 			break
 		}
 		p.next()
 	}
+
+	var ddd bool
 	if p.tok == token.DotDotDot {
-		d.DotDotDot = true
 		p.next()
+		ddd = true
 	}
-	d.Type = parseType(p)
-	pl.Parameters = append(pl.Parameters, d)
-	parseDeclParameterList(p, pl)
-	return
+	typ := parseType(p)
+	ds := distributeParm(ids, typ, ddd)
+	return parseDeclParameterList(p, append(ps, ds...))
 }
 
-func typeNameDecls(idents []Identifier) []ParameterDecl {
-	decls := make([]ParameterDecl, len(idents))
-	for i := range idents {
-		decls[i].Type = &idents[i]
+func distributeParm(ids []*Identifier, typ Type, ddd bool) []ParameterDecl {
+	ds := make([]ParameterDecl, len(ids))
+	for i, id := range ids {
+		ds[i].Name = id
+		ds[i].Type = typ
+	}
+	ds[len(ds)-1].DotDotDot = ddd
+	return ds
+}
+
+func typeNameDecls(ids []*Identifier) []ParameterDecl {
+	decls := make([]ParameterDecl, len(ids))
+	for i, id := range ids {
+		decls[i].Type = id
 	}
 	return decls
 }

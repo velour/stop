@@ -467,14 +467,14 @@ func (n *StructType) typeNode()             {}
 
 // A FieldDecl is a node representing a struct field declaration.
 type FieldDecl struct {
-	Names []Identifier
-	Type  Type
-	Tag   *StringLiteral
+	Name *Identifier
+	Type Type
+	Tag  *StringLiteral
 }
 
 func (n *FieldDecl) Start() token.Location {
-	if len(n.Names) > 0 {
-		return n.Names[0].Start()
+	if n.Name != nil {
+		return n.Name.Start()
 	}
 	return n.Type.Start()
 }
@@ -524,37 +524,27 @@ type FunctionType struct {
 func (n *FunctionType) Loc() token.Location { return n.funcLoc }
 func (n *FunctionType) typeNode()           {}
 
-// A Signature is a node representing a parameter list and result types.
+// A Signature is a node representing parameter and result declarations.
 type Signature struct {
-	Parameters ParameterList
-	Result     ParameterList
+	Parameters []ParameterDecl
+	Results    []ParameterDecl
+	start, end token.Location
 }
 
-func (n *Signature) Start() token.Location { return n.Parameters.Start() }
-func (n *Signature) End() token.Location   { return n.Result.End() }
+func (n *Signature) Start() token.Location { return n.start }
+func (n *Signature) End() token.Location   { return n.end }
 
-// A ParameterList is a node representing a, possibly empty,
-// parenthesized list of parameters.
-type ParameterList struct {
-	Parameters        []ParameterDecl
-	openLoc, closeLoc token.Location
-}
-
-func (n *ParameterList) Start() token.Location { return n.openLoc }
-func (n *ParameterList) End() token.Location   { return n.closeLoc }
-
-// A ParameterDecl is a node representing the declaration of a set
-// of parameters of a common type.
+// A ParameterDecl is a node representing the declaration of a single parameter.
 type ParameterDecl struct {
-	Type  Type
-	Names []Identifier
+	Type Type
+	Name *Identifier
 	// DotDotDot is true if the final identifier was followed by a "...".
 	DotDotDot bool
 }
 
 func (n *ParameterDecl) Start() token.Location {
-	if len(n.Names) > 0 {
-		return n.Names[0].Start()
+	if n.Name != nil {
+		return n.Name.Start()
 	}
 	return n.Type.Start()
 }
@@ -765,7 +755,7 @@ func (u *UnaryOp) Start() token.Location { return u.opLoc }
 func (u *UnaryOp) Loc() token.Location   { return u.opLoc }
 func (u *UnaryOp) End() token.Location   { return u.Operand.End() }
 
-// An Identifier is an un-qualified identifier representing either  type
+// An Identifier is an un-qualified identifier representing either a type
 // name or an identifier expression.
 type Identifier struct {
 	Name string
