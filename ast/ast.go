@@ -527,11 +527,11 @@ func (n *FunctionType) typeNode()           {}
 // A Signature is a node representing a parameter list and result types.
 type Signature struct {
 	Parameters ParameterList
-	Result     ParameterList
+	Results    ParameterList
 }
 
 func (n *Signature) Start() token.Location { return n.Parameters.Start() }
-func (n *Signature) End() token.Location   { return n.Result.End() }
+func (n *Signature) End() token.Location   { return n.Results.End() }
 
 // A ParameterList is a node representing a, possibly empty,
 // parenthesized list of parameters.

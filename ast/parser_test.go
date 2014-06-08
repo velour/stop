@@ -105,7 +105,7 @@ var specDeclarationTests = parserTests{
 							Parameters: ParameterList{Parameters: []ParameterDecl{
 								{Name: b, Type: id("Buffer")},
 							}},
-							Result: ParameterList{Parameters: []ParameterDecl{
+							Results: ParameterList{Parameters: []ParameterDecl{
 								{Type: id("bool")},
 							}},
 						},
@@ -116,7 +116,7 @@ var specDeclarationTests = parserTests{
 							Parameters: ParameterList{Parameters: []ParameterDecl{
 								{Name: b, Type: id("Buffer")},
 							}},
-							Result: ParameterList{Parameters: []ParameterDecl{
+							Results: ParameterList{Parameters: []ParameterDecl{
 								{Type: id("bool")},
 							}},
 						},
@@ -174,7 +174,7 @@ var specDeclarationTests = parserTests{
 					Parameters: ParameterList{Parameters: []ParameterDecl{
 						{Type: id("int")}, {Type: id("float64")},
 					}},
-					Result: ParameterList{Parameters: []ParameterDecl{
+					Results: ParameterList{Parameters: []ParameterDecl{
 						{Type: &Star{Target: t0}},
 					}},
 				}},
@@ -186,7 +186,7 @@ var specDeclarationTests = parserTests{
 						{Name: x, Type: id("int")},
 						{Name: y, Type: id("float64")},
 					}},
-					Result: ParameterList{Parameters: []ParameterDecl{
+					Results: ParameterList{Parameters: []ParameterDecl{
 						{Type: &Star{Target: &SliceType{Type: id("string")}}},
 					}},
 				}},
@@ -416,7 +416,7 @@ var specDeclarationTests = parserTests{
 					&Method{
 						Name: *id("BlockSize"),
 						Signature: Signature{
-							Result: ParameterList{Parameters: []ParameterDecl{
+							Results: ParameterList{Parameters: []ParameterDecl{
 								{Type: id("int")},
 							}},
 						},
@@ -585,7 +585,7 @@ var specTypeTests = parserTests{
 			Parameters: ParameterList{Parameters: []ParameterDecl{
 				{Name: x, Type: id("int")},
 			}},
-			Result: ParameterList{Parameters: []ParameterDecl{
+			Results: ParameterList{Parameters: []ParameterDecl{
 				{Type: id("int")},
 			}},
 		}},
@@ -598,7 +598,7 @@ var specTypeTests = parserTests{
 				{Name: id("_"), Type: id("int")},
 				{Name: z, Type: id("float32")},
 			}},
-			Result: ParameterList{Parameters: []ParameterDecl{
+			Results: ParameterList{Parameters: []ParameterDecl{
 				{Type: id("bool")},
 			}},
 		}},
@@ -611,7 +611,7 @@ var specTypeTests = parserTests{
 				{Name: b, Type: id("int")},
 				{Name: z, Type: id("float32")},
 			}},
-			Result: ParameterList{Parameters: []ParameterDecl{
+			Results: ParameterList{Parameters: []ParameterDecl{
 				{Type: id("bool")},
 			}},
 		}},
@@ -634,7 +634,7 @@ var specTypeTests = parserTests{
 				{Name: z, Type: id("float64")},
 				{Name: id("opt"), DotDotDot: true, Type: &InterfaceType{}},
 			}},
-			Result: ParameterList{Parameters: []ParameterDecl{
+			Results: ParameterList{Parameters: []ParameterDecl{
 				{Name: id("success"), Type: id("bool")},
 			}},
 		}},
@@ -645,7 +645,7 @@ var specTypeTests = parserTests{
 			Parameters: ParameterList{Parameters: []ParameterDecl{
 				{Type: id("int")}, {Type: id("int")}, {Type: id("float64")},
 			}},
-			Result: ParameterList{Parameters: []ParameterDecl{
+			Results: ParameterList{Parameters: []ParameterDecl{
 				{Type: id("float64")},
 				{Type: &Star{Target: &SliceType{Type: id("int")}}},
 			}},
@@ -657,7 +657,7 @@ var specTypeTests = parserTests{
 			Parameters: ParameterList{Parameters: []ParameterDecl{
 				{Name: id("n"), Type: id("int")},
 			}},
-			Result: ParameterList{Parameters: []ParameterDecl{
+			Results: ParameterList{Parameters: []ParameterDecl{
 				{
 					Type: &FunctionType{Signature: Signature{
 						Parameters: ParameterList{Parameters: []ParameterDecl{
@@ -681,7 +681,7 @@ var specTypeTests = parserTests{
 					Parameters: ParameterList{Parameters: []ParameterDecl{
 						{Name: b, Type: id("Buffer")},
 					}},
-					Result: ParameterList{Parameters: []ParameterDecl{
+					Results: ParameterList{Parameters: []ParameterDecl{
 						{Type: id("bool")},
 					}},
 				},
@@ -692,7 +692,7 @@ var specTypeTests = parserTests{
 					Parameters: ParameterList{Parameters: []ParameterDecl{
 						{Name: b, Type: id("Buffer")},
 					}},
-					Result: ParameterList{Parameters: []ParameterDecl{
+					Results: ParameterList{Parameters: []ParameterDecl{
 						{Type: id("bool")},
 					}},
 				},
@@ -1863,7 +1863,7 @@ func TestParseMethodDecl(t *testing.T) {
 								{Name: d, Type: bigInt},
 							},
 						},
-						Result: ParameterList{
+						Results: ParameterList{
 							Parameters: []ParameterDecl{{Type: bigInt}},
 						},
 					},
@@ -1905,7 +1905,7 @@ func TestParseFunctionDecl(t *testing.T) {
 								{Name: b, Type: bigInt},
 							},
 						},
-						Result: ParameterList{
+						Results: ParameterList{
 							Parameters: []ParameterDecl{{Type: bigInt}},
 						},
 					},

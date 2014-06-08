@@ -1136,10 +1136,10 @@ func parseInterfaceType(p *Parser) *InterfaceType {
 func parseSignature(p *Parser) Signature {
 	s := Signature{Parameters: parseParameterList(p)}
 	if p.tok == token.OpenParen {
-		s.Result = parseParameterList(p)
+		s.Results = parseParameterList(p)
 	} else if typeFirst[p.tok] {
 		t := parseType(p)
-		s.Result = ParameterList{
+		s.Results = ParameterList{
 			Parameters: []ParameterDecl{{Type: t}},
 			openLoc:    t.Start(),
 			closeLoc:   t.End(),
