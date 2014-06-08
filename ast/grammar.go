@@ -1188,11 +1188,11 @@ func parseParameterList(p *Parser) ParameterList {
 	return pl
 }
 
-func parseParameterListTail(p *Parser, pl *ParameterList, idents []Identifier) {
+func parseParameterListTail(p *Parser, pl *ParameterList, ids []*Identifier) {
 	switch {
 	case p.tok == token.CloseParen:
 		pl.closeLoc = p.start()
-		pl.Parameters = typeNameDecls(idents)
+		pl.Parameters = typeNameDecls(ids)
 		return
 
 	case p.tok == token.Identifier:
@@ -1202,7 +1202,7 @@ func parseParameterListTail(p *Parser, pl *ParameterList, idents []Identifier) {
 			p.next()
 			fallthrough
 		case p.tok == token.CloseParen:
-			parseParameterListTail(p, pl, append(idents, *id))
+			parseParameterListTail(p, pl, append(ids, id))
 			return
 
 		case p.tok == token.Dot:
@@ -1214,34 +1214,33 @@ func parseParameterListTail(p *Parser, pl *ParameterList, idents []Identifier) {
 				dotLoc: l,
 			}
 			d := ParameterDecl{Type: t}
-			pl.Parameters = append(typeNameDecls(idents), d)
+			pl.Parameters = append(typeNameDecls(ids), d)
 			parseTypeParameterList(p, pl)
 			return
 
 		default:
-			idents = append(idents, *id)
-			d := ParameterDecl{Names: idents}
+			ids = append(ids, id)
 			if p.tok == token.DotDotDot {
-				d.DotDotDot = true
 				p.next()
+				typ := parseType(p)
+				pl.Parameters = distributeParm(ids, typ, true)
+				return
 			}
-			d.Type = parseType(p)
-			pl.Parameters = []ParameterDecl{d}
-			if !d.DotDotDot {
-				parseDeclParameterList(p, pl)
-			}
+			typ := parseType(p)
+			pl.Parameters = distributeParm(ids, typ, false)
+			parseDeclParameterList(p, pl)
 			return
 		}
 
 	case p.tok == token.DotDotDot:
 		p.next()
 		d := ParameterDecl{Type: parseType(p), DotDotDot: true}
-		pl.Parameters = append(typeNameDecls(idents), d)
+		pl.Parameters = append(typeNameDecls(ids), d)
 		return
 
 	case typeFirst[p.tok]:
 		d := ParameterDecl{Type: parseType(p)}
-		pl.Parameters = append(typeNameDecls(idents), d)
+		pl.Parameters = append(typeNameDecls(ids), d)
 		parseTypeParameterList(p, pl)
 		return
 	}
@@ -1278,7 +1277,6 @@ func parseDeclParameterList(p *Parser, pl *ParameterList) {
 	if p.tok == token.CloseParen {
 		return
 	}
-
 	p.expect(token.Comma)
 	p.next()
 
@@ -1287,30 +1285,41 @@ func parseDeclParameterList(p *Parser, pl *ParameterList) {
 		return
 	}
 
-	d := ParameterDecl{}
+	var ids []*Identifier
 	for {
-		id := parseIdentifier(p)
-		d.Names = append(d.Names, *id)
-
+		ids = append(ids, parseIdentifier(p))
 		if p.tok != token.Comma {
 			break
 		}
 		p.next()
 	}
+
+	var ddd bool
 	if p.tok == token.DotDotDot {
-		d.DotDotDot = true
 		p.next()
+		ddd = true
 	}
-	d.Type = parseType(p)
-	pl.Parameters = append(pl.Parameters, d)
+	typ := parseType(p)
+	ds := distributeParm(ids, typ, ddd)
+	pl.Parameters = append(pl.Parameters, ds...)
 	parseDeclParameterList(p, pl)
 	return
 }
 
-func typeNameDecls(idents []Identifier) []ParameterDecl {
-	decls := make([]ParameterDecl, len(idents))
-	for i := range idents {
-		decls[i].Type = &idents[i]
+func distributeParm(ids []*Identifier, typ Type, ddd bool) []ParameterDecl {
+	ds := make([]ParameterDecl, len(ids))
+	for i, id := range ids {
+		ds[i].Name = id
+		ds[i].Type = typ
+	}
+	ds[len(ds)-1].DotDotDot = ddd
+	return ds
+}
+
+func typeNameDecls(ids []*Identifier) []ParameterDecl {
+	decls := make([]ParameterDecl, len(ids))
+	for i, id := range ids {
+		decls[i].Type = id
 	}
 	return decls
 }

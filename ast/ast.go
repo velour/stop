@@ -543,18 +543,17 @@ type ParameterList struct {
 func (n *ParameterList) Start() token.Location { return n.openLoc }
 func (n *ParameterList) End() token.Location   { return n.closeLoc }
 
-// A ParameterDecl is a node representing the declaration of a set
-// of parameters of a common type.
+// A ParameterDecl is a node representing the declaration of a single parameter.
 type ParameterDecl struct {
-	Type  Type
-	Names []Identifier
+	Type Type
+	Name *Identifier
 	// DotDotDot is true if the final identifier was followed by a "...".
 	DotDotDot bool
 }
 
 func (n *ParameterDecl) Start() token.Location {
-	if len(n.Names) > 0 {
-		return n.Names[0].Start()
+	if n.Name != nil {
+		return n.Name.Start()
 	}
 	return n.Type.Start()
 }
