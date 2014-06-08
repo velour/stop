@@ -755,7 +755,7 @@ func (u *UnaryOp) Start() token.Location { return u.opLoc }
 func (u *UnaryOp) Loc() token.Location   { return u.opLoc }
 func (u *UnaryOp) End() token.Location   { return u.Operand.End() }
 
-// An Identifier is an un-qualified identifier representing either  type
+// An Identifier is an un-qualified identifier representing either a type
 // name or an identifier expression.
 type Identifier struct {
 	Name string
