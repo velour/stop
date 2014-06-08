@@ -531,7 +531,12 @@ type Signature struct {
 }
 
 func (n *Signature) Start() token.Location { return n.Parameters.Start() }
-func (n *Signature) End() token.Location   { return n.Results.End() }
+func (n *Signature) End() token.Location {
+	if len(n.Results.Parameters) != 0 {
+		return n.Results.End()
+	}
+	return n.Parameters.End()
+}
 
 // A ParameterList is a node representing a, possibly empty,
 // parenthesized list of parameters.
