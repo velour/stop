@@ -467,14 +467,14 @@ func (n *StructType) typeNode()             {}
 
 // A FieldDecl is a node representing a struct field declaration.
 type FieldDecl struct {
-	Names []Identifier
-	Type  Type
-	Tag   *StringLiteral
+	Name *Identifier
+	Type Type
+	Tag  *StringLiteral
 }
 
 func (n *FieldDecl) Start() token.Location {
-	if len(n.Names) > 0 {
-		return n.Names[0].Start()
+	if n.Name != nil {
+		return n.Name.Start()
 	}
 	return n.Type.Start()
 }

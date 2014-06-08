@@ -1015,8 +1015,8 @@ func parseStructType(p *Parser) *StructType {
 	p.next()
 
 	for p.tok != token.CloseBrace {
-		field := parseFieldDecl(p)
-		st.Fields = append(st.Fields, field)
+		fields := parseFieldDecl(p)
+		st.Fields = append(st.Fields, fields...)
 		if p.tok == token.CloseBrace {
 			break
 		}
@@ -1030,14 +1030,16 @@ func parseStructType(p *Parser) *StructType {
 	return st
 }
 
-func parseFieldDecl(p *Parser) FieldDecl {
+func parseFieldDecl(p *Parser) []FieldDecl {
 	var id *Identifier
+	var ids []*Identifier
+	var typ Type
+	var tag *StringLiteral
 
-	d := FieldDecl{}
 	if p.tok == token.Star {
 		l := p.start()
 		p.next()
-		d.Type = &Star{Target: parseTypeName(p), starLoc: l}
+		typ = &Star{Target: parseTypeName(p), starLoc: l}
 		goto tag
 	}
 
@@ -1046,7 +1048,7 @@ func parseFieldDecl(p *Parser) FieldDecl {
 	case token.Dot:
 		l := p.start()
 		p.next()
-		d.Type = &Selector{
+		typ = &Selector{
 			Parent: id,
 			Name:   parseIdentifier(p),
 			dotLoc: l,
@@ -1054,28 +1056,40 @@ func parseFieldDecl(p *Parser) FieldDecl {
 		goto tag
 
 	case token.StringLiteral:
-		d.Tag = parseStringLiteral(p)
+		tag = parseStringLiteral(p)
 		fallthrough
 	case token.Semicolon:
 		fallthrough
 	case token.CloseBrace:
-		d.Type = id
-		return d
+		typ = id
+		return distributeField(ids, typ, tag)
 	}
 
-	d.Names = []Identifier{*id}
+	ids = append(ids, id)
 	for p.tok == token.Comma {
 		p.next()
-		id := parseIdentifier(p)
-		d.Names = append(d.Names, *id)
+		ids = append(ids, parseIdentifier(p))
 	}
-	d.Type = parseType(p)
+	typ = parseType(p)
 
 tag:
 	if p.tok == token.StringLiteral {
-		d.Tag = parseStringLiteral(p)
+		tag = parseStringLiteral(p)
 	}
-	return d
+	return distributeField(ids, typ, tag)
+}
+
+func distributeField(ids []*Identifier, typ Type, tag *StringLiteral) []FieldDecl {
+	if len(ids) == 0 {
+		return []FieldDecl{{Type: typ, Tag: tag}}
+	}
+	ds := make([]FieldDecl, len(ids))
+	for i, id := range ids {
+		ds[i].Name = id
+		ds[i].Type = typ
+		ds[i].Tag = tag
+	}
+	return ds
 }
 
 func parseInterfaceType(p *Parser) *InterfaceType {

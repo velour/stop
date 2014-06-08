@@ -157,13 +157,15 @@ var specDeclarationTests = parserTests{
 			&TypeSpec{
 				Name: *t2,
 				Type: &StructType{Fields: []FieldDecl{
-					{Names: ids("a", "b"), Type: id("int")},
+					{Name: a, Type: id("int")},
+					{Name: b, Type: id("int")},
 				}},
 			},
 			&TypeSpec{
 				Name: *t3,
 				Type: &StructType{Fields: []FieldDecl{
-					{Names: ids("a", "c"), Type: id("int")},
+					{Name: a, Type: id("int")},
+					{Name: c, Type: id("int")},
 				}},
 			},
 			&TypeSpec{
@@ -378,7 +380,8 @@ var specDeclarationTests = parserTests{
 			&TypeSpec{
 				Name: *id("Point"),
 				Type: &StructType{Fields: []FieldDecl{
-					{Names: ids("x", "y"), Type: id("float64")},
+					{Name: x, Type: id("float64")},
+					{Name: y, Type: id("float64")},
 				}},
 			},
 			&TypeSpec{Name: *id("Polar"), Type: id("Point")},
@@ -393,14 +396,9 @@ var specDeclarationTests = parserTests{
 			&TypeSpec{
 				Name: *id("TreeNode"),
 				Type: &StructType{Fields: []FieldDecl{
-					{
-						Names: ids("left", "right"),
-						Type:  &Star{Target: id("TreeNode")},
-					},
-					{
-						Names: ids("value"),
-						Type:  &Star{Target: id("Comparable")},
-					},
+					{Name: id("left"), Type: &Star{Target: id("TreeNode")}},
+					{Name: id("right"), Type: &Star{Target: id("TreeNode")}},
+					{Name: id("value"), Type: &Star{Target: id("Comparable")}},
 				}},
 			},
 		},
@@ -459,7 +457,8 @@ var specTypeTests = parserTests{
 			Size: binOp(token.Star, intLit("2"), id("N")),
 			Type: &StructType{
 				Fields: []FieldDecl{
-					{Names: ids("x", "y"), Type: id("int32")},
+					{Name: x, Type: id("int32")},
+					{Name: y, Type: id("int32")},
 				},
 			},
 		},
@@ -512,17 +511,12 @@ var specTypeTests = parserTests{
 			}`,
 		&StructType{
 			Fields: []FieldDecl{
-				{Names: ids("x", "y"), Type: id("int")},
-				{Names: ids("u"), Type: id("float32")},
-				{Names: ids("_"), Type: id("float32")},
-				{
-					Names: ids("A"),
-					Type:  &Star{Target: &SliceType{Type: id("int")}},
-				},
-				{
-					Names: ids("F"),
-					Type:  &FunctionType{},
-				},
+				{Name: x, Type: id("int")},
+				{Name: y, Type: id("int")},
+				{Name: id("u"), Type: id("float32")},
+				{Name: id("_"), Type: id("float32")},
+				{Name: id("A"), Type: &Star{Target: &SliceType{Type: id("int")}}},
+				{Name: id("F"), Type: &FunctionType{}},
 			},
 		},
 	},
@@ -540,7 +534,8 @@ var specTypeTests = parserTests{
 				{Type: &Star{Target: t2}},
 				{Type: sel(id("P"), t3).(Type)},
 				{Type: &Star{Target: sel(id("P"), t4).(Type)}},
-				{Names: ids("x", "y"), Type: id("int")},
+				{Name: x, Type: id("int")},
+				{Name: y, Type: id("int")},
 			},
 		},
 	},
@@ -568,19 +563,19 @@ var specTypeTests = parserTests{
 		&StructType{
 			Fields: []FieldDecl{
 				{
-					Names: ids("microsec"),
-					Type:  id("uint64"),
-					Tag:   strLit("field 1"),
+					Name: id("microsec"),
+					Type: id("uint64"),
+					Tag:  strLit("field 1"),
 				},
 				{
-					Names: ids("serverIP6"),
-					Type:  id("uint64"),
-					Tag:   strLit("field 2"),
+					Name: id("serverIP6"),
+					Type: id("uint64"),
+					Tag:  strLit("field 2"),
 				},
 				{
-					Names: ids("process"),
-					Type:  id("string"),
-					Tag:   strLit("field 3"),
+					Name: id("process"),
+					Type: id("string"),
+					Tag:  strLit("field 3"),
 				},
 			},
 		},
@@ -724,7 +719,8 @@ var specTypeTests = parserTests{
 		&MapType{
 			Key: &Star{Target: id("T")},
 			Value: &StructType{Fields: []FieldDecl{
-				{Names: ids("x", "y"), Type: id("float64")},
+				{Name: x, Type: id("float64")},
+				{Name: y, Type: id("float64")},
 			}},
 		},
 	},
@@ -2172,15 +2168,16 @@ func TestParseStructType(t *testing.T) {
 			{Type: c},
 		}}},
 		{`struct{a, b c}`, &StructType{Fields: []FieldDecl{
-			{Names: ids("a", "b"), Type: c},
+			{Name: a, Type: c},
+			{Name: b, Type: c},
 		}}},
 		{`struct{a b; c}`, &StructType{Fields: []FieldDecl{
-			{Names: ids("a"), Type: b},
+			{Name: a, Type: b},
 			{Type: c},
 		}}},
 		{`struct{a; b c}`, &StructType{Fields: []FieldDecl{
 			{Type: a},
-			{Names: ids("b"), Type: c},
+			{Name: b, Type: c},
 		}}},
 		{`struct{big.Int}`, &StructType{Fields: []FieldDecl{
 			{Type: bigInt},
@@ -2191,11 +2188,11 @@ func TestParseStructType(t *testing.T) {
 		}}},
 		{`struct{big.Int; a b}`, &StructType{Fields: []FieldDecl{
 			{Type: bigInt},
-			{Names: ids("a"), Type: b},
+			{Name: a, Type: b},
 		}}},
 		{`struct{big.Int; a big.Int}`, &StructType{Fields: []FieldDecl{
 			{Type: bigInt},
-			{Names: ids("a"), Type: bigInt},
+			{Name: a, Type: bigInt},
 		}}},
 		{`struct{*big.Int}`, &StructType{Fields: []FieldDecl{
 			{Type: &Star{Target: bigInt}},
@@ -2227,7 +2224,11 @@ func TestParseStructType(t *testing.T) {
 			{Type: b},
 		}}},
 		{`struct{a b "your it"}`, &StructType{Fields: []FieldDecl{
-			{Names: ids("a"), Type: b, Tag: strLit("your it")},
+			{Name: a, Type: b, Tag: strLit("your it")},
+		}}},
+		{`struct{a, b c "your it"}`, &StructType{Fields: []FieldDecl{
+			{Name: a, Type: c, Tag: strLit("your it")},
+			{Name: b, Type: c, Tag: strLit("your it")},
 		}}},
 
 		// Trailing ;
@@ -2247,8 +2248,8 @@ func TestParseStructType(t *testing.T) {
 		{
 			`struct {a int; b int}`,
 			&StructType{Fields: []FieldDecl{
-				{Names: ids("a"), Type: id("int")},
-				{Names: ids("b"), Type: id("int")},
+				{Name: a, Type: id("int")},
+				{Name: b, Type: id("int")},
 			},
 			},
 		},
@@ -2708,7 +2709,7 @@ func TestParseCompositeLiteral(t *testing.T) {
 	parserTests{
 		{`struct{ a int }{ a: 4 }`, &CompositeLiteral{
 			Type: &StructType{Fields: []FieldDecl{
-				{Names: ids("a"), Type: id("int")},
+				{Name: a, Type: id("int")},
 			}},
 			Elements: []Element{
 				{Key: a, Value: intLit("4")},
@@ -2716,7 +2717,8 @@ func TestParseCompositeLiteral(t *testing.T) {
 		}},
 		{`struct{ a, b int }{ a: 4, b: 5}`, &CompositeLiteral{
 			Type: &StructType{Fields: []FieldDecl{
-				{Names: ids("a", "b"), Type: id("int")},
+				{Name: a, Type: id("int")},
+				{Name: b, Type: id("int")},
 			}},
 			Elements: []Element{
 				{Key: a, Value: intLit("4")},
@@ -2725,7 +2727,7 @@ func TestParseCompositeLiteral(t *testing.T) {
 		}},
 		{`struct{ a []int }{ a: { 4, 5 } }`, &CompositeLiteral{
 			Type: &StructType{Fields: []FieldDecl{
-				{Names: ids("a"), Type: &SliceType{Type: id("int")}},
+				{Name: a, Type: &SliceType{Type: id("int")}},
 			}},
 			Elements: []Element{
 				{Key: a, Value: &CompositeLiteral{
@@ -2752,7 +2754,8 @@ func TestParseCompositeLiteral(t *testing.T) {
 		// Trailing ,
 		{`struct{ a, b int }{ a: 4, b: 5,}`, &CompositeLiteral{
 			Type: &StructType{Fields: []FieldDecl{
-				{Names: ids("a", "b"), Type: id("int")},
+				{Name: a, Type: id("int")},
+				{Name: b, Type: id("int")},
 			}},
 			Elements: []Element{
 				{Key: a, Value: intLit("4")},
@@ -2799,7 +2802,7 @@ func TestParseConversionExpr(t *testing.T) {
 	parserTests{
 		{`(int)(a)`, call(id("int"), false, a)},
 		{`(struct{x int})(a)`, call(&StructType{
-			Fields: []FieldDecl{{Names: ids("x"), Type: id("int")}},
+			Fields: []FieldDecl{{Name: x, Type: id("int")}},
 		}, false, a)},
 		{`(chan <- a)(b)`, call(&ChannelType{Send: true, Type: a}, false, b)},
 		{`chan <- a(b)`, call(&ChannelType{Send: true, Type: a}, false, b)},
