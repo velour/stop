@@ -377,8 +377,8 @@ func (n *ImportDecl) End() token.Location   { return n.endLoc }
 
 // An ImportSpec represents the import of a single package.
 type ImportSpec struct {
-	Dot  bool
-	Name *Identifier
+	Dot bool
+	*Identifier
 	Path StringLiteral
 }
 
@@ -389,7 +389,7 @@ type MethodDecl struct {
 	Receiver     Identifier
 	Pointer      bool
 	BaseTypeName Identifier
-	Name         Identifier
+	Identifier
 	Signature
 	Body BlockStmt
 }
@@ -401,7 +401,7 @@ func (n *MethodDecl) End() token.Location   { return n.Body.End() }
 type FunctionDecl struct {
 	comments
 	startLoc token.Location
-	Name     Identifier
+	Identifier
 	Signature
 	Body BlockStmt
 }
@@ -415,12 +415,12 @@ type ConstSpec struct {
 	comments
 	// Type is the type of the spec or nil if the type should be inferred
 	// from the values.
-	Type   Type
-	Names  []Identifier
-	Values []Expression
+	Type        Type
+	Identifiers []Identifier
+	Values      []Expression
 }
 
-func (n *ConstSpec) Start() token.Location { return n.Names[0].Start() }
+func (n *ConstSpec) Start() token.Location { return n.Identifiers[0].Start() }
 func (n *ConstSpec) End() token.Location   { return n.Values[len(n.Values)-1].End() }
 
 // A VarSpec is a declaration node representing the declaration of
@@ -429,23 +429,23 @@ type VarSpec struct {
 	comments
 	// Type is the type of the spec or nil if the type should be inferred
 	// from the values.
-	Type   Type
-	Names  []Identifier
-	Values []Expression
+	Type        Type
+	Identifiers []Identifier
+	Values      []Expression
 }
 
-func (n *VarSpec) Start() token.Location { return n.Names[0].Start() }
+func (n *VarSpec) Start() token.Location { return n.Identifiers[0].Start() }
 func (n *VarSpec) End() token.Location   { return n.Values[len(n.Values)-1].End() }
 
 // A TypeSpec is a declaration node representing the declaration of
 // a single type.
 type TypeSpec struct {
 	comments
-	Name Identifier
+	Identifier
 	Type Type
 }
 
-func (n *TypeSpec) Start() token.Location { return n.Name.Start() }
+func (n *TypeSpec) Start() token.Location { return n.Identifier.Start() }
 func (n *TypeSpec) End() token.Location   { return n.Type.End() }
 
 // The Type interface is implemented by nodes that represent types.
@@ -467,14 +467,14 @@ func (n *StructType) typeNode()             {}
 
 // A FieldDecl is a node representing a struct field declaration.
 type FieldDecl struct {
-	Name *Identifier
+	*Identifier
 	Type Type
 	Tag  *StringLiteral
 }
 
 func (n *FieldDecl) Start() token.Location {
-	if n.Name != nil {
-		return n.Name.Start()
+	if n.Identifier != nil {
+		return n.Identifier.Start()
 	}
 	return n.Type.Start()
 }
@@ -503,17 +503,12 @@ func (n *InterfaceType) typeNode()             {}
 
 // A Method is a node representing a method name and its signature.
 type Method struct {
-	Name Identifier
+	Identifier
 	Signature
 }
 
-func (n *Method) Start() token.Location {
-	return n.Name.Start()
-}
-
-func (n *Method) End() token.Location {
-	return n.Signature.End()
-}
+func (n *Method) Start() token.Location { return n.Identifier.Start() }
+func (n *Method) End() token.Location   { return n.Signature.End() }
 
 // A FunctionType is a type node representing a function type.
 type FunctionType struct {
@@ -537,14 +532,14 @@ func (n *Signature) End() token.Location   { return n.end }
 // A ParameterDecl is a node representing the declaration of a single parameter.
 type ParameterDecl struct {
 	Type Type
-	Name *Identifier
+	*Identifier
 	// DotDotDot is true if the final identifier was followed by a "...".
 	DotDotDot bool
 }
 
 func (n *ParameterDecl) Start() token.Location {
-	if n.Name != nil {
-		return n.Name.Start()
+	if n.Identifier != nil {
+		return n.Identifier.Start()
 	}
 	return n.Type.Start()
 }
@@ -709,13 +704,13 @@ func (n *TypeAssertion) End() token.Location   { return n.closeLoc }
 // an selector expression.
 type Selector struct {
 	Parent Expression
-	Name   *Identifier
+	*Identifier
 	dotLoc token.Location
 }
 
 func (n *Selector) Start() token.Location { return n.Parent.Start() }
 func (n *Selector) Loc() token.Location   { return n.dotLoc }
-func (n *Selector) End() token.Location   { return n.Name.End() }
+func (n *Selector) End() token.Location   { return n.Identifier.End() }
 func (n *Selector) typeNode()             {}
 
 // Call is a function call expression.

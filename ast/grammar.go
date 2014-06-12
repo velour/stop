@@ -763,7 +763,7 @@ func parseImportSpec(p *Parser) ImportSpec {
 		return s
 	}
 	if p.tok != token.StringLiteral {
-		s.Name = parseIdentifier(p)
+		s.Identifier = parseIdentifier(p)
 	}
 	s.Path = *parseStringLiteral(p)
 	return s
@@ -792,17 +792,17 @@ func parseFunctionOrMethodDecl(p *Parser) Declaration {
 		m.BaseTypeName = *parseIdentifier(p)
 		p.expect(token.CloseParen)
 		p.next()
-		m.Name = *parseIdentifier(p)
+		m.Identifier = *parseIdentifier(p)
 		m.Signature = parseSignature(p)
 		m.Body = *parseBlock(p)
 		return m
 	}
 	return &FunctionDecl{
-		comments:  cmnts,
-		startLoc:  l,
-		Name:      *parseIdentifier(p),
-		Signature: parseSignature(p),
-		Body:      *parseBlock(p),
+		comments:   cmnts,
+		startLoc:   l,
+		Identifier: *parseIdentifier(p),
+		Signature:  parseSignature(p),
+		Body:       *parseBlock(p),
 	}
 }
 
@@ -845,8 +845,8 @@ func parseVarDecl(p *Parser) Declarations {
 
 func parseVarSpec(p *Parser) *VarSpec {
 	vs := &VarSpec{
-		comments: p.comments(),
-		Names:    parseIdentifierList(p),
+		comments:    p.comments(),
+		Identifiers: parseIdentifierList(p),
 	}
 	if typeFirst[p.tok] {
 		vs.Type = parseType(p)
@@ -888,8 +888,8 @@ func parseConstDecl(p *Parser) Declarations {
 
 func parseConstSpec(p *Parser) *ConstSpec {
 	cs := &ConstSpec{
-		comments: p.comments(),
-		Names:    parseIdentifierList(p),
+		comments:    p.comments(),
+		Identifiers: parseIdentifierList(p),
 	}
 	if typeFirst[p.tok] {
 		cs.Type = parseType(p)
@@ -941,9 +941,9 @@ func parseTypeDecl(p *Parser) Declarations {
 
 func parseTypeSpec(p *Parser) *TypeSpec {
 	return &TypeSpec{
-		comments: p.comments(),
-		Name:     *parseIdentifier(p),
-		Type:     parseType(p),
+		comments:   p.comments(),
+		Identifier: *parseIdentifier(p),
+		Type:       parseType(p),
 	}
 }
 
@@ -1049,9 +1049,9 @@ func parseFieldDecl(p *Parser) []FieldDecl {
 		l := p.start()
 		p.next()
 		typ = &Selector{
-			Parent: id,
-			Name:   parseIdentifier(p),
-			dotLoc: l,
+			Parent:     id,
+			Identifier: parseIdentifier(p),
+			dotLoc:     l,
 		}
 		goto tag
 
@@ -1085,7 +1085,7 @@ func distributeField(ids []*Identifier, typ Type, tag *StringLiteral) []FieldDec
 	}
 	ds := make([]FieldDecl, len(ids))
 	for i, id := range ids {
-		ds[i].Name = id
+		ds[i].Identifier = id
 		ds[i].Type = typ
 		ds[i].Tag = tag
 	}
@@ -1104,17 +1104,17 @@ func parseInterfaceType(p *Parser) *InterfaceType {
 		switch p.tok {
 		case token.OpenParen:
 			it.Methods = append(it.Methods, &Method{
-				Name:      *id,
-				Signature: parseSignature(p),
+				Identifier: *id,
+				Signature:  parseSignature(p),
 			})
 
 		case token.Dot:
 			l := p.start()
 			p.next()
 			it.Methods = append(it.Methods, &Selector{
-				Parent: id,
-				Name:   parseIdentifier(p),
-				dotLoc: l,
+				Parent:     id,
+				Identifier: parseIdentifier(p),
+				dotLoc:     l,
 			})
 
 		default:
@@ -1207,9 +1207,9 @@ func parseParameterListTail(p *Parser, ids []*Identifier) []ParameterDecl {
 			l := p.start()
 			p.next()
 			t := &Selector{
-				Parent: id,
-				Name:   parseIdentifier(p),
-				dotLoc: l,
+				Parent:     id,
+				Identifier: parseIdentifier(p),
+				dotLoc:     l,
 			}
 			ps := append(typeNameDecls(ids), ParameterDecl{Type: t})
 			return parseTypeParameterList(p, ps)
@@ -1298,7 +1298,7 @@ func parseDeclParameterList(p *Parser, ps []ParameterDecl) []ParameterDecl {
 func distributeParm(ids []*Identifier, typ Type, ddd bool) []ParameterDecl {
 	ds := make([]ParameterDecl, len(ids))
 	for i, id := range ids {
-		ds[i].Name = id
+		ds[i].Identifier = id
 		ds[i].Type = typ
 	}
 	ds[len(ds)-1].DotDotDot = ddd
@@ -1373,9 +1373,9 @@ func parseTypeName(p *Parser) Type {
 		l := p.start()
 		p.next()
 		return &Selector{
-			Parent: n,
-			Name:   parseIdentifier(p),
-			dotLoc: l,
+			Parent:     n,
+			Identifier: parseIdentifier(p),
+			dotLoc:     l,
 		}
 	}
 	return n
@@ -1743,9 +1743,9 @@ func parseSelectorOrTypeAssertion(p *Parser, left Expression, typeSwitch bool) E
 
 	case token.Identifier:
 		left = &Selector{
-			Parent: left,
-			Name:   parseIdentifier(p),
-			dotLoc: dotLoc,
+			Parent:     left,
+			Identifier: parseIdentifier(p),
+			dotLoc:     dotLoc,
 		}
 		if p.tok == token.Dot {
 			return parseSelectorOrTypeAssertion(p, left, typeSwitch)
