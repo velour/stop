@@ -609,6 +609,22 @@ func (n *Star) End() token.Location   { return n.Target.End() }
 func (n *Star) Loc() token.Location   { return n.starLoc }
 func (n *Star) typeNode()             {}
 
+// A TypeName is a type node representing a possibly-qualified type name.
+type TypeName struct {
+	// The package name, or nil for an unqualified name.
+	Package *Identifier
+	Identifier
+}
+
+func (n *TypeName) Start() token.Location {
+	if n.Package != nil {
+		return n.Package.Start()
+	}
+	return n.Identifier.Start()
+}
+func (n *TypeName) End() token.Location { return n.Identifier.End() }
+func (n *TypeName) typeNode()           {}
+
 // The Expression interface is implemented by all nodes that are
 // also expressions.
 type Expression interface {
@@ -711,7 +727,6 @@ type Selector struct {
 func (n *Selector) Start() token.Location { return n.Parent.Start() }
 func (n *Selector) Loc() token.Location   { return n.dotLoc }
 func (n *Selector) End() token.Location   { return n.Identifier.End() }
-func (n *Selector) typeNode()             {}
 
 // Call is a function call expression.
 // After parsing but before type checking, a Call can represent
@@ -756,8 +771,6 @@ type Identifier struct {
 	Name string
 	span
 }
-
-func (n *Identifier) typeNode() {}
 
 // IntegerLiteral is an expression node representing a decimal,
 // octal, or hex

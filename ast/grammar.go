@@ -1046,12 +1046,10 @@ func parseFieldDecl(p *Parser) []FieldDecl {
 	id = parseIdentifier(p)
 	switch p.tok {
 	case token.Dot:
-		l := p.start()
 		p.next()
-		typ = &Selector{
-			Parent:     id,
-			Identifier: parseIdentifier(p),
-			dotLoc:     l,
+		typ = &TypeName{
+			Package:    id,
+			Identifier: *parseIdentifier(p),
 		}
 		goto tag
 
@@ -1061,7 +1059,7 @@ func parseFieldDecl(p *Parser) []FieldDecl {
 	case token.Semicolon:
 		fallthrough
 	case token.CloseBrace:
-		typ = id
+		typ = &TypeName{Identifier: *id}
 		return distributeField(ids, typ, tag)
 	}
 
@@ -1109,16 +1107,14 @@ func parseInterfaceType(p *Parser) *InterfaceType {
 			})
 
 		case token.Dot:
-			l := p.start()
 			p.next()
-			it.Methods = append(it.Methods, &Selector{
-				Parent:     id,
-				Identifier: parseIdentifier(p),
-				dotLoc:     l,
+			it.Methods = append(it.Methods, &TypeName{
+				Package:    id,
+				Identifier: *parseIdentifier(p),
 			})
 
 		default:
-			it.Methods = append(it.Methods, id)
+			it.Methods = append(it.Methods, &TypeName{Identifier: *id})
 		}
 		if p.tok == token.CloseBrace {
 			break
@@ -1204,12 +1200,10 @@ func parseParameterListTail(p *Parser, ids []*Identifier) []ParameterDecl {
 			return parseParameterListTail(p, append(ids, id))
 
 		case p.tok == token.Dot:
-			l := p.start()
 			p.next()
-			t := &Selector{
-				Parent:     id,
-				Identifier: parseIdentifier(p),
-				dotLoc:     l,
+			t := &TypeName{
+				Package:    id,
+				Identifier: *parseIdentifier(p),
 			}
 			ps := append(typeNameDecls(ids), ParameterDecl{Type: t})
 			return parseTypeParameterList(p, ps)
@@ -1308,7 +1302,7 @@ func distributeParm(ids []*Identifier, typ Type, ddd bool) []ParameterDecl {
 func typeNameDecls(ids []*Identifier) []ParameterDecl {
 	decls := make([]ParameterDecl, len(ids))
 	for i, id := range ids {
-		decls[i].Type = id
+		decls[i].Type = &TypeName{Identifier: *id}
 	}
 	return decls
 }
@@ -1368,17 +1362,14 @@ func parseArrayOrSliceType(p *Parser, dotDotDot bool) Type {
 
 func parseTypeName(p *Parser) Type {
 	p.expect(token.Identifier)
-	n := parseIdentifier(p)
+	var pkg *Identifier
+	name := parseIdentifier(p)
 	if p.tok == token.Dot {
-		l := p.start()
 		p.next()
-		return &Selector{
-			Parent:     n,
-			Identifier: parseIdentifier(p),
-			dotLoc:     l,
-		}
+		pkg = name
+		name = parseIdentifier(p)
 	}
-	return n
+	return &TypeName{Package: pkg, Identifier: *name}
 }
 
 var (
@@ -1503,10 +1494,12 @@ func parseUnaryExpr(p *Parser, typeSwitch bool) Expression {
 
 func parsePrimaryExpr(p *Parser, typeSwitch bool) Expression {
 	left := parseOperand(p, typeSwitch)
-	if t, ok := left.(Type); ok && p.exprLevel >= 0 && p.tok == token.OpenBrace {
-		lit := parseLiteralValue(p)
-		lit.Type = t
-		return lit
+	if p.exprLevel >= 0 && p.tok == token.OpenBrace {
+		if t := typeExpr(left); t != nil {
+			lit := parseLiteralValue(p)
+			lit.Type = t
+			return lit
+		}
 	}
 	for {
 		switch p.tok {
@@ -1524,6 +1517,21 @@ func parsePrimaryExpr(p *Parser, typeSwitch bool) Expression {
 			return left
 		}
 	}
+}
+
+// Returns a Type if the Expression can be a Type, or nil if it is not.
+func typeExpr(e Expression) Type {
+	switch t := e.(type) {
+	case Type:
+		return t
+	case *Identifier:
+		return &TypeName{Identifier: *t}
+	case *Selector:
+		if pkg, ok := t.Parent.(*Identifier); ok {
+			return &TypeName{Package: pkg, Identifier: *t.Identifier}
+		}
+	}
+	return nil
 }
 
 func parseSliceOrIndex(p *Parser, left Expression) Expression {
