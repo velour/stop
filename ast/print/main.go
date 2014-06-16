@@ -7,9 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"strings"
 
-	"github.com/mccoyst/pipeline"
 	"github.com/velour/stop/ast"
 	"github.com/velour/stop/token"
 )
@@ -60,14 +58,8 @@ func dot(root ast.Node) {
 	tmp.Close()
 	defer os.Remove(ps)
 
-	pl, err := pipeline.New(
-		exec.Command("dot", "-o"+ps, "-Tps"),
-		exec.Command("gv", ps),
-	)
-	if err != nil {
-		die(err)
-	}
-	out, err := pl.First().StdinPipe()
+	dotCmd := exec.Command("dot", "-o"+ps, "-Tps")
+	out, err := dotCmd.StdinPipe()
 	if err != nil {
 		die(err)
 	}
@@ -77,21 +69,12 @@ func dot(root ast.Node) {
 		}
 		out.Close()
 	}()
-	pl.Start()
-	es := pl.Wait()
-	if len(es) > 0 {
-		die(errs(es))
+	if err := dotCmd.Run(); err != nil {
+		die(err)
 	}
-}
-
-type errs []error
-
-func (es errs) Error() string {
-	s := ""
-	for _, e := range es {
-		s += e.Error() + "\n"
+	if err := exec.Command("gv", ps).Run(); err != nil {
+		die(err)
 	}
-	return strings.TrimSpace(s)
 }
 
 func die(err error) {
