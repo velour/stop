@@ -866,18 +866,25 @@ func parseConstDecl(p *Parser) Declarations {
 	cmnts := p.comments()
 	p.next()
 
+	i := 0
+	var typ Type
+	var vals []Expression
 	if p.tok != token.OpenParen {
-		cs := parseConstSpec(p)
+		cs := parseConstSpec(p, typ, vals, i)
 		cs.comments = cmnts
 		return append(decls, cs)
 	}
 	p.next()
 
 	for p.tok != token.CloseParen {
-		decls = append(decls, parseConstSpec(p))
+		cs := parseConstSpec(p, typ, vals, i)
+		decls = append(decls, cs)
 		if p.tok == token.CloseParen {
 			break
 		}
+		typ = cs.Type
+		vals = cs.Values
+		i++
 		p.expect(token.Semicolon)
 		p.next()
 	}
@@ -886,17 +893,30 @@ func parseConstDecl(p *Parser) Declarations {
 	return decls
 }
 
-func parseConstSpec(p *Parser) *ConstSpec {
+func parseConstSpec(p *Parser, typ Type, vals []Expression, i int) *ConstSpec {
 	cs := &ConstSpec{
 		comments:    p.comments(),
 		Identifiers: parseIdentifierList(p),
+		Iota:        i,
 	}
 	if typeFirst[p.tok] {
 		cs.Type = parseType(p)
-	}
-	if p.tok == token.Equal {
+		p.expect(token.Equal)
 		p.next()
 		cs.Values = parseExpressionList(p)
+	} else {
+		if p.tok == token.Equal {
+			p.next()
+			cs.Values = parseExpressionList(p)
+		}
+	}
+	if cs.Values == nil {
+		if cs.Type != nil {
+			// This is disallowed by the grammar.
+			panic("ConstSpec with a type and copied values")
+		}
+		cs.Type = typ
+		cs.Values = vals
 	}
 	return cs
 }

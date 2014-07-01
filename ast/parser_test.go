@@ -222,6 +222,7 @@ var specDeclarationTests = parserTests{
 			&ConstSpec{
 				Identifiers: ids("eof"),
 				Values:      []Expression{unOp(token.Minus, intLit("1"))},
+				Iota:        1,
 			},
 		},
 	},
@@ -260,13 +261,41 @@ var specDeclarationTests = parserTests{
 				Identifiers: ids("Sunday"),
 				Values:      []Expression{id("iota")},
 			},
-			&ConstSpec{Identifiers: ids("Monday")},
-			&ConstSpec{Identifiers: ids("Tuesday")},
-			&ConstSpec{Identifiers: ids("Wednesday")},
-			&ConstSpec{Identifiers: ids("Thursday")},
-			&ConstSpec{Identifiers: ids("Friday")},
-			&ConstSpec{Identifiers: ids("Partyday")},
-			&ConstSpec{Identifiers: ids("numberOfDays")},
+			&ConstSpec{
+				Identifiers: ids("Monday"),
+				Values:      []Expression{id("iota")},
+				Iota:        1,
+			},
+			&ConstSpec{
+				Identifiers: ids("Tuesday"),
+				Values:      []Expression{id("iota")},
+				Iota:        2,
+			},
+			&ConstSpec{
+				Identifiers: ids("Wednesday"),
+				Values:      []Expression{id("iota")},
+				Iota:        3,
+			},
+			&ConstSpec{
+				Identifiers: ids("Thursday"),
+				Values:      []Expression{id("iota")},
+				Iota:        4,
+			},
+			&ConstSpec{
+				Identifiers: ids("Friday"),
+				Values:      []Expression{id("iota")},
+				Iota:        5,
+			},
+			&ConstSpec{
+				Identifiers: ids("Partyday"),
+				Values:      []Expression{id("iota")},
+				Iota:        6,
+			},
+			&ConstSpec{
+				Identifiers: ids("numberOfDays"),
+				Values:      []Expression{id("iota")},
+				Iota:        7,
+			},
 		},
 	},
 	{
@@ -283,10 +312,12 @@ var specDeclarationTests = parserTests{
 			&ConstSpec{
 				Identifiers: ids("c1"),
 				Values:      []Expression{id("iota")},
+				Iota:        1,
 			},
 			&ConstSpec{
 				Identifiers: ids("c2"),
 				Values:      []Expression{id("iota")},
+				Iota:        2,
 			},
 		},
 	},
@@ -304,10 +335,12 @@ var specDeclarationTests = parserTests{
 			&ConstSpec{
 				Identifiers: ids("b"),
 				Values:      []Expression{binOp(token.LessLess, intLit("1"), id("iota"))},
+				Iota:        1,
 			},
 			&ConstSpec{
 				Identifiers: ids("c"),
 				Values:      []Expression{binOp(token.LessLess, intLit("1"), id("iota"))},
+				Iota:        2,
 			},
 		},
 	},
@@ -326,10 +359,12 @@ var specDeclarationTests = parserTests{
 				Identifiers: ids("v"),
 				Type:        typ("float64"),
 				Values:      []Expression{binOp(token.Star, id("iota"), intLit("42"))},
+				Iota:        1,
 			},
 			&ConstSpec{
 				Identifiers: ids("w"),
 				Values:      []Expression{binOp(token.Star, id("iota"), intLit("42"))},
+				Iota:        2,
 			},
 		},
 	},
@@ -350,9 +385,33 @@ var specDeclarationTests = parserTests{
 						intLit("1")),
 				},
 			},
-			&ConstSpec{Identifiers: ids("bit1", "mask1")},
-			&ConstSpec{Identifiers: ids("_", "_")},
-			&ConstSpec{Identifiers: ids("bit3", "mask3")},
+			&ConstSpec{Identifiers: ids("bit1", "mask1"),
+				Values: []Expression{
+					binOp(token.LessLess, intLit("1"), id("iota")),
+					binOp(token.Minus,
+						binOp(token.LessLess, intLit("1"), id("iota")),
+						intLit("1")),
+				},
+				Iota: 1,
+			},
+			&ConstSpec{Identifiers: ids("_", "_"),
+				Values: []Expression{
+					binOp(token.LessLess, intLit("1"), id("iota")),
+					binOp(token.Minus,
+						binOp(token.LessLess, intLit("1"), id("iota")),
+						intLit("1")),
+				},
+				Iota: 2,
+			},
+			&ConstSpec{Identifiers: ids("bit3", "mask3"),
+				Values: []Expression{
+					binOp(token.LessLess, intLit("1"), id("iota")),
+					binOp(token.Minus,
+						binOp(token.LessLess, intLit("1"), id("iota")),
+						intLit("1")),
+				},
+				Iota: 3,
+			},
 		},
 	},
 	{
@@ -1971,12 +2030,6 @@ func TestParseConstDecl(t *testing.T) {
 			},
 		},
 		{
-			`const a big.Int`,
-			Declarations{
-				&ConstSpec{Identifiers: ids("a"), Type: bigInt},
-			},
-		},
-		{
 			`const a int = 5`,
 			Declarations{
 				&ConstSpec{
@@ -2007,13 +2060,19 @@ func TestParseConstDecl(t *testing.T) {
 					Type:        typ("int"),
 					Values:      []Expression{intLit("7")},
 				},
-				&ConstSpec{Identifiers: ids("b")},
+				&ConstSpec{
+					Identifiers: ids("b"),
+					Type:        typ("int"),
+					Values:      []Expression{intLit("7")},
+					Iota:        1,
+				},
 			},
 		},
 		{
 			`const (
 				a int = 7
 				b, c, d
+				e, f, g
 				x, y, z float64 = 3.0, 4.0, 5.0
 			)`,
 			Declarations{
@@ -2022,14 +2081,27 @@ func TestParseConstDecl(t *testing.T) {
 					Type:        typ("int"),
 					Values:      []Expression{intLit("7")},
 				},
-				&ConstSpec{Identifiers: ids("b", "c", "d")},
+				&ConstSpec{
+					Identifiers: ids("b", "c", "d"),
+					Type:        typ("int"),
+					Values:      []Expression{intLit("7")},
+					Iota:        1,
+				},
+				&ConstSpec{
+					Identifiers: ids("e", "f", "g"),
+					Type:        typ("int"),
+					Values:      []Expression{intLit("7")},
+					Iota:        2,
+				},
 				&ConstSpec{
 					Identifiers: ids("x", "y", "z"),
 					Type:        typ("float64"),
 					Values:      []Expression{floatLit("3.0"), floatLit("4.0"), floatLit("5.0")},
+					Iota:        3,
 				},
 			},
 		},
+		{`const a big.Int`, parseError{""}},
 	}.run(t, func(p *Parser) Node { return parseTopLevelDecl(p) })
 }
 
