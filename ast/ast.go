@@ -418,6 +418,7 @@ type ConstSpec struct {
 	Type        Type
 	Identifiers []Identifier
 	Values      []Expression
+	Iota        int
 }
 
 func (n *ConstSpec) Start() token.Location { return n.Identifiers[0].Start() }
