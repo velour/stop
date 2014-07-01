@@ -10,7 +10,7 @@ import (
 
 // Parse returns the root of an abstract syntax tree for the Go language
 // or an error if one is encountered.
-func Parse(p *Parser) (root Node, err error) {
+func Parse(p *Parser) (root *SourceFile, err error) {
 	defer func() {
 		r := recover()
 		if r == nil {
@@ -29,7 +29,7 @@ func Parse(p *Parser) (root Node, err error) {
 	return parseSourceFile(p), nil
 }
 
-func parseSourceFile(p *Parser) Node {
+func parseSourceFile(p *Parser) *SourceFile {
 	p.expect(token.Package)
 	s := &SourceFile{comments: p.comments(), startLoc: p.start()}
 	p.next()
