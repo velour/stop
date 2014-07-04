@@ -2930,13 +2930,13 @@ func TestParseImaginaryLiteral(t *testing.T) {
 		return &ImaginaryLiteral{Value: &r}
 	}
 	parserTests{
-		{"0.i", i("0.0i")},
-		{"1.i", i("1.0i")},
-		{"1.0i", i("1.0i")},
-		{"0.1i", i("0.1i")},
-		{"0.1000i", i("0.1i")},
-		{"1e1i", i("10.0i")},
-		{"1e-1i", i("0.1i")},
+		{"0.i", i("0.0")},
+		{"1.i", i("1.0")},
+		{"1.0i", i("1.0")},
+		{"0.1i", i("0.1")},
+		{"0.1000i", i("0.1")},
+		{"1e1i", i("10.0")},
+		{"1e-1i", i("0.1")},
 	}.run(t, func(p *Parser) Node { return parseExpr(p) })
 }
 
