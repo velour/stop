@@ -26,4 +26,6 @@ golint . \
 	| grep -v 'Start should have comment'\
 	| grep -v 'Loc should have comment'\
 	| grep -v 'End should have comment'\
+	| grep -v 'Eq should have comment'\
+	| grep -v 'Fold should have comment'\
 
