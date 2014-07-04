@@ -781,10 +781,28 @@ type IntegerLiteral struct {
 	span
 }
 
+func (n *IntegerLiteral) Eq(v interface{}) bool {
+	m, ok := v.(*IntegerLiteral)
+	return ok && n.Value.Cmp(m.Value) == 0
+}
+
+func (n *IntegerLiteral) String() string {
+	return "IntegerLiteral{ " + n.Value.String() + " }"
+}
+
 // FloatLiteral is an expression node representing a floating point literal.
 type FloatLiteral struct {
 	Value *big.Rat
 	span
+}
+
+func (n *FloatLiteral) Eq(v interface{}) bool {
+	m, ok := v.(*FloatLiteral)
+	return ok && n.Value.Cmp(m.Value) == 0
+}
+
+func (n *FloatLiteral) String() string {
+	return "FloatLiteral{ " + n.Value.String() + " }"
 }
 
 // ImaginaryLiteral is an expression node representing an imaginary
@@ -792,6 +810,15 @@ type FloatLiteral struct {
 type ImaginaryLiteral struct {
 	Value *big.Rat
 	span
+}
+
+func (n *ImaginaryLiteral) Eq(v interface{}) bool {
+	m, ok := v.(*ImaginaryLiteral)
+	return ok && n.Value.Cmp(m.Value) == 0
+}
+
+func (n *ImaginaryLiteral) String() string {
+	return "ImaginaryLiteral{ " + n.Value.String() + " }"
 }
 
 // RuneLiteral is an expression node representing a rune literal.
