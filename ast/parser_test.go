@@ -45,6 +45,12 @@ func floatLit(s string) *FloatLiteral {
 	return &FloatLiteral{Value: &r}
 }
 
+func imgLit(s string) *ComplexLiteral {
+	var r big.Rat
+	r.SetString(s)
+	return &ComplexLiteral{Real: new(big.Rat), Imaginary: &r}
+}
+
 func typ(s string) *TypeName { return &TypeName{Identifier: *id(s)} }
 func qtyp(p, s string) *TypeName {
 	return &TypeName{Package: id(p), Identifier: *id(s)}
@@ -2618,33 +2624,41 @@ func TestParseFunctionLiteral(t *testing.T) {
 		{
 			`func()big.Int{}`,
 			&FunctionLiteral{
-				Signature: Signature{
-					Results: []ParameterDecl{{Type: bigInt}},
+				FunctionType: FunctionType{
+					Signature: Signature{
+						Results: []ParameterDecl{{Type: bigInt}},
+					},
 				},
 			},
 		},
 		{
 			`func(a){}`,
 			&FunctionLiteral{
-				Signature: Signature{
-					Parameters: []ParameterDecl{{Type: typ("a")}},
+				FunctionType: FunctionType{
+					Signature: Signature{
+						Parameters: []ParameterDecl{{Type: typ("a")}},
+					},
 				},
 			},
 		},
 		{
 			`func(a b){}`,
 			&FunctionLiteral{
-				Signature: Signature{
-					Parameters: []ParameterDecl{{Identifier: a, Type: typ("b")}},
+				FunctionType: FunctionType{
+					Signature: Signature{
+						Parameters: []ParameterDecl{{Identifier: a, Type: typ("b")}},
+					},
 				},
 			},
 		},
 		{
 			`func(a b)big.Int{}`,
 			&FunctionLiteral{
-				Signature: Signature{
-					Parameters: []ParameterDecl{{Identifier: a, Type: typ("b")}},
-					Results:    []ParameterDecl{{Type: bigInt}},
+				FunctionType: FunctionType{
+					Signature: Signature{
+						Parameters: []ParameterDecl{{Identifier: a, Type: typ("b")}},
+						Results:    []ParameterDecl{{Type: bigInt}},
+					},
 				},
 			},
 		},
@@ -2667,9 +2681,11 @@ func TestParseFunctionLiteral(t *testing.T) {
 				return c
 			}`,
 			&FunctionLiteral{
-				Signature: Signature{
-					Parameters: []ParameterDecl{{Identifier: a, Type: typ("b")}},
-					Results:    []ParameterDecl{{Type: bigInt}},
+				FunctionType: FunctionType{
+					Signature: Signature{
+						Parameters: []ParameterDecl{{Identifier: a, Type: typ("b")}},
+						Results:    []ParameterDecl{{Type: bigInt}},
+					},
 				},
 				Body: BlockStmt{
 					Statements: []Statement{
@@ -2924,19 +2940,14 @@ func TestParseFloatLiteral(t *testing.T) {
 }
 
 func TestParseImaginaryLiteral(t *testing.T) {
-	i := func(s string) Node {
-		var r big.Rat
-		r.SetString(s)
-		return &ImaginaryLiteral{Value: &r}
-	}
 	parserTests{
-		{"0.i", i("0.0")},
-		{"1.i", i("1.0")},
-		{"1.0i", i("1.0")},
-		{"0.1i", i("0.1")},
-		{"0.1000i", i("0.1")},
-		{"1e1i", i("10.0")},
-		{"1e-1i", i("0.1")},
+		{"0.i", imgLit("0.0")},
+		{"1.i", imgLit("1.0")},
+		{"1.0i", imgLit("1.0")},
+		{"0.1i", imgLit("0.1")},
+		{"0.1000i", imgLit("0.1")},
+		{"1e1i", imgLit("10.0")},
+		{"1e-1i", imgLit("0.1")},
 	}.run(t, func(p *Parser) Node { return parseExpr(p) })
 }
 
