@@ -10,7 +10,7 @@ import (
 
 // Parse returns the root of an abstract syntax tree for the Go language
 // or an error if one is encountered.
-func Parse(p *Parser) (root Node, err error) {
+func Parse(p *Parser) (root *SourceFile, err error) {
 	defer func() {
 		r := recover()
 		if r == nil {
@@ -29,7 +29,7 @@ func Parse(p *Parser) (root Node, err error) {
 	return parseSourceFile(p), nil
 }
 
-func parseSourceFile(p *Parser) Node {
+func parseSourceFile(p *Parser) *SourceFile {
 	p.expect(token.Package)
 	s := &SourceFile{comments: p.comments(), startLoc: p.start()}
 	p.next()
@@ -1702,12 +1702,13 @@ func parseOperand(p *Parser, typeSwitch bool) Expression {
 }
 
 func parseFunctionLiteral(p *Parser) *FunctionLiteral {
+	var f FunctionLiteral
 	p.expect(token.Func)
-	f := &FunctionLiteral{startLoc: p.start()}
+	f.funcLoc = p.start()
 	p.next()
 	f.Signature = parseSignature(p)
 	f.Body = *parseBlock(p)
-	return f
+	return &f
 }
 
 func parseLiteralValue(p *Parser) *CompositeLiteral {
@@ -1823,8 +1824,12 @@ func parseImaginaryLiteral(p *Parser) Expression {
 		panic("bad imaginary literal: " + text)
 	}
 	text = text[:len(text)-1]
-	l := &ImaginaryLiteral{Value: new(big.Rat), span: p.span()}
-	if _, ok := l.Value.SetString(text); ok {
+	l := &ComplexLiteral{
+		Real:      new(big.Rat),
+		Imaginary: new(big.Rat),
+		span:      p.span(),
+	}
+	if _, ok := l.Imaginary.SetString(text); ok {
 		p.next()
 		return l
 	}

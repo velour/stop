@@ -638,14 +638,11 @@ type Expression interface {
 
 // A FunctionLiteral is an expression node that represents a function literal.
 type FunctionLiteral struct {
-	startLoc token.Location
-	Signature
+	FunctionType
 	Body BlockStmt
 }
 
-func (n *FunctionLiteral) Loc() token.Location   { return n.startLoc }
-func (n *FunctionLiteral) Start() token.Location { return n.startLoc }
-func (n *FunctionLiteral) End() token.Location   { return n.Body.End() }
+func (n *FunctionLiteral) End() token.Location { return n.Body.End() }
 
 // A CompositeLiteral is an expression node that represents a
 // composite literal.
@@ -805,20 +802,22 @@ func (n *FloatLiteral) String() string {
 	return "FloatLiteral{ " + n.Value.String() + " }"
 }
 
-// ImaginaryLiteral is an expression node representing an imaginary
-// literal, the imaginary component of a complex number.
-type ImaginaryLiteral struct {
-	Value *big.Rat
+// ComplexLiteral is an expression node representing a complex literal,
+// both the real and the imaginary components of a complex number.
+type ComplexLiteral struct {
+	Real, Imaginary *big.Rat
 	span
 }
 
-func (n *ImaginaryLiteral) Eq(v interface{}) bool {
-	m, ok := v.(*ImaginaryLiteral)
-	return ok && n.Value.Cmp(m.Value) == 0
+func (n *ComplexLiteral) Eq(v interface{}) bool {
+	m, ok := v.(*ComplexLiteral)
+	return ok && n.Real.Cmp(m.Real) == 0 &&
+		n.Imaginary.Cmp(m.Imaginary) == 0
 }
 
-func (n *ImaginaryLiteral) String() string {
-	return "ImaginaryLiteral{ " + n.Value.String() + " }"
+func (n *ComplexLiteral) String() string {
+	return "ComplexLiteral{ Real: " + n.Real.String() +
+		", Imaginary: " + n.Imaginary.String() + " }"
 }
 
 // RuneLiteral is an expression node representing a rune literal.
