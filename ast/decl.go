@@ -8,8 +8,8 @@ var (
 	uint8Decl predeclared
 	int32Decl predeclared
 
-	// UnivScope is the universal scope, containing all predeclared identifiers.
-	univScope = scope{
+	// UnivScope is the universal symtab, containing all predeclared identifiers.
+	univScope = symtab{
 		Decls: map[string]Declaration{
 			// Predeclared types.
 			"bool":       &predeclared{},
@@ -61,25 +61,45 @@ var (
 	}
 )
 
-// A scope is the main element of the symbol table. It contains a mapping
+// A predeclared is a declaration node representing a predeclared identifier.
+type predeclared struct{}
+
+func (n *predeclared) Comments() []string    { return nil }
+func (n *predeclared) Start() token.Location { return token.Location{} }
+func (n *predeclared) End() token.Location   { return token.Location{} }
+
+// A symtab is the main element of the symbol table. It contains a mapping
 // from all identifiers in a given scope to their declaration. The declarations
 // are unique.  Each identifier declared in a VarSpec or a ConstSpec is
 // mapped to a unique view of the declaring spec.
-type scope struct {
-	Up    *scope
+type symtab struct {
+	Up    *symtab
 	Decls map[string]Declaration
 }
 
 // Find returns the declaration bound to the given identifier, or nil if the identifier
 // is not found.
-func (s *scope) Find(id string) Declaration {
+func (s *symtab) Find(n string) Declaration {
 	if s == nil {
 		return nil
 	}
-	if d, ok := s.Decls[id]; ok {
+	if d, ok := s.Decls[n]; ok {
 		return d
 	}
-	return s.Up.Find(id)
+	return s.Up.Find(n)
+}
+
+// Bind binds a name to its declaration, returning an error if the name is already
+// bound in this symtab. The blank identifier is not bound.
+func (s *symtab) Bind(n string, decl Declaration) error {
+	if n == "_" {
+		return nil
+	}
+	if d, ok := s.Decls[n]; ok {
+		return &Redeclaration{Name: n, First: d, Second: decl}
+	}
+	s.Decls[n] = decl
+	return nil
 }
 
 // A constSpecView is a view of a ConstSpec that focuses on a single identifier
@@ -104,42 +124,38 @@ type varSpecView struct {
 	*VarSpec
 }
 
-// A predeclared is a declaration node representing a predeclared identifier.
-type predeclared struct{}
-
-func (n *predeclared) Comments() []string    { return nil }
-func (n *predeclared) Start() token.Location { return token.Location{} }
-func (n *predeclared) End() token.Location   { return token.Location{} }
-
-// PkgScope returns a scope, mapping from package-scoped identifiers
+// PkgDecls returns a symtab, mapping from package-scoped identifiers
 // to their corresponding declarations. Each identifier is mapped to a
 // unique declaration. Each identifier declared in a VarSpec or a
 // ConstSpec is mapped to a unique view of the declaring spec.
-func pkgScope(files []*SourceFile) *scope {
-	ds := make(map[string]Declaration)
+func pkgDecls(files []*SourceFile) (*symtab, error) {
+	s := &symtab{Up: &univScope, Decls: make(map[string]Declaration)}
+	var errs errors
 	for _, f := range files {
 		for _, d := range f.Declarations {
 			switch d := d.(type) {
 			case *MethodDecl:
-				ds[d.Identifier.Name] = d
+				errs.Add(s.Bind(d.Identifier.Name, d))
 			case *FunctionDecl:
-				ds[d.Identifier.Name] = d
+				errs.Add(s.Bind(d.Identifier.Name, d))
 			case *TypeSpec:
-				ds[d.Identifier.Name] = d
+				errs.Add(s.Bind(d.Identifier.Name, d))
 			case *ConstSpec:
 				for i := range d.Identifiers {
 					n := d.Identifiers[i].Name
-					ds[n] = &constSpecView{Index: i, ConstSpec: d}
+					v := &constSpecView{Index: i, ConstSpec: d}
+					errs.Add(s.Bind(n, v))
 				}
 			case *VarSpec:
 				for i := range d.Identifiers {
 					n := d.Identifiers[i].Name
-					ds[n] = &varSpecView{Index: i, VarSpec: d}
+					v := &varSpecView{Index: i, VarSpec: d}
+					errs.Add(s.Bind(n, v))
 				}
 			default:
 				panic("invalid top-level declaration")
 			}
 		}
 	}
-	return &scope{Up: &univScope, Decls: ds}
+	return s, errs.ErrorOrNil()
 }
