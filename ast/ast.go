@@ -413,8 +413,6 @@ func (n *FunctionDecl) End() token.Location   { return n.Body.End() }
 // a series of constants.
 type ConstSpec struct {
 	comments
-	// Type is the type of the spec or nil if the type should be inferred
-	// from the values.
 	Type        Type
 	Identifiers []Identifier
 	Values      []Expression
