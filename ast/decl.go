@@ -140,11 +140,27 @@ func (s *symtab) Bind(n string, decl Declaration) error {
 	return nil
 }
 
+// A checkState specifies whether a declaration is unchecked, checked,
+// or is currently being checked.
+type checkState int
+
+const (
+	unchecked = iota
+	checking
+	checkedOK
+	checkedError
+)
+
 // A constSpecView is a view of a ConstSpec that focuses on a single identifier
 // at a given index.
 type constSpecView struct {
 	Index int
+	// If the type of the const spec is not specified, then each identifier gets
+	// its own type, based on the type of its expression.
+	Type Type
 	*ConstSpec
+
+	state checkState
 }
 
 // Value returns the bound expression or nil if there isn't one.

@@ -109,3 +109,39 @@ type Undeclared struct{ *Identifier }
 func (e Undeclared) Error() string {
 	return fmt.Sprintf("%s: undeclared identifier %s", e.Start(), e.Name)
 }
+
+// A ConstantLoop is an error returned when there is a cycle in a constant definition.
+type ConstantLoop struct{ *constSpecView }
+
+func (e ConstantLoop) Error() string {
+	return fmt.Sprintf("%s: constant definition loop", e.Start())
+}
+
+// A NotConstant is an error returned when a constant initializer is not constant.
+type NotConstant struct{ Expression }
+
+func (e NotConstant) Error() string {
+	return fmt.Sprintf("%s: const initializer is not constant", e.Start())
+}
+
+// A BadConstAssign is an error returned when a constant operand has a value
+// that is not representable by the type to which it is being assigned.
+type BadConstAssign struct {
+	Expression
+	Type
+}
+
+func (e BadConstAssign) Error() string {
+	return fmt.Sprintf("%s: bad constant assignment", e.Expression.Start())
+}
+
+// A BadAssign is an error returned when an expression is not assignable
+// to the type to which it is being assigned.
+type BadAssign struct {
+	Expression
+	Type
+}
+
+func (e BadAssign) Error() string {
+	return fmt.Sprintf("%s: bad assignment", e.Expression.Start())
+}

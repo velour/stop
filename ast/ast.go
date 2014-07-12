@@ -434,6 +434,7 @@ func (n *FunctionDecl) End() token.Location   { return n.Body.End() }
 // a series of constants.
 type ConstSpec struct {
 	comments
+	// Type is nil if the type of the constant was not specified.
 	Type        Type
 	Identifiers []Identifier
 	Values      []Expression
