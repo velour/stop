@@ -2,6 +2,7 @@ package ast
 
 import (
 	"reflect"
+	"regexp"
 	"sort"
 	"testing"
 
@@ -9,133 +10,201 @@ import (
 	"github.com/velour/stop/token"
 )
 
-var (
-	testSource = `
-		package testpkg
-		const (
-			π = 3.1415926535
-			name = "eaburns"
-		)
-		var mayChange int = f()
-		var len = 1	// Shadows the predeclared len function.
-
-		func f() int { return 0 }
-	`
-
-	testScope = pkgScope([]*SourceFile{
-		parseSourceFile(NewParser(token.NewLexer("", testSource))),
-	})
-)
-
-var pkgDeclsTests = []struct {
-	srcFiles []string
-	// The top-level identifiers.
-	ids []string
-}{
-	{
-		[]string{
-			`package a; const a = 1`,
-			`package a; const B = 1`,
+func TestPkgDecls(t *testing.T) {
+	tests := []struct {
+		src []string
+		// The top-level identifiers.
+		ids []string
+		// An expected error, if non-empty.
+		err string
+	}{
+		{
+			src: []string{
+				`package a; const a = 1`,
+				`package a; const B = 1`,
+			},
+			ids: []string{"a", "B"},
 		},
-		[]string{"a", "B"},
-	},
-	{
-		[]string{`package a; const a, B = B, 1`},
-		[]string{"a", "B"},
-	},
-	{
-		[]string{
-			`package a
+		{
+			src: []string{`package a; const a, B = B, 1`},
+			ids: []string{"a", "B"},
+		},
+		{
+			src: []string{
+				`package a
 			const (
 				a, B = B, 1
 				c, d
 			)`,
+			},
+			ids: []string{"a", "B", "c", "d"},
 		},
-		[]string{"a", "B", "c", "d"},
-	},
-	{
-		[]string{
-			`package a; var a = 1`,
-			`package a; var B = 1`,
+		{
+			src: []string{
+				`package a; var a = 1`,
+				`package a; var B = 1`,
+			},
+			ids: []string{"a", "B"},
 		},
-		[]string{"a", "B"},
-	},
-	{
-		[]string{`package a; var a, B = 1, 2`},
-		[]string{"a", "B"},
-	},
-	{
-		[]string{
-			`package a
+		{
+			src: []string{`package a; var a, B = 1, 2`},
+			ids: []string{"a", "B"},
+		},
+		{
+			src: []string{
+				`package a
 			var (
 				a, B = 0, 1
 				c, d = 3.0, 4.0
 			)`,
+			},
+			ids: []string{"a", "B", "c", "d"},
 		},
-		[]string{"a", "B", "c", "d"},
-	},
-	{
-		[]string{
-			`package a
+		{
+			src: []string{
+				`package a
 			type (
 				a struct{}
 				B struct { C }
 			)`,
+			},
+			ids: []string{"a", "B"},
 		},
-		[]string{"a", "B"},
-	},
-	{
-		[]string{
-			`package a
+		{
+			src: []string{
+				`package a
 			func a(){}
 			func B() int { return 0 }`,
+			},
+			ids: []string{"a", "B"},
 		},
-		[]string{"a", "B"},
-	},
-	{
-		[]string{
-			`package a
+		{
+			src: []string{
+				`package a
 			func a(){}
 			func B() int { return 0 }`,
-			`package a
+				`package a
 			func c(e int){}
 			func d() (f int) { return 0 }`,
+			},
+			ids: []string{"a", "B", "c", "d"},
 		},
-		[]string{"a", "B", "c", "d"},
-	},
-	{
-		[]string{
-			`package a
+		{
+			src: []string{
+				`package a
 			func (z int) a(){}
 			func (z float64) B() int { return 0 }`,
+			},
+			ids: []string{"a", "B"},
 		},
-		[]string{"a", "B"},
-	},
-	{
-		[]string{
-			`package a
+		{
+			src: []string{
+				`package a
 			func (z T0) a(){}
 			func (z T1) B() int { return 0 }`,
-			`package a
+				`package a
 			func (z T2) c(e int){}
 			func (z T3) d() (f int) { return 0 }`,
+			},
+			ids: []string{"a", "B", "c", "d"},
 		},
-		[]string{"a", "B", "c", "d"},
-	},
-}
 
-func TestPkgDecls(t *testing.T) {
-	for _, test := range pkgDeclsTests {
-		files := parseSrcFiles(t, test.srcFiles)
+		// Redeclaration errors.
+		{
+			src: []string{`package a; const a = 1; const a = 2`},
+			err: "a redeclared",
+		},
+		{
+			src: []string{`package a; const a = 1; var a = 2`},
+			err: "a redeclared",
+		},
+		{
+			src: []string{`package a; const a = 1; func a(){}`},
+			err: "a redeclared",
+		},
+		{
+			src: []string{
+				`package a; const a = 1`,
+				`package a; const a = 2`,
+			},
+			err: "a redeclared",
+		},
+		{
+			src: []string{`
+				package a
+				import (
+					"fmt"
+					"fmt"
+				)
+			`},
+			err: "fmt redeclared",
+		},
+		{
+			src: []string{`
+				package a
+				import (
+					"fmt"
+					"foo/bar/fmt"
+				)
+			`},
+			err: "fmt redeclared",
+		},
+		{
+			src: []string{`
+				package a
+				import fmt "foo"
+				import "fmt"
+			`},
+			err: "fmt redeclared",
+		},
+		{
+			src: []string{`
+				package a
+				import (
+					"fmt"
+					fmt "foo/bar"
+				)
+			`},
+			err: "fmt redeclared",
+		},
+		{
+			// Not an error to redeclare the same import in different files.
+			src: []string{
+				`package a; import "fmt"`,
+				`package a; import "fmt"`,
+			},
+		},
+
+		// The blank identifier is not redeclared.
+		{
+			src: []string{`package a; const _ = 1; const _ = 2`},
+		},
+	}
+
+	for _, test := range tests {
+		files := parseSrcFiles(t, test.src)
 		if files == nil {
 			continue
 		}
 		var ids []string
 		seen := make(map[Declaration]bool)
-		for id, d := range pkgScope(files).Decls {
+		s, err := pkgDecls(files)
+		if test.err != "" {
+			if err == nil {
+				t.Errorf("pkgDecls(%v), err=nil, want matching %s", test.src, test.err)
+			} else if !regexp.MustCompile(test.err).MatchString(err.Error()) {
+				t.Errorf("pkgDecls(%v), err=[%v], want matching [%s]", test.src, err, test.err)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("pkgDecls(%v), unexpected err=[%v]", test.src, err)
+			continue
+		}
+		for id, d := range s.Decls {
 			ids = append(ids, id)
 			if seen[d] {
-				t.Errorf("multiple idents map to declaration %s", pp.MustString(d))
+				t.Errorf("pkgDecls(%v), multiple idents map to declaration %s", test.src, pp.MustString(d))
 			}
 			seen[d] = true
 		}
@@ -144,7 +213,7 @@ func TestPkgDecls(t *testing.T) {
 		if reflect.DeepEqual(ids, test.ids) {
 			continue
 		}
-		t.Errorf("pkgDecls(%s)=%v, want %v", pp.MustString(test.srcFiles), ids, test.ids)
+		t.Errorf("pkgDecls(%v)=%v, want %v", test.src, ids, test.ids)
 	}
 }
 
@@ -175,7 +244,10 @@ func TestScopeFind(t *testing.T) {
 		func f() int { return 0 }
 	`
 	p := NewParser(token.NewLexer("", src))
-	scope := pkgScope([]*SourceFile{parseSourceFile(p)})
+	s, err := pkgDecls([]*SourceFile{parseSourceFile(p)})
+	if err != nil {
+		panic(err)
+	}
 
 	tests := []struct {
 		id       string
@@ -189,7 +261,7 @@ func TestScopeFind(t *testing.T) {
 		{"notDefined", nil},
 	}
 	for _, test := range tests {
-		d := scope.Find(test.id)
+		d := s.Find(test.id)
 		typ := reflect.TypeOf(d)
 		if (d == nil && test.declType != nil) || (d != nil && typ != test.declType) {
 			t.Errorf("Find(%s)=%s, want %s", test.id, typ, test.declType)

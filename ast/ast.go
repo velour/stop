@@ -3,6 +3,7 @@ package ast
 import (
 	"io"
 	"math/big"
+	"path"
 
 	"github.com/eaburns/pp"
 	"github.com/velour/stop/token"
@@ -26,6 +27,9 @@ type SourceFile struct {
 	PackageName      Identifier
 	Imports          []ImportDecl
 	Declarations
+
+	// syms is the symbol table for the scope of this source file.
+	syms *symtab
 }
 
 func (n *SourceFile) Start() token.Location { return n.PackageName.Start() }
@@ -378,8 +382,17 @@ func (n *ImportDecl) End() token.Location   { return n.endLoc }
 // An ImportSpec represents the import of a single package.
 type ImportSpec struct {
 	Dot bool
+	// If Identifier is nil, the import name is the last path element.
 	*Identifier
 	Path StringLiteral
+}
+
+// Name returns the name to which this import is bound.
+func (n *ImportSpec) Name() string {
+	if n.Identifier != nil {
+		return n.Identifier.Name
+	}
+	return path.Base(n.Path.Value)
 }
 
 // A MethodDecl is a declaration node representing a method declaration.
@@ -392,6 +405,10 @@ type MethodDecl struct {
 	Identifier
 	Signature
 	Body BlockStmt
+
+	// Syms is the file-level symbol table defining the scope in which this
+	// method was declared.
+	syms *symtab
 }
 
 func (n *MethodDecl) Start() token.Location { return n.startLoc }
@@ -404,6 +421,10 @@ type FunctionDecl struct {
 	Identifier
 	Signature
 	Body BlockStmt
+
+	// Syms is the file-level symbol table defining the scope in which this
+	// function was declared, or nil if this is not a package-level function.
+	syms *symtab
 }
 
 func (n *FunctionDecl) Start() token.Location { return n.startLoc }
@@ -413,12 +434,14 @@ func (n *FunctionDecl) End() token.Location   { return n.Body.End() }
 // a series of constants.
 type ConstSpec struct {
 	comments
-	// Type is the type of the spec or nil if the type should be inferred
-	// from the values.
 	Type        Type
 	Identifiers []Identifier
 	Values      []Expression
 	Iota        int
+
+	// Syms is the file-level symbol table defining the scope in which these
+	// constants were declared, or nil if they are not package-level.
+	syms *symtab
 }
 
 func (n *ConstSpec) Start() token.Location { return n.Identifiers[0].Start() }
@@ -433,6 +456,10 @@ type VarSpec struct {
 	Type        Type
 	Identifiers []Identifier
 	Values      []Expression
+
+	// Syms is the file-level symbol table defining the scope in which these
+	// variables were declared, or nil if they are not package-level.
+	syms *symtab
 }
 
 func (n *VarSpec) Start() token.Location { return n.Identifiers[0].Start() }
@@ -444,6 +471,10 @@ type TypeSpec struct {
 	comments
 	Identifier
 	Type Type
+
+	// Syms is the file-level symbol table defining the scope in which this
+	// type was declared, or nil if this is not a package-level type.
+	syms *symtab
 }
 
 func (n *TypeSpec) Start() token.Location { return n.Identifier.Start() }
