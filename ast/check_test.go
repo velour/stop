@@ -108,6 +108,8 @@ func TestPkgDecls(t *testing.T) {
 			},
 			ids: []string{"a", "B", "c", "d"},
 		},
+
+		// Redeclaration errors.
 		{
 			src: []string{`package a; const a = 1; const a = 2`},
 			err: "a redeclared",
@@ -127,6 +129,53 @@ func TestPkgDecls(t *testing.T) {
 			},
 			err: "a redeclared",
 		},
+		{
+			src: []string{`
+				package a
+				import (
+					"fmt"
+					"fmt"
+				)
+			`},
+			err: "fmt redeclared",
+		},
+		{
+			src: []string{`
+				package a
+				import (
+					"fmt"
+					"foo/bar/fmt"
+				)
+			`},
+			err: "fmt redeclared",
+		},
+		{
+			src: []string{`
+				package a
+				import fmt "foo"
+				import "fmt"
+			`},
+			err: "fmt redeclared",
+		},
+		{
+			src: []string{`
+				package a
+				import (
+					"fmt"
+					fmt "foo/bar"
+				)
+			`},
+			err: "fmt redeclared",
+		},
+		{
+			// Not an error to redeclare the same import in different files.
+			src: []string{
+				`package a; import "fmt"`,
+				`package a; import "fmt"`,
+			},
+		},
+
+		// The blank identifier is not redeclared.
 		{
 			src: []string{`package a; const _ = 1; const _ = 2`},
 		},

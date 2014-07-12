@@ -77,6 +77,11 @@ type symtab struct {
 	Decls map[string]Declaration
 }
 
+// MakeSymtab returns a new symbol table.
+func makeSymtab(up *symtab) *symtab {
+	return &symtab{Up: up, Decls: make(map[string]Declaration)}
+}
+
 // Find returns the declaration bound to the given identifier, or nil if the identifier
 // is not found.
 func (s *symtab) Find(n string) Declaration {
@@ -124,38 +129,74 @@ type varSpecView struct {
 	*VarSpec
 }
 
+// A packageDecl is a a package import declaration. It contains a mapping for all
+// exported symbols in the package.
+type packageDecl struct {
+	syms *symtab
+	*ImportDecl
+}
+
 // PkgDecls returns a symtab, mapping from package-scoped identifiers
 // to their corresponding declarations. Each identifier is mapped to a
 // unique declaration. Each identifier declared in a VarSpec or a
 // ConstSpec is mapped to a unique view of the declaring spec.
+// Any errors that are encountered are also returned, but the symtab is always
+// valid, even in the face of errors.
 func pkgDecls(files []*SourceFile) (*symtab, error) {
-	s := &symtab{Up: &univScope, Decls: make(map[string]Declaration)}
+	psyms := makeSymtab(&univScope)
 	var errs errors
 	for _, f := range files {
+		fsyms, err := fileDecls(psyms, f)
+		errs.Add(err)
 		for _, d := range f.Declarations {
 			switch d := d.(type) {
 			case *MethodDecl:
-				errs.Add(s.Bind(d.Identifier.Name, d))
+				d.syms = fsyms
+				errs.Add(psyms.Bind(d.Identifier.Name, d))
 			case *FunctionDecl:
-				errs.Add(s.Bind(d.Identifier.Name, d))
+				d.syms = fsyms
+				errs.Add(psyms.Bind(d.Identifier.Name, d))
 			case *TypeSpec:
-				errs.Add(s.Bind(d.Identifier.Name, d))
+				d.syms = fsyms
+				errs.Add(psyms.Bind(d.Identifier.Name, d))
 			case *ConstSpec:
+				d.syms = fsyms
 				for i := range d.Identifiers {
 					n := d.Identifiers[i].Name
 					v := &constSpecView{Index: i, ConstSpec: d}
-					errs.Add(s.Bind(n, v))
+					errs.Add(psyms.Bind(n, v))
 				}
 			case *VarSpec:
+				d.syms = fsyms
 				for i := range d.Identifiers {
 					n := d.Identifiers[i].Name
 					v := &varSpecView{Index: i, VarSpec: d}
-					errs.Add(s.Bind(n, v))
+					errs.Add(psyms.Bind(n, v))
 				}
 			default:
 				panic("invalid top-level declaration")
 			}
 		}
 	}
-	return s, errs.ErrorOrNil()
+	return psyms, errs.ErrorOrNil()
+}
+
+// FileDecls returns the symtab, mapping file-scoped identifiers to their
+// correpsonding declarations. Any errors that are encountered are also
+// returned, but the symtab is always valid, even in the face of errors.
+func fileDecls(psyms *symtab, file *SourceFile) (*symtab, error) {
+	syms := makeSymtab(psyms)
+	var errs errors
+	for i, d := range file.Imports {
+		for _, im := range d.Imports {
+			// BUG(eaburns): Should actually read the package imports.
+			// BUG(eaburns): Should deal with dot imports
+			p := &packageDecl{
+				syms:       makeSymtab(&univScope),
+				ImportDecl: &file.Imports[i],
+			}
+			errs.Add(syms.Bind(im.Name(), p))
+		}
+	}
+	return syms, errs.ErrorOrNil()
 }
