@@ -9,24 +9,6 @@ import (
 	"github.com/velour/stop/token"
 )
 
-var (
-	testSource = `
-		package testpkg
-		const (
-			π = 3.1415926535
-			name = "eaburns"
-		)
-		var mayChange int = f()
-		var len = 1	// Shadows the predeclared len function.
-
-		func f() int { return 0 }
-	`
-
-	testScope = pkgScope([]*SourceFile{
-		parseSourceFile(NewParser(token.NewLexer("", testSource))),
-	})
-)
-
 var pkgDeclsTests = []struct {
 	srcFiles []string
 	// The top-level identifiers.
