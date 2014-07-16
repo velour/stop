@@ -1459,6 +1459,15 @@ func TestParseFor(t *testing.T) {
 				Block: BlockStmt{Statements: []Statement{dStmt}},
 			},
 		},
+		{
+			`for range b { c }`,
+			&ForStmt{
+				Range: &ShortVarDecl{
+					Right: []Expression{b},
+				},
+				Block: BlockStmt{Statements: []Statement{cStmt}},
+			},
+		},
 
 		// Range is unexpected with any assign op other that =.
 		{`for a *= range b { c }`, parseError{"range"}},

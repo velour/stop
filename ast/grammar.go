@@ -380,7 +380,17 @@ func parseFor(p *Parser) Statement {
 
 	prevLevel := p.exprLevel
 	p.exprLevel = -1
-	stmt := parseSimpleStmt(p, rangeOK)
+	var stmt Statement
+	if p.tok == token.Range {
+		cmnts := p.comments()
+		p.next()
+		stmt = rangeClause{&ShortVarDecl{
+			comments: cmnts,
+			Right:    []Expression{parseExpr(p)},
+		}}
+	} else {
+		stmt = parseSimpleStmt(p, rangeOK)
+	}
 	p.exprLevel = prevLevel
 
 	if r, ok := stmt.(rangeClause); ok {
