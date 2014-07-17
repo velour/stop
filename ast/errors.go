@@ -102,3 +102,10 @@ type Redeclaration struct {
 func (e *Redeclaration) Error() string {
 	return fmt.Sprintf("%s: %s redeclared, originally declared at %s", e.Second.Start(), e.Name, e.First.Start())
 }
+
+// An Undeclared is an error returned for undeclared identifiers.
+type Undeclared struct{ *Identifier }
+
+func (e Undeclared) Error() string {
+	return fmt.Sprintf("%s: undeclared identifier %s", e.Start(), e.Name)
+}

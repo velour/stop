@@ -15,7 +15,7 @@ type ConstKind int
 const (
 	NilConst ConstKind = iota
 	RuneConst
-	IntConst
+	IntegerConst
 	FloatConst
 	ComplexConst
 	StringConst

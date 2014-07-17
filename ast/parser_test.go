@@ -40,7 +40,7 @@ func strLit(s string) *StringLiteral {
 func intLit(s string) *IntegerLiteral {
 	var i big.Int
 	i.SetString(s, 0)
-	return &IntegerLiteral{Value: &i, typ: Untyped(IntConst)}
+	return &IntegerLiteral{Value: &i, typ: Untyped(IntegerConst)}
 }
 
 func floatLit(s string) *FloatLiteral {
