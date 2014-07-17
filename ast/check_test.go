@@ -272,8 +272,9 @@ func TestScopeFind(t *testing.T) {
 	// still findable in the universal scope.
 	d := univScope.Find("len")
 	typ := reflect.TypeOf(d)
-	if d == nil || typ != reflect.TypeOf(&predeclared{}) {
-		t.Errorf("Find(len)=%s, want %s", typ, reflect.TypeOf(&predeclared{}))
+	lenType := reflect.TypeOf(&predeclaredFunc{})
+	if d == nil || typ != lenType {
+		t.Errorf("Find(len)=%s, want %s", typ, lenType)
 	}
 
 	// Rune and byte are aliases for int32 and uint8 respectively;
