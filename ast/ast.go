@@ -4,6 +4,8 @@ import (
 	"io"
 	"math/big"
 	"path"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/eaburns/pp"
 	"github.com/velour/stop/token"
@@ -483,7 +485,10 @@ func (n *TypeSpec) End() token.Location   { return n.Type.End() }
 // The Type interface is implemented by nodes that represent types.
 type Type interface {
 	Expression
-	typeNode()
+	// Identical returns whether the types are identical.
+	Identical(Type) bool
+	// Underlying returns the underlying type.
+	Underlying() Type
 }
 
 // A StructType is a type node representing a struct type.
@@ -495,13 +500,17 @@ type StructType struct {
 func (n *StructType) Start() token.Location { return n.keywordLoc }
 func (n *StructType) End() token.Location   { return n.closeLoc }
 func (n *StructType) Loc() token.Location   { return n.Start() }
-func (n *StructType) typeNode()             {}
 
 // A FieldDecl is a node representing a struct field declaration.
 type FieldDecl struct {
+	// Identifier is nil for anonymous fields.
 	*Identifier
 	Type Type
 	Tag  *StringLiteral
+
+	// Pkg is the package in which the field was declared or nil
+	// if it was declared in the current package.
+	pkg *packageDecl
 }
 
 func (n *FieldDecl) Start() token.Location {
@@ -524,19 +533,25 @@ type InterfaceType struct {
 	// A method declaration is either a Method, giving the name and
 	// signature of a method, or a TypeName, naming an interface
 	// whose methods are included in this interface too.
-	Methods              []Node
+	Methods []Node
+	// MethodSet is like Methods but with all TypeNames expanded and
+	// sorted by the methods' Identifier names.
+	methodSet            []*Method
 	keywordLoc, closeLoc token.Location
 }
 
 func (n *InterfaceType) Start() token.Location { return n.keywordLoc }
 func (n *InterfaceType) End() token.Location   { return n.closeLoc }
 func (n *InterfaceType) Loc() token.Location   { return n.Start() }
-func (n *InterfaceType) typeNode()             {}
 
 // A Method is a node representing a method name and its signature.
 type Method struct {
 	Identifier
 	Signature
+
+	// Pkg is the package in which the method was declared or nil
+	// if it was declared in the current package.
+	pkg *packageDecl
 }
 
 func (n *Method) Start() token.Location { return n.Identifier.Start() }
@@ -549,7 +564,6 @@ type FunctionType struct {
 }
 
 func (n *FunctionType) Loc() token.Location { return n.funcLoc }
-func (n *FunctionType) typeNode()           {}
 
 // A Signature is a node representing parameter and result declarations.
 type Signature struct {
@@ -581,14 +595,13 @@ func (n *ParameterDecl) End() token.Location { return n.Type.End() }
 // a send and receive channel.
 type ChannelType struct {
 	Send, Receive bool
-	Type          Type
+	ElementType   Type
 	startLoc      token.Location
 }
 
 func (n *ChannelType) Start() token.Location { return n.startLoc }
-func (n *ChannelType) End() token.Location   { return n.Type.End() }
+func (n *ChannelType) End() token.Location   { return n.ElementType.End() }
 func (n *ChannelType) Loc() token.Location   { return n.Start() }
-func (n *ChannelType) typeNode()             {}
 
 // An MapType is a type node that represents a map from types to types.
 type MapType struct {
@@ -599,32 +612,29 @@ type MapType struct {
 func (n *MapType) Start() token.Location { return n.mapLoc }
 func (n *MapType) End() token.Location   { return n.Value.End() }
 func (n *MapType) Loc() token.Location   { return n.Start() }
-func (n *MapType) typeNode()             {}
 
 // An ArrayType is a type node that represents an array of types.
 type ArrayType struct {
 	// If size==nil then this is an array type for a composite literal
 	// with the size specified using [...]Type notation.
-	Size    Expression
-	Type    Type
-	openLoc token.Location
+	Size        Expression
+	ElementType Type
+	openLoc     token.Location
 }
 
 func (n *ArrayType) Start() token.Location { return n.openLoc }
-func (n *ArrayType) End() token.Location   { return n.Type.End() }
+func (n *ArrayType) End() token.Location   { return n.ElementType.End() }
 func (n *ArrayType) Loc() token.Location   { return n.Start() }
-func (n *ArrayType) typeNode()             {}
 
 // A SliceType is a type node that represents a slice of types.
 type SliceType struct {
-	Type    Type
-	openLoc token.Location
+	ElementType Type
+	openLoc     token.Location
 }
 
 func (n *SliceType) Start() token.Location { return n.openLoc }
-func (n *SliceType) End() token.Location   { return n.Type.End() }
+func (n *SliceType) End() token.Location   { return n.ElementType.End() }
 func (n *SliceType) Loc() token.Location   { return n.Start() }
-func (n *SliceType) typeNode()             {}
 
 // A Star is either a dereference expression or a type node that representing
 // a pointer to a type.
@@ -639,7 +649,6 @@ type Star struct {
 func (n *Star) Start() token.Location { return n.starLoc }
 func (n *Star) End() token.Location   { return n.Target.End() }
 func (n *Star) Loc() token.Location   { return n.starLoc }
-func (n *Star) typeNode()             {}
 
 // A TypeName is a type node representing a possibly-qualified type name.
 type TypeName struct {
@@ -655,7 +664,6 @@ func (n *TypeName) Start() token.Location {
 	return n.Identifier.Start()
 }
 func (n *TypeName) End() token.Location { return n.Identifier.End() }
-func (n *TypeName) typeNode()           {}
 
 // The Expression interface is implemented by all nodes that are
 // also expressions.
@@ -678,17 +686,17 @@ func (n *FunctionLiteral) End() token.Location { return n.Body.End() }
 // A CompositeLiteral is an expression node that represents a
 // composite literal.
 type CompositeLiteral struct {
-	// Type may be nil.
-	Type              Type
+	// LiteralType may be nil.
+	LiteralType       Type
 	Elements          []Element
 	openLoc, closeLoc token.Location
 }
 
 func (n *CompositeLiteral) Start() token.Location {
-	if n.Type != nil {
+	if n.LiteralType != nil {
 		return n.openLoc
 	}
-	return n.Type.Start()
+	return n.LiteralType.Start()
 }
 
 func (n *CompositeLiteral) Loc() token.Location { return n.Start() }
@@ -736,8 +744,8 @@ func (n *Slice) End() token.Location   { return n.closeLoc }
 // A TypeAssertion is an expression node representing a type assertion.
 type TypeAssertion struct {
 	Expression Expression
-	// If Type == nil then this is a type switch guard.
-	Type             Type
+	// If AssertedType == nil then this is a type switch guard.
+	AssertedType     Type
 	dotLoc, closeLoc token.Location
 }
 
@@ -800,6 +808,15 @@ type Identifier struct {
 	Name string
 	decl Declaration
 	span
+}
+
+// Exported returns whether the identifier is exported.
+func (n *Identifier) Exported() bool {
+	r, sz := utf8.DecodeRuneInString(n.Name)
+	if r == utf8.RuneError && sz == 1 {
+		return false
+	}
+	return unicode.IsUpper(r)
 }
 
 // IntegerLiteral is an expression node representing a decimal,

@@ -28,4 +28,4 @@ golint . \
 	| grep -v 'End should have comment'\
 	| grep -v 'Eq should have comment'\
 	| grep -v 'Fold should have comment'\
-
+	| grep -v 'Underlying should have comment'\
