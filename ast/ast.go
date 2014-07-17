@@ -798,6 +798,7 @@ func (u *UnaryOp) End() token.Location   { return u.Operand.End() }
 // name or an identifier expression.
 type Identifier struct {
 	Name string
+	decl Declaration
 	span
 }
 
