@@ -5,68 +5,82 @@ import (
 )
 
 var (
-	uint8Decl predeclared
-	int32Decl predeclared
+	uint8Decl predeclaredType
+	int32Decl predeclaredType
 
 	// UnivScope is the universal symtab, containing all predeclared identifiers.
 	univScope = symtab{
 		Decls: map[string]Declaration{
 			// Predeclared types.
-			"bool":       &predeclared{},
+			"bool":       &predeclaredType{},
 			"byte":       &uint8Decl,
-			"complex64":  &predeclared{},
-			"complex128": &predeclared{},
-			"error":      &predeclared{},
-			"float32":    &predeclared{},
-			"float64":    &predeclared{},
-			"int":        &predeclared{},
-			"int8":       &predeclared{},
-			"int16":      &predeclared{},
+			"complex64":  &predeclaredType{},
+			"complex128": &predeclaredType{},
+			"error":      &predeclaredType{},
+			"float32":    &predeclaredType{},
+			"float64":    &predeclaredType{},
+			"int":        &predeclaredType{},
+			"int8":       &predeclaredType{},
+			"int16":      &predeclaredType{},
 			"int32":      &int32Decl,
-			"int64":      &predeclared{},
+			"int64":      &predeclaredType{},
 			"rune":       &int32Decl,
-			"string":     &predeclared{},
-			"uint":       &predeclared{},
+			"string":     &predeclaredType{},
+			"uint":       &predeclaredType{},
 			"uint8":      &uint8Decl,
-			"uint16":     &predeclared{},
-			"uint32":     &predeclared{},
-			"uint64":     &predeclared{},
-			"uintptr":    &predeclared{},
+			"uint16":     &predeclaredType{},
+			"uint32":     &predeclaredType{},
+			"uint64":     &predeclaredType{},
+			"uintptr":    &predeclaredType{},
 
 			// Predeclared constants.
-			"true":  &predeclared{},
-			"false": &predeclared{},
-			"iota":  &predeclared{},
+			"true":  &predeclaredConst{},
+			"false": &predeclaredConst{},
+			"iota":  &predeclaredConst{},
 
 			// Predeclared zero value.
-			"nil": &predeclared{},
+			"nil": &predeclaredConst{},
 
 			// Predeclared functions.
-			"append":  &predeclared{},
-			"cap":     &predeclared{},
-			"close":   &predeclared{},
-			"complex": &predeclared{},
-			"copy":    &predeclared{},
-			"delete":  &predeclared{},
-			"imag":    &predeclared{},
-			"len":     &predeclared{},
-			"make":    &predeclared{},
-			"new":     &predeclared{},
-			"panic":   &predeclared{},
-			"print":   &predeclared{},
-			"println": &predeclared{},
-			"real":    &predeclared{},
-			"recover": &predeclared{},
+			"append":  &predeclaredFunc{},
+			"cap":     &predeclaredFunc{},
+			"close":   &predeclaredFunc{},
+			"complex": &predeclaredFunc{},
+			"copy":    &predeclaredFunc{},
+			"delete":  &predeclaredFunc{},
+			"imag":    &predeclaredFunc{},
+			"len":     &predeclaredFunc{},
+			"make":    &predeclaredFunc{},
+			"new":     &predeclaredFunc{},
+			"panic":   &predeclaredFunc{},
+			"print":   &predeclaredFunc{},
+			"println": &predeclaredFunc{},
+			"real":    &predeclaredFunc{},
+			"recover": &predeclaredFunc{},
 		},
 	}
 )
 
-// A predeclared is a declaration node representing a predeclared identifier.
-type predeclared struct{}
+// A predeclaredType is a declaration node representing a predeclared type.
+type predeclaredType struct{}
 
-func (n *predeclared) Comments() []string    { return nil }
-func (n *predeclared) Start() token.Location { return token.Location{} }
-func (n *predeclared) End() token.Location   { return token.Location{} }
+func (*predeclaredType) Comments() []string    { return nil }
+func (*predeclaredType) Start() token.Location { return token.Location{} }
+func (*predeclaredType) End() token.Location   { return token.Location{} }
+
+// A predeclaredConst is a declaration node representing a predeclared constant.
+type predeclaredConst struct{}
+
+func (*predeclaredConst) Comments() []string    { return nil }
+func (*predeclaredConst) Start() token.Location { return token.Location{} }
+func (*predeclaredConst) End() token.Location   { return token.Location{} }
+
+// A predeclaredFunc is a declaration node representing a predeclared function.
+type predeclaredFunc struct{}
+
+func (*predeclaredFunc) Comments() []string    { return nil }
+func (*predeclaredFunc) Start() token.Location { return token.Location{} }
+func (*predeclaredFunc) End() token.Location   { return token.Location{} }
 
 // A symtab is the main element of the symbol table. It contains a mapping
 // from all identifiers in a given scope to their declaration. The declarations
