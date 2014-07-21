@@ -68,9 +68,11 @@ func binOp(op token.Token, l, r Expression) *BinaryOp { return &BinaryOp{Op: op,
 func call(f Expression, ddd bool, args ...Expression) *Call {
 	return &Call{Function: f, Arguments: args, DotDotDot: ddd}
 }
-func assert(e Expression, t Type) *TypeAssertion { return &TypeAssertion{Expression: e, Type: t} }
-func index(e, i Expression) *Index               { return &Index{Expression: e, Index: i} }
-func slice(e, l, h, m Expression) *Slice         { return &Slice{Expression: e, Low: l, High: h, Max: m} }
+func assert(e Expression, t Type) *TypeAssertion {
+	return &TypeAssertion{Expression: e, AssertedType: t}
+}
+func index(e, i Expression) *Index       { return &Index{Expression: e, Index: i} }
+func slice(e, l, h, m Expression) *Slice { return &Slice{Expression: e, Low: l, High: h, Max: m} }
 
 func sel(e Expression, ids ...*Identifier) Expression {
 	p := e
@@ -83,7 +85,7 @@ func sel(e Expression, ids ...*Identifier) Expression {
 var specDeclarationTests = parserTests{
 	{`type T1 string`, Declarations{&TypeSpec{Identifier: *id("T1"), Type: typ("string")}}},
 	{`type T2 T1`, Declarations{&TypeSpec{Identifier: *id("T2"), Type: t1}}},
-	{`type T3 []T1`, Declarations{&TypeSpec{Identifier: *id("T3"), Type: &SliceType{Type: t1}}}},
+	{`type T3 []T1`, Declarations{&TypeSpec{Identifier: *id("T3"), Type: &SliceType{ElementType: t1}}}},
 	{`type T4 T3`, Declarations{&TypeSpec{Identifier: *id("T4"), Type: t3}}},
 	{
 		`type Lock interface {
@@ -154,8 +156,8 @@ var specDeclarationTests = parserTests{
 			T5 func(x int, y float64) *[]string
 		)`,
 		Declarations{
-			&TypeSpec{Identifier: *id("T0"), Type: &SliceType{Type: typ("string")}},
-			&TypeSpec{Identifier: *id("T1"), Type: &SliceType{Type: typ("string")}},
+			&TypeSpec{Identifier: *id("T0"), Type: &SliceType{ElementType: typ("string")}},
+			&TypeSpec{Identifier: *id("T1"), Type: &SliceType{ElementType: typ("string")}},
 			&TypeSpec{
 				Identifier: *id("T2"),
 				Type: &StructType{Fields: []FieldDecl{
@@ -189,7 +191,7 @@ var specDeclarationTests = parserTests{
 						{Identifier: y, Type: typ("float64")},
 					},
 					Results: []ParameterDecl{
-						{Type: &Star{Target: &SliceType{Type: typ("string")}}},
+						{Type: &Star{Target: &SliceType{ElementType: typ("string")}}},
 					},
 				}},
 			},
@@ -426,8 +428,8 @@ var specDeclarationTests = parserTests{
 			&TypeSpec{
 				Identifier: *id("IntArray"),
 				Type: &ArrayType{
-					Size: intLit("16"),
-					Type: typ("int"),
+					Size:        intLit("16"),
+					ElementType: typ("int"),
 				},
 			},
 		},
@@ -484,8 +486,8 @@ var specDeclarationTests = parserTests{
 						Identifier: *id("Encrypt"),
 						Signature: Signature{
 							Parameters: []ParameterDecl{
-								{Identifier: id("src"), Type: &SliceType{Type: typ("byte")}},
-								{Identifier: id("dst"), Type: &SliceType{Type: typ("byte")}},
+								{Identifier: id("src"), Type: &SliceType{ElementType: typ("byte")}},
+								{Identifier: id("dst"), Type: &SliceType{ElementType: typ("byte")}},
 							},
 						},
 					},
@@ -493,8 +495,8 @@ var specDeclarationTests = parserTests{
 						Identifier: *id("Decrypt"),
 						Signature: Signature{
 							Parameters: []ParameterDecl{
-								{Identifier: id("src"), Type: &SliceType{Type: typ("byte")}},
-								{Identifier: id("dst"), Type: &SliceType{Type: typ("byte")}},
+								{Identifier: id("src"), Type: &SliceType{ElementType: typ("byte")}},
+								{Identifier: id("dst"), Type: &SliceType{ElementType: typ("byte")}},
 							},
 						},
 					},
@@ -505,12 +507,12 @@ var specDeclarationTests = parserTests{
 }
 
 var specTypeTests = parserTests{
-	{`[32]byte`, &ArrayType{Size: intLit("32"), Type: typ("byte")}},
+	{`[32]byte`, &ArrayType{Size: intLit("32"), ElementType: typ("byte")}},
 	{
 		`[2*N] struct { x, y int32 }`,
 		&ArrayType{
 			Size: binOp(token.Star, intLit("2"), id("N")),
-			Type: &StructType{
+			ElementType: &StructType{
 				Fields: []FieldDecl{
 					{Identifier: x, Type: typ("int32")},
 					{Identifier: y, Type: typ("int32")},
@@ -520,24 +522,24 @@ var specTypeTests = parserTests{
 	},
 	{
 		`[1000]*float64`,
-		&ArrayType{Size: intLit("1000"), Type: &Star{Target: typ("float64")}},
+		&ArrayType{Size: intLit("1000"), ElementType: &Star{Target: typ("float64")}},
 	},
 	{
 		`[3][5]int`,
 		&ArrayType{
-			Size: intLit("3"),
-			Type: &ArrayType{Size: intLit("5"), Type: typ("int")},
+			Size:        intLit("3"),
+			ElementType: &ArrayType{Size: intLit("5"), ElementType: typ("int")},
 		},
 	},
 	{
 		`[2][2][2]float64`,
 		&ArrayType{
 			Size: intLit("2"),
-			Type: &ArrayType{
+			ElementType: &ArrayType{
 				Size: intLit("2"),
-				Type: &ArrayType{
-					Size: intLit("2"),
-					Type: typ("float64"),
+				ElementType: &ArrayType{
+					Size:        intLit("2"),
+					ElementType: typ("float64"),
 				},
 			},
 		},
@@ -546,11 +548,11 @@ var specTypeTests = parserTests{
 		`[2]([2]([2]float64))`,
 		&ArrayType{
 			Size: intLit("2"),
-			Type: &ArrayType{
+			ElementType: &ArrayType{
 				Size: intLit("2"),
-				Type: &ArrayType{
-					Size: intLit("2"),
-					Type: typ("float64"),
+				ElementType: &ArrayType{
+					Size:        intLit("2"),
+					ElementType: typ("float64"),
 				},
 			},
 		},
@@ -570,7 +572,7 @@ var specTypeTests = parserTests{
 				{Identifier: y, Type: typ("int")},
 				{Identifier: id("u"), Type: typ("float32")},
 				{Identifier: id("_"), Type: typ("float32")},
-				{Identifier: id("A"), Type: &Star{Target: &SliceType{Type: typ("int")}}},
+				{Identifier: id("A"), Type: &Star{Target: &SliceType{ElementType: typ("int")}}},
 				{Identifier: id("F"), Type: &FunctionType{}},
 			},
 		},
@@ -636,7 +638,7 @@ var specTypeTests = parserTests{
 		},
 	},
 	{`*Point`, &Star{Target: typ("Point")}},
-	{`*[4]int`, &Star{Target: &ArrayType{Size: intLit("4"), Type: typ("int")}}},
+	{`*[4]int`, &Star{Target: &ArrayType{Size: intLit("4"), ElementType: typ("int")}}},
 	{`func()`, &FunctionType{}},
 	{
 		`func(x int) int`,
@@ -696,7 +698,7 @@ var specTypeTests = parserTests{
 			},
 			Results: []ParameterDecl{
 				{Type: typ("float64")},
-				{Type: &Star{Target: &SliceType{Type: typ("int")}}},
+				{Type: &Star{Target: &SliceType{ElementType: typ("int")}}},
 			},
 		}},
 	},
@@ -752,36 +754,36 @@ var specTypeTests = parserTests{
 		},
 	},
 	{`map[string]interface{}`, &MapType{Key: typ("string"), Value: &InterfaceType{}}},
-	{`chan T`, &ChannelType{Send: true, Receive: true, Type: typ("T")}},
-	{`chan<- float64`, &ChannelType{Send: true, Type: typ("float64")}},
-	{`<-chan int`, &ChannelType{Receive: true, Type: typ("int")}},
+	{`chan T`, &ChannelType{Send: true, Receive: true, ElementType: typ("T")}},
+	{`chan<- float64`, &ChannelType{Send: true, ElementType: typ("float64")}},
+	{`<-chan int`, &ChannelType{Receive: true, ElementType: typ("int")}},
 	{
 		`chan<- chan int`,
 		&ChannelType{
-			Send: true,
-			Type: &ChannelType{Send: true, Receive: true, Type: typ("int")},
+			Send:        true,
+			ElementType: &ChannelType{Send: true, Receive: true, ElementType: typ("int")},
 		},
 	},
 	{
 		`chan<- <-chan int`,
 		&ChannelType{
-			Send: true,
-			Type: &ChannelType{Receive: true, Type: typ("int")},
+			Send:        true,
+			ElementType: &ChannelType{Receive: true, ElementType: typ("int")},
 		},
 	},
 	{
 		`<-chan <-chan int`,
 		&ChannelType{
-			Receive: true,
-			Type:    &ChannelType{Receive: true, Type: typ("int")},
+			Receive:     true,
+			ElementType: &ChannelType{Receive: true, ElementType: typ("int")},
 		},
 	},
 	{
 		`chan (<-chan int)`,
 		&ChannelType{
-			Send:    true,
-			Receive: true,
-			Type:    &ChannelType{Receive: true, Type: typ("int")},
+			Send:        true,
+			Receive:     true,
+			ElementType: &ChannelType{Receive: true, ElementType: typ("int")},
 		},
 	},
 }
@@ -1333,14 +1335,14 @@ func TestParseSwitch(t *testing.T) {
 		{
 			`switch (struct{}{}) {}`,
 			&ExprSwitch{
-				Expression: &CompositeLiteral{Type: &StructType{}},
+				Expression: &CompositeLiteral{LiteralType: &StructType{}},
 			},
 		},
 		{
 			`switch (struct{}{}); 5 {}`,
 			&ExprSwitch{
 				Initialization: &ExpressionStmt{
-					Expression: &CompositeLiteral{Type: &StructType{}},
+					Expression: &CompositeLiteral{LiteralType: &StructType{}},
 				},
 				Expression: intLit("5"),
 			},
@@ -1348,7 +1350,7 @@ func TestParseSwitch(t *testing.T) {
 		{
 			`switch (struct{}{}).(type) {}`,
 			&TypeSwitch{
-				Expression: &CompositeLiteral{Type: &StructType{}},
+				Expression: &CompositeLiteral{LiteralType: &StructType{}},
 			},
 		},
 	}.run(t, func(p *Parser) Node { return parseStatement(p) })
@@ -1486,7 +1488,7 @@ func TestParseFor(t *testing.T) {
 		{
 			`for (struct{}{}) {}`,
 			&ForStmt{
-				Condition: &CompositeLiteral{Type: &StructType{}},
+				Condition: &CompositeLiteral{LiteralType: &StructType{}},
 			},
 		},
 	}.run(t, func(p *Parser) Node { return parseStatement(p) })
@@ -1561,7 +1563,7 @@ func TestParseIf(t *testing.T) {
 		{
 			`if (struct{}{}){}`,
 			&IfStmt{
-				Condition: &CompositeLiteral{Type: &StructType{}},
+				Condition: &CompositeLiteral{LiteralType: &StructType{}},
 				Block:     BlockStmt{},
 			},
 		},
@@ -2156,18 +2158,18 @@ func TestParseType(t *testing.T) {
 		{`(a)`, typ("a")},
 		{`((a))`, typ("a")},
 		{`*(a)`, &Star{Target: typ("a")}},
-		{`[](a)`, &SliceType{Type: typ("a")}},
-		{`[]*(a)`, &SliceType{Type: &Star{Target: typ("a")}}},
-		{`*[](a)`, &Star{Target: &SliceType{Type: typ("a")}}},
+		{`[](a)`, &SliceType{ElementType: typ("a")}},
+		{`[]*(a)`, &SliceType{ElementType: &Star{Target: typ("a")}}},
+		{`*[](a)`, &Star{Target: &SliceType{ElementType: typ("a")}}},
 		{`map[a]b`, &MapType{Key: typ("a"), Value: typ("b")}},
 
-		{`[]func()`, &SliceType{Type: &FunctionType{}}},
+		{`[]func()`, &SliceType{ElementType: &FunctionType{}}},
 		{
 			`[]func()<-chan int`,
 			&SliceType{
-				Type: &FunctionType{Signature: Signature{
+				ElementType: &FunctionType{Signature: Signature{
 					Results: []ParameterDecl{
-						{Type: &ChannelType{Receive: true, Type: typ("int")}},
+						{Type: &ChannelType{Receive: true, ElementType: typ("int")}},
 					},
 				}},
 			},
@@ -2175,16 +2177,16 @@ func TestParseType(t *testing.T) {
 		{
 			`[]interface{ c()<-chan[5]big.Int }`,
 			&SliceType{
-				Type: &InterfaceType{Methods: []Node{
+				ElementType: &InterfaceType{Methods: []Node{
 					&Method{
 						Identifier: *c,
 						Signature: Signature{
 							Results: []ParameterDecl{
 								{Type: &ChannelType{
 									Receive: true,
-									Type: &ArrayType{
-										Size: intLit("5"),
-										Type: bigInt,
+									ElementType: &ArrayType{
+										Size:        intLit("5"),
+										ElementType: bigInt,
 									},
 								}},
 							},
@@ -2418,7 +2420,7 @@ func TestParseParameterList(t *testing.T) {
 			&Signature{Parameters: []ParameterDecl{
 				{Type: typ("a")},
 				{Type: typ("b")},
-				{Type: &SliceType{Type: typ("c")}},
+				{Type: &SliceType{ElementType: typ("c")}},
 			}},
 		},
 		{
@@ -2426,13 +2428,13 @@ func TestParseParameterList(t *testing.T) {
 			&Signature{Parameters: []ParameterDecl{
 				{Type: typ("a")},
 				{Type: typ("b")},
-				{Type: &SliceType{Type: typ("c")}, DotDotDot: true},
+				{Type: &SliceType{ElementType: typ("c")}, DotDotDot: true},
 			}},
 		},
 		{
 			`([]a, b, c)`,
 			&Signature{Parameters: []ParameterDecl{
-				{Type: &SliceType{Type: typ("a")}},
+				{Type: &SliceType{ElementType: typ("a")}},
 				{Type: typ("b")},
 				{Type: typ("c")},
 			}},
@@ -2440,7 +2442,7 @@ func TestParseParameterList(t *testing.T) {
 		{
 			`([]a, b, ...c)`,
 			&Signature{Parameters: []ParameterDecl{
-				{Type: &SliceType{Type: typ("a")}},
+				{Type: &SliceType{ElementType: typ("a")}},
 				{Type: typ("b")},
 				{Type: typ("c"), DotDotDot: true},
 			}},
@@ -2477,24 +2479,24 @@ func TestParseParameterList(t *testing.T) {
 		{
 			`(a, b []int)`,
 			&Signature{Parameters: []ParameterDecl{
-				{Identifier: a, Type: &SliceType{Type: typ("int")}},
-				{Identifier: b, Type: &SliceType{Type: typ("int")}},
+				{Identifier: a, Type: &SliceType{ElementType: typ("int")}},
+				{Identifier: b, Type: &SliceType{ElementType: typ("int")}},
 			}},
 		},
 		{
 			`(a, b ...[]int)`,
 			&Signature{Parameters: []ParameterDecl{
-				{Identifier: a, Type: &SliceType{Type: typ("int")}},
-				{Identifier: b, Type: &SliceType{Type: typ("int")}, DotDotDot: true},
+				{Identifier: a, Type: &SliceType{ElementType: typ("int")}},
+				{Identifier: b, Type: &SliceType{ElementType: typ("int")}, DotDotDot: true},
 			}},
 		},
 		{
 			`(a, b []int, c, d ...[]int)`,
 			&Signature{Parameters: []ParameterDecl{
-				{Identifier: a, Type: &SliceType{Type: typ("int")}},
-				{Identifier: b, Type: &SliceType{Type: typ("int")}},
-				{Identifier: c, Type: &SliceType{Type: typ("int")}},
-				{Identifier: d, Type: &SliceType{Type: typ("int")}, DotDotDot: true},
+				{Identifier: a, Type: &SliceType{ElementType: typ("int")}},
+				{Identifier: b, Type: &SliceType{ElementType: typ("int")}},
+				{Identifier: c, Type: &SliceType{ElementType: typ("int")}},
+				{Identifier: d, Type: &SliceType{ElementType: typ("int")}, DotDotDot: true},
 			}},
 		},
 
@@ -2511,24 +2513,24 @@ func TestParseParameterList(t *testing.T) {
 			`(a, []b, c,)`,
 			&Signature{Parameters: []ParameterDecl{
 				{Type: typ("a")},
-				{Type: &SliceType{Type: typ("b")}},
+				{Type: &SliceType{ElementType: typ("b")}},
 				{Type: typ("c")},
 			}},
 		},
 		{
 			`(a, b []int,)`,
 			&Signature{Parameters: []ParameterDecl{
-				{Identifier: a, Type: &SliceType{Type: typ("int")}},
-				{Identifier: b, Type: &SliceType{Type: typ("int")}},
+				{Identifier: a, Type: &SliceType{ElementType: typ("int")}},
+				{Identifier: b, Type: &SliceType{ElementType: typ("int")}},
 			}},
 		},
 		{
 			`(a, b []int, c, d ...[]int,)`,
 			&Signature{Parameters: []ParameterDecl{
-				{Identifier: a, Type: &SliceType{Type: typ("int")}},
-				{Identifier: b, Type: &SliceType{Type: typ("int")}},
-				{Identifier: c, Type: &SliceType{Type: typ("int")}},
-				{Identifier: d, Type: &SliceType{Type: typ("int")}, DotDotDot: true},
+				{Identifier: a, Type: &SliceType{ElementType: typ("int")}},
+				{Identifier: b, Type: &SliceType{ElementType: typ("int")}},
+				{Identifier: c, Type: &SliceType{ElementType: typ("int")}},
+				{Identifier: d, Type: &SliceType{ElementType: typ("int")}, DotDotDot: true},
 			}},
 		},
 
@@ -2558,12 +2560,12 @@ func TestParseParameterList(t *testing.T) {
 
 func TestParseChannelType(t *testing.T) {
 	parserTests{
-		{`chan a`, &ChannelType{Send: true, Receive: true, Type: typ("a")}},
-		{`<-chan a`, &ChannelType{Receive: true, Type: typ("a")}},
-		{`chan<- a`, &ChannelType{Send: true, Type: typ("a")}},
-		{`chan<- <- chan a`, &ChannelType{Send: true, Type: &ChannelType{Receive: true, Type: typ("a")}}},
-		{`chan<- chan a`, &ChannelType{Send: true, Type: &ChannelType{Send: true, Receive: true, Type: typ("a")}}},
-		{`<- chan <-chan a`, &ChannelType{Receive: true, Type: &ChannelType{Receive: true, Type: typ("a")}}},
+		{`chan a`, &ChannelType{Send: true, Receive: true, ElementType: typ("a")}},
+		{`<-chan a`, &ChannelType{Receive: true, ElementType: typ("a")}},
+		{`chan<- a`, &ChannelType{Send: true, ElementType: typ("a")}},
+		{`chan<- <- chan a`, &ChannelType{Send: true, ElementType: &ChannelType{Receive: true, ElementType: typ("a")}}},
+		{`chan<- chan a`, &ChannelType{Send: true, ElementType: &ChannelType{Send: true, Receive: true, ElementType: typ("a")}}},
+		{`<- chan <-chan a`, &ChannelType{Receive: true, ElementType: &ChannelType{Receive: true, ElementType: typ("a")}}},
 
 		{`<- chan<- a`, parseError{"expected"}},
 		{`chan<- <- a`, parseError{"expected"}},
@@ -2584,13 +2586,13 @@ func TestParseMapType(t *testing.T) {
 
 func TestParseArrayType(t *testing.T) {
 	parserTests{
-		{`[4]a`, &ArrayType{Size: intLit("4"), Type: typ("a")}},
-		{`[4]a.b`, &ArrayType{Size: intLit("4"), Type: qtyp("a", "b")}},
-		{`[4](a)`, &ArrayType{Size: intLit("4"), Type: typ("a")}},
-		{`[4][]a`, &ArrayType{Size: intLit("4"), Type: &SliceType{Type: typ("a")}}},
+		{`[4]a`, &ArrayType{Size: intLit("4"), ElementType: typ("a")}},
+		{`[4]a.b`, &ArrayType{Size: intLit("4"), ElementType: qtyp("a", "b")}},
+		{`[4](a)`, &ArrayType{Size: intLit("4"), ElementType: typ("a")}},
+		{`[4][]a`, &ArrayType{Size: intLit("4"), ElementType: &SliceType{ElementType: typ("a")}}},
 		{`[4][42*b]a`, &ArrayType{
-			Size: intLit("4"),
-			Type: &ArrayType{Size: binOp(token.Star, intLit("42"), b), Type: typ("a")},
+			Size:        intLit("4"),
+			ElementType: &ArrayType{Size: binOp(token.Star, intLit("42"), b), ElementType: typ("a")},
 		}},
 		// [...]Type notation is only allowed in composite literals,
 		// not types in general
@@ -2600,10 +2602,10 @@ func TestParseArrayType(t *testing.T) {
 
 func TestParseSliceType(t *testing.T) {
 	parserTests{
-		{`[]a`, &SliceType{Type: typ("a")}},
-		{`[]a.b`, &SliceType{Type: qtyp("a", "b")}},
-		{`[](a)`, &SliceType{Type: typ("a")}},
-		{`[][]a`, &SliceType{Type: &SliceType{Type: typ("a")}}},
+		{`[]a`, &SliceType{ElementType: typ("a")}},
+		{`[]a.b`, &SliceType{ElementType: qtyp("a", "b")}},
+		{`[](a)`, &SliceType{ElementType: typ("a")}},
+		{`[][]a`, &SliceType{ElementType: &SliceType{ElementType: typ("a")}}},
 	}.run(t, func(p *Parser) Node { return parseType(p) })
 }
 
@@ -2711,7 +2713,7 @@ func TestParseFunctionLiteral(t *testing.T) {
 func TestParseCompositeLiteral(t *testing.T) {
 	parserTests{
 		{`struct{ a int }{ a: 4 }`, &CompositeLiteral{
-			Type: &StructType{Fields: []FieldDecl{
+			LiteralType: &StructType{Fields: []FieldDecl{
 				{Identifier: a, Type: typ("int")},
 			}},
 			Elements: []Element{
@@ -2719,7 +2721,7 @@ func TestParseCompositeLiteral(t *testing.T) {
 			},
 		}},
 		{`struct{ a, b int }{ a: 4, b: 5}`, &CompositeLiteral{
-			Type: &StructType{Fields: []FieldDecl{
+			LiteralType: &StructType{Fields: []FieldDecl{
 				{Identifier: a, Type: typ("int")},
 				{Identifier: b, Type: typ("int")},
 			}},
@@ -2729,8 +2731,8 @@ func TestParseCompositeLiteral(t *testing.T) {
 			},
 		}},
 		{`struct{ a []int }{ a: { 4, 5 } }`, &CompositeLiteral{
-			Type: &StructType{Fields: []FieldDecl{
-				{Identifier: a, Type: &SliceType{Type: typ("int")}},
+			LiteralType: &StructType{Fields: []FieldDecl{
+				{Identifier: a, Type: &SliceType{ElementType: typ("int")}},
 			}},
 			Elements: []Element{
 				{Key: a, Value: &CompositeLiteral{
@@ -2741,7 +2743,7 @@ func TestParseCompositeLiteral(t *testing.T) {
 			},
 		}},
 		{`[][]int{ {4, 5} }`, &CompositeLiteral{
-			Type: &SliceType{Type: &SliceType{Type: typ("int")}},
+			LiteralType: &SliceType{ElementType: &SliceType{ElementType: typ("int")}},
 			Elements: []Element{
 				{Value: &CompositeLiteral{
 					Elements: []Element{{Value: intLit("4")}, {Value: intLit("5")}},
@@ -2749,14 +2751,14 @@ func TestParseCompositeLiteral(t *testing.T) {
 			},
 		}},
 		{`[...]int{ 4, 5 }`, &CompositeLiteral{
-			Type: &ArrayType{Type: typ("int")},
+			LiteralType: &ArrayType{ElementType: typ("int")},
 			Elements: []Element{
 				{Value: intLit("4")}, {Value: intLit("5")},
 			},
 		}},
 		// Trailing ,
 		{`struct{ a, b int }{ a: 4, b: 5,}`, &CompositeLiteral{
-			Type: &StructType{Fields: []FieldDecl{
+			LiteralType: &StructType{Fields: []FieldDecl{
 				{Identifier: a, Type: typ("int")},
 				{Identifier: b, Type: typ("int")},
 			}},
@@ -2766,14 +2768,14 @@ func TestParseCompositeLiteral(t *testing.T) {
 			},
 		}},
 		{`a{b: 5, c: 6}`, &CompositeLiteral{
-			Type: typ("a"),
+			LiteralType: typ("a"),
 			Elements: []Element{
 				{Key: b, Value: intLit("5")},
 				{Key: c, Value: intLit("6")},
 			},
 		}},
 		{`a.b{c: 6}`, &CompositeLiteral{
-			Type: qtyp("a", "b"),
+			LiteralType: qtyp("a", "b"),
 			Elements: []Element{
 				{Key: c, Value: intLit("6")},
 			},
@@ -2813,16 +2815,16 @@ func TestParseConversionExpr(t *testing.T) {
 		{`(struct{x int})(a)`, call(&StructType{
 			Fields: []FieldDecl{{Identifier: x, Type: typ("int")}},
 		}, false, a)},
-		{`(chan <- a)(b)`, call(&ChannelType{Send: true, Type: typ("a")}, false, b)},
-		{`chan <- a(b)`, call(&ChannelType{Send: true, Type: typ("a")}, false, b)},
+		{`(chan <- a)(b)`, call(&ChannelType{Send: true, ElementType: typ("a")}, false, b)},
+		{`chan <- a(b)`, call(&ChannelType{Send: true, ElementType: typ("a")}, false, b)},
 	}.run(t, func(p *Parser) Node { return parseExpr(p) })
 }
 
 func TestParseBuiltInCall(t *testing.T) {
 	parserTests{
-		{`make(chan <- a)`, call(id("make"), false, &ChannelType{Send: true, Type: typ("a")})},
-		{`make(chan <- a, 5)`, call(id("make"), false, &ChannelType{Send: true, Type: typ("a")}, intLit("5"))},
-		{`(make)(chan <- a, 5)`, call(id("make"), false, &ChannelType{Send: true, Type: typ("a")}, intLit("5"))},
+		{`make(chan <- a)`, call(id("make"), false, &ChannelType{Send: true, ElementType: typ("a")})},
+		{`make(chan <- a, 5)`, call(id("make"), false, &ChannelType{Send: true, ElementType: typ("a")}, intLit("5"))},
+		{`(make)(chan <- a, 5)`, call(id("make"), false, &ChannelType{Send: true, ElementType: typ("a")}, intLit("5"))},
 	}.run(t, func(p *Parser) Node { return parseExpr(p) })
 }
 

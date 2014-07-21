@@ -231,12 +231,12 @@ func parseSwitch(p *Parser) Statement {
 		// Must be a type switch with a declaration.
 		p.next()
 		ta, ok := parsePrimaryExpr(p, true).(*TypeAssertion)
-		if !ok || ta.Type != nil {
+		if !ok || ta.AssertedType != nil {
 			panic(p.err("type switch guard"))
 		}
 		return parseTypeSwitchBlock(p, loc, cmnts, stmt, ta.Expression, id)
 	}
-	if ta, ok := expr.(*TypeAssertion); ok && ta.Type == nil {
+	if ta, ok := expr.(*TypeAssertion); ok && ta.AssertedType == nil {
 		return parseTypeSwitchBlock(p, loc, cmnts, stmt, ta.Expression, nil)
 	}
 
@@ -253,7 +253,7 @@ func guardStatement(stmt Statement) (Expression, *Identifier) {
 		if len(s.Right) != 1 {
 			break
 		}
-		if ta, ok := s.Right[0].(*TypeAssertion); ok && ta.Type == nil {
+		if ta, ok := s.Right[0].(*TypeAssertion); ok && ta.AssertedType == nil {
 			if len(s.Left) != 1 {
 				panic("too many identifiers in a type switch guard")
 			}
@@ -262,7 +262,7 @@ func guardStatement(stmt Statement) (Expression, *Identifier) {
 		break
 
 	case *ExpressionStmt:
-		if ta, ok := s.Expression.(*TypeAssertion); ok && ta.Type == nil {
+		if ta, ok := s.Expression.(*TypeAssertion); ok && ta.AssertedType == nil {
 			return ta.Expression, nil
 		}
 	}
@@ -1349,7 +1349,7 @@ func parseChannelType(p *Parser) Type {
 		ch.Receive = false
 		p.next()
 	}
-	ch.Type = parseType(p)
+	ch.ElementType = parseType(p)
 	return ch
 }
 
@@ -1375,7 +1375,7 @@ func parseArrayOrSliceType(p *Parser, dotDotDot bool) Type {
 
 	if p.tok == token.CloseBracket {
 		p.next()
-		sl := &SliceType{Type: parseType(p), openLoc: openLoc}
+		sl := &SliceType{ElementType: parseType(p), openLoc: openLoc}
 		return sl
 	}
 	ar := &ArrayType{openLoc: openLoc}
@@ -1386,7 +1386,7 @@ func parseArrayOrSliceType(p *Parser, dotDotDot bool) Type {
 	}
 	p.expect(token.CloseBracket)
 	p.next()
-	ar.Type = parseType(p)
+	ar.ElementType = parseType(p)
 	return ar
 }
 
@@ -1480,7 +1480,7 @@ func parseExpression(p *Parser, typeSwitch bool) Expression {
 
 func parseBinaryExpr(p *Parser, prec int, typeSwitch bool) Expression {
 	left := parseUnaryExpr(p, typeSwitch)
-	if ta, ok := left.(*TypeAssertion); ok && ta.Type == nil {
+	if ta, ok := left.(*TypeAssertion); ok && ta.AssertedType == nil {
 		if !typeSwitch {
 			panic("parsed a disallowed type switch guard")
 		}
@@ -1527,7 +1527,7 @@ func parsePrimaryExpr(p *Parser, typeSwitch bool) Expression {
 	if p.exprLevel >= 0 && p.tok == token.OpenBrace {
 		if t := typeExpr(left); t != nil {
 			lit := parseLiteralValue(p)
-			lit.Type = t
+			lit.LiteralType = t
 			return lit
 		}
 	}
@@ -1650,7 +1650,7 @@ func parseExpressionListOrTypeGuard(p *Parser) []Expression {
 	for {
 		expr := parseExpression(p, len(exprs) == 0)
 		exprs = append(exprs, expr)
-		if ta, ok := expr.(*TypeAssertion); ok && ta.Type == nil {
+		if ta, ok := expr.(*TypeAssertion); ok && ta.AssertedType == nil {
 			if len(exprs) > 1 {
 				panic("parsed disallowed type switch guard")
 			}
@@ -1773,7 +1773,7 @@ func parseSelectorOrTypeAssertion(p *Parser, left Expression, typeSwitch bool) E
 		if typeSwitch && p.tok == token.Type {
 			p.next()
 		} else {
-			t.Type = parseType(p)
+			t.AssertedType = parseType(p)
 		}
 		p.expect(token.CloseParen)
 		t.closeLoc = p.start()
