@@ -1,13 +1,11 @@
 package ast
 
 import (
-	"io"
 	"math/big"
 	"path"
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/eaburns/pp"
 	"github.com/velour/stop/token"
 )
 
@@ -827,12 +825,14 @@ type IntegerLiteral struct {
 	span
 }
 
+// Eq implements the eq.Eqer interface. It is intended to be used only for test code.
 func (n *IntegerLiteral) Eq(v interface{}) bool {
 	m, ok := v.(*IntegerLiteral)
 	return ok && n.Value.Cmp(m.Value) == 0
 }
 
-func (n *IntegerLiteral) String() string {
+// PrettyPrint implements the pretty.PrettyPrinter interface.
+func (n *IntegerLiteral) PrettyPrint() string {
 	return "IntegerLiteral{ " + n.Value.String() + " }"
 }
 
@@ -842,12 +842,14 @@ type FloatLiteral struct {
 	span
 }
 
+// Eq implements the eq.Eqer interface. It is intended to be used only for test code.
 func (n *FloatLiteral) Eq(v interface{}) bool {
 	m, ok := v.(*FloatLiteral)
 	return ok && n.Value.Cmp(m.Value) == 0
 }
 
-func (n *FloatLiteral) String() string {
+// PrettyPrint implements the pretty.PrettyPrinter interface.
+func (n *FloatLiteral) PrettyPrint() string {
 	return "FloatLiteral{ " + n.Value.String() + " }"
 }
 
@@ -858,13 +860,15 @@ type ComplexLiteral struct {
 	span
 }
 
+// Eq implements the eq.Eqer interface. It is intended to be used only for test code.
 func (n *ComplexLiteral) Eq(v interface{}) bool {
 	m, ok := v.(*ComplexLiteral)
 	return ok && n.Real.Cmp(m.Real) == 0 &&
 		n.Imaginary.Cmp(m.Imaginary) == 0
 }
 
-func (n *ComplexLiteral) String() string {
+// PrettyPrint implements the pretty.PrettyPrinter interface.
+func (n *ComplexLiteral) PrettyPrint() string {
 	return "ComplexLiteral{ Real: " + n.Real.String() +
 		", Imaginary: " + n.Imaginary.String() + " }"
 }
@@ -880,16 +884,4 @@ type RuneLiteral struct {
 type StringLiteral struct {
 	Value string
 	span
-}
-
-// Print writes a human-readable representation of an abstract
-// syntax tree to an io.Writer.
-func Print(out io.Writer, n Node) error {
-	return pp.Print(out, n)
-}
-
-// Dot writes an abstract syntax tree to an io.Writer using the dot
-// language of graphviz.
-func Dot(out io.Writer, n Node) error {
-	return pp.Dot(out, n)
 }

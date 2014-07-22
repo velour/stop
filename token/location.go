@@ -22,7 +22,5 @@ func (l Location) Column() int {
 // String returns the string representation of a location as an
 // Acme address.
 func (l Location) String() string {
-	line := strconv.Itoa(l.Line)
-	col := strconv.Itoa(l.Column())
-	return l.Path + ":" + line + "-+#" + col
+	return l.Path + ":" + strconv.Itoa(l.Line) + ":" + strconv.Itoa(l.Column())
 }

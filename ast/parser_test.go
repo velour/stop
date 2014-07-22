@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/eaburns/eq"
-	"github.com/eaburns/pp"
+	"github.com/eaburns/pretty"
 	"github.com/velour/stop/test"
 	"github.com/velour/stop/token"
 )
@@ -3012,7 +3012,7 @@ func (test parserTest) run(t *testing.T, production func(*Parser) Node) {
 	n, err := parse(NewParser(token.NewLexer("", test.text)), production)
 	if pe, ok := test.node.(parseError); ok {
 		if err == nil {
-			t.Errorf("parse(%s): expected error matching %s, got\n%s", test.text, pe.re, pp.MustString(n))
+			t.Errorf("parse(%s): expected error matching %s, got\n%s", test.text, pe.re, pretty.String(n))
 		} else if !regexp.MustCompile(pe.re).MatchString(err.Error()) {
 			t.Errorf("parse(%s): expected an error matching %s, got %s", test.text, pe.re, err.Error())
 		}
@@ -3022,7 +3022,7 @@ func (test parserTest) run(t *testing.T, production func(*Parser) Node) {
 		t.Errorf("parse(%s): unexpected error: %s", test.text, err.Error())
 	}
 	if !eq.Deep(n, test.node) {
-		t.Errorf("parse(%s): %s,\nexpected: %s", test.text, pp.MustString(n), pp.MustString(test.node))
+		t.Errorf("parse(%s): %s,\nexpected: %s", test.text, pretty.String(n), pretty.String(test.node))
 	}
 }
 

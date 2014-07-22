@@ -103,7 +103,7 @@ func (t *ArrayType) Identical(other Type) bool {
 	}
 	tSz := t.Size.(*IntegerLiteral)
 	sSz := s.Size.(*IntegerLiteral)
-	return tSz.Eq(sSz) && t.ElementType.Identical(s.ElementType)
+	return tSz.Value.Cmp(sSz.Value) == 0 && t.ElementType.Identical(s.ElementType)
 }
 
 // Identical returns whether the two types are identical.
