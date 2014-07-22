@@ -113,12 +113,6 @@ func (p *Parser) expect(tok token.Token) {
 	}
 }
 
-type stringStringer string
-
-func (s stringStringer) String() string {
-	return string(s)
-}
-
 // Error returns a syntax error.  The argument must be either a string
 // or a fmt.Stringer.  The syntax error states that the parse wanted
 // the string value of the argument, but got the current token instead.
