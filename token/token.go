@@ -183,9 +183,10 @@ var tokenNames = map[Token]string{
 }
 
 // String returns the string represenation of a token.
-func (tok Token) String() string {
-	return tokenNames[tok]
-}
+func (tok Token) String() string { return tokenNames[tok] }
+
+// PrettyPrint implements the pretty.PrettyPrinter interface.
+func (tok Token) PrettyPrint() string { return tok.String() }
 
 var keywords = map[string]Token{
 	"break":       Break,

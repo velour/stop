@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/eaburns/eq"
-	"github.com/eaburns/pp"
+	"github.com/eaburns/pretty"
 	"github.com/velour/stop/token"
 )
 
@@ -705,14 +705,14 @@ func TestTypeIdentical(t *testing.T) {
 	for _, test := range tests {
 		ident := test.u.Identical(test.v)
 		if ident != test.ident {
-			t.Errorf("(%s).Identical(%s)=%t, want %t", pp.MustString(test.u), pp.MustString(test.v), ident, test.ident)
+			t.Errorf("(%s).Identical(%s)=%t, want %t", pretty.String(test.u), pretty.String(test.v), ident, test.ident)
 		}
 		identReflect := test.v.Identical(test.u)
 		if ident == identReflect {
 			continue
 		}
-		u := pp.MustString(test.u)
-		v := pp.MustString(test.v)
+		u := pretty.String(test.u)
+		v := pretty.String(test.v)
 		t.Errorf("(%s).Identical(%s)=%t, but (%s).Identical(%s)=%t", u, v, ident, v, u, identReflect)
 	}
 }
@@ -752,7 +752,7 @@ func TestTypeUnderlying(t *testing.T) {
 		if eq.Deep(u, test.u) {
 			continue
 		}
-		t.Errorf("(%s).Underlying()=%s, want %s", pp.MustString(test.t), pp.MustString(u), pp.MustString(test.u))
+		t.Errorf("(%s).Underlying()=%s, want %s", pretty.String(test.t), pretty.String(u), pretty.String(test.u))
 	}
 }
 
@@ -950,7 +950,7 @@ func TestPkgDecls(t *testing.T) {
 		for id, d := range s.Decls {
 			ids = append(ids, id)
 			if seen[d] {
-				t.Errorf("pkgDecls(%v), multiple idents map to declaration %s", test.src, pp.MustString(d))
+				t.Errorf("pkgDecls(%v), multiple idents map to declaration %s", test.src, pretty.String(d))
 			}
 			seen[d] = true
 		}
