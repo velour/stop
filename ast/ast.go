@@ -887,3 +887,25 @@ type StringLiteral struct {
 	Value string
 	span
 }
+
+// BoolLiteral is an expression node representing a literal boolean value: true or false.
+//
+// In the grammar, "true" and "false" are predeclared identifiers, not keywords.
+// So, the parser will never return a BoolLiteral node, as it needs the symbol
+// table in order to determine if an "true" or "false" identifier is one of the
+// predeclared boolean constants. Instead, BoolLiteral nodes are constructed by
+// constant folding.
+type BoolLiteral struct {
+	Value bool
+	span
+}
+
+// NilLiteral is an expression node representing a literal nil value.
+//
+// In the grammar, "nil" is a predeclared identifier, not a keyword.
+// So, the parser will never return a NilLiteral node, as it needs the
+// symbol table to determine if a "nil" identifier is the predeclared
+// nil literal, or something else.
+type NilLiteral struct {
+	span
+}

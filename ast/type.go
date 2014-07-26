@@ -217,3 +217,11 @@ func (n *RuneLiteral) Type() Type {
 func (n *StringLiteral) Type() Type {
 	panic("unimplemented")
 }
+
+func (n *BoolLiteral) Type() Type {
+	panic("unimplemented")
+}
+
+func (n *NilLiteral) Type() Type {
+	panic("unimplemented")
+}
