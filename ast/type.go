@@ -11,6 +11,7 @@ import (
 // A ConstKind is a constant kind.
 type ConstKind int
 
+// Constant kinds.
 const (
 	NilConst ConstKind = iota
 	RuneConst

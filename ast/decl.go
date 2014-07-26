@@ -61,6 +61,7 @@ var (
 // A predeclaredType is a declaration node representing a predeclared type.
 type predeclaredType int
 
+// Predeclared types.
 const (
 	Bool predeclaredType = iota
 	Complex64
