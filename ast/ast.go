@@ -679,6 +679,14 @@ type Expression interface {
 	Source() string
 	// Type returns the Type of the result of the expression.
 	Type() Type
+	// Checks the expression, returning a replacement if the
+	// expression can be reduced (for example, by constant folding)
+	// and any errors that may have occurred. Iota specifies the
+	// value to which iota should evaluate if encountered. For
+	// expressions that do not appear in ConstSpec nodes, it is -1.
+	// When iota is non-negative, it is an error for the expression
+	// not to reduce to a constant operand.
+	Check(syms *symtab, iota int) (Expression, error)
 }
 
 // A FunctionLiteral is an expression node that represents a function literal.
