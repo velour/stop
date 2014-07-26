@@ -2,7 +2,90 @@ package ast
 
 import (
 	"fmt"
+	"math"
+	"math/big"
+
+	"github.com/velour/stop/token"
 )
+
+// A ConstKind is a constant kind.
+type ConstKind int
+
+const (
+	RuneConst ConstKind = iota
+	IntConst
+	FloatConst
+	ComplexConst
+	StringConst
+	BoolConst
+)
+
+// An Untyped is a Type that representes an untyped constant.
+type Untyped struct{ ConstKind }
+
+func (Untyped) Start() token.Location { panic("unimplemented") }
+func (Untyped) End() token.Location   { panic("unimplemented") }
+func (Untyped) Loc() token.Location   { panic("unimplemented") }
+func (Untyped) Identical(t Type) bool { return false }
+func (n Untyped) Underlying() Type    { return n }
+func (n Untyped) Type() Type          { return n }
+
+var bounds = map[predeclaredType]struct{ min, max *big.Int }{
+	Int:     {big.NewInt(minInt), big.NewInt(maxInt)},
+	Int8:    {big.NewInt(math.MinInt8), big.NewInt(math.MaxInt8)},
+	Int16:   {big.NewInt(math.MinInt16), big.NewInt(math.MaxInt16)},
+	Int32:   {big.NewInt(math.MinInt32), big.NewInt(math.MaxInt32)},
+	Int64:   {big.NewInt(math.MinInt64), big.NewInt(math.MaxInt64)},
+	Uint:    {big.NewInt(0), newUint(maxUint)},
+	Uint8:   {big.NewInt(0), newUint(math.MaxUint8)},
+	Uint16:  {big.NewInt(0), newUint(math.MaxUint16)},
+	Uint32:  {big.NewInt(0), newUint(math.MaxUint32)},
+	Uint64:  {big.NewInt(0), newUint(math.MaxUint64)},
+	Uintptr: {big.NewInt(0), newUint(maxUintptr)},
+}
+
+func newUint(x uint64) *big.Int {
+	var i big.Int
+	i.SetUint64(x)
+	return &i
+}
+
+// IsRepresentable returns whether a constant expression can be represented by a type.
+func IsRepresentable(x Expression, t Type) bool {
+	tn, ok := t.Underlying().(*TypeName)
+	if !ok {
+		return false
+	}
+	switch tn.Identifier.decl {
+	case Bool:
+		u, untyped := x.(Untyped)
+		_, boolLit := x.(*BoolLiteral)
+		return boolLit || (untyped && u.ConstKind == BoolConst)
+
+	case Complex64, Complex128:
+		_, cmplxLit := x.(*ComplexLiteral)
+		_, floatLit := x.(*FloatLiteral)
+		_, intLit := x.(*IntegerLiteral)
+		return cmplxLit || floatLit || intLit
+
+	case Float32, Float64:
+		_, floatLit := x.(*FloatLiteral)
+		_, intLit := x.(*IntegerLiteral)
+		return floatLit || intLit
+
+	case String:
+		_, strLit := x.(*StringLiteral)
+		return strLit
+
+	case Int, Int8, Int16, Int32, Int64, Uint, Uint8, Uint16, Uint32, Uint64, Uintptr:
+		d := tn.Identifier.decl.(predeclaredType)
+		if l, ok := x.(*IntegerLiteral); ok {
+			b := bounds[d]
+			return b.min.Cmp(l.Value) <= 0 && l.Value.Cmp(b.max) <= 0
+		}
+	}
+	return false
+}
 
 // Identical returns whether the two types are identical.
 // Two struct types are identical if they have the same sequence of fields, and if corresponding fields have the same names, and identical types, and identical tags. Two anonymous fields are considered to have the same name. Lower-case field names from different packages are always different.
@@ -141,7 +224,7 @@ func (t *Star) Underlying() Type          { return t }
 
 func (t *TypeName) Underlying() Type {
 	switch d := t.Identifier.decl.(type) {
-	case *predeclaredType:
+	case predeclaredType:
 		return t
 	case *TypeSpec:
 		return d.Type.Underlying()

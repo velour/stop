@@ -5,33 +5,30 @@ import (
 )
 
 var (
-	uint8Decl predeclaredType
-	int32Decl predeclaredType
-
 	// UnivScope is the universal symtab, containing all predeclared identifiers.
 	univScope = symtab{
 		Decls: map[string]Declaration{
 			// Predeclared types.
-			"bool":       &predeclaredType{},
-			"byte":       &uint8Decl,
-			"complex64":  &predeclaredType{},
-			"complex128": &predeclaredType{},
-			"error":      &predeclaredType{},
-			"float32":    &predeclaredType{},
-			"float64":    &predeclaredType{},
-			"int":        &predeclaredType{},
-			"int8":       &predeclaredType{},
-			"int16":      &predeclaredType{},
-			"int32":      &int32Decl,
-			"int64":      &predeclaredType{},
-			"rune":       &int32Decl,
-			"string":     &predeclaredType{},
-			"uint":       &predeclaredType{},
-			"uint8":      &uint8Decl,
-			"uint16":     &predeclaredType{},
-			"uint32":     &predeclaredType{},
-			"uint64":     &predeclaredType{},
-			"uintptr":    &predeclaredType{},
+			"bool":       Bool,
+			"byte":       Uint8,
+			"complex64":  Complex64,
+			"complex128": Complex128,
+			"error":      Error,
+			"float32":    Float32,
+			"float64":    Float64,
+			"int":        Int,
+			"int8":       Int8,
+			"int16":      Int16,
+			"int32":      Int32,
+			"int64":      Int64,
+			"rune":       Int32,
+			"string":     String,
+			"uint":       Uint,
+			"uint8":      Uint8,
+			"uint16":     Uint16,
+			"uint32":     Uint32,
+			"uint64":     Uint64,
+			"uintptr":    Uintptr,
 
 			// Predeclared constants.
 			"true":  &predeclaredConst{},
@@ -62,11 +59,32 @@ var (
 )
 
 // A predeclaredType is a declaration node representing a predeclared type.
-type predeclaredType struct{}
+type predeclaredType int
 
-func (*predeclaredType) Comments() []string    { return nil }
-func (*predeclaredType) Start() token.Location { return token.Location{} }
-func (*predeclaredType) End() token.Location   { return token.Location{} }
+const (
+	Bool predeclaredType = iota
+	Complex64
+	Complex128
+	Error
+	Float32
+	Float64
+	Int
+	Int8
+	Int16
+	Int32
+	Int64
+	String
+	Uint
+	Uint8
+	Uint16
+	Uint32
+	Uint64
+	Uintptr
+)
+
+func (predeclaredType) Comments() []string    { return nil }
+func (predeclaredType) Start() token.Location { return token.Location{} }
+func (predeclaredType) End() token.Location   { return token.Location{} }
 
 // A predeclaredConst is a declaration node representing a predeclared constant.
 type predeclaredConst struct{}
