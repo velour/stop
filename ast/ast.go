@@ -824,6 +824,7 @@ func (n *Identifier) Exported() bool {
 // integer literal.
 type IntegerLiteral struct {
 	Value *big.Int
+	typ   Type
 	span
 }
 
@@ -841,6 +842,7 @@ func (n *IntegerLiteral) PrettyPrint() string {
 // FloatLiteral is an expression node representing a floating point literal.
 type FloatLiteral struct {
 	Value *big.Rat
+	typ   Type
 	span
 }
 
@@ -859,6 +861,7 @@ func (n *FloatLiteral) PrettyPrint() string {
 // both the real and the imaginary components of a complex number.
 type ComplexLiteral struct {
 	Real, Imaginary *big.Rat
+	typ             Type
 	span
 }
 
@@ -878,6 +881,7 @@ func (n *ComplexLiteral) PrettyPrint() string {
 // RuneLiteral is an expression node representing a rune literal.
 type RuneLiteral struct {
 	Value rune
+	typ   Type
 	span
 }
 
@@ -885,6 +889,7 @@ type RuneLiteral struct {
 // raw string literal.
 type StringLiteral struct {
 	Value string
+	typ   Type
 	span
 }
 
@@ -897,6 +902,7 @@ type StringLiteral struct {
 // constant folding.
 type BoolLiteral struct {
 	Value bool
+	typ   Type
 	span
 }
 
@@ -907,5 +913,6 @@ type BoolLiteral struct {
 // symbol table to determine if a "nil" identifier is the predeclared
 // nil literal, or something else.
 type NilLiteral struct {
+	typ Type
 	span
 }

@@ -335,33 +335,32 @@ func (n *UnaryOp) Type() Type {
 }
 
 func (n *Identifier) Type() Type {
-	panic("unimplemented")
+	switch d := n.decl.(type) {
+	case *VarSpec:
+		return d.Type
+
+	case *MethodDecl:
+		return &FunctionType{Signature: d.Signature}
+
+	case *FunctionDecl:
+		return &FunctionType{Signature: d.Signature}
+
+	case *predeclaredFunc:
+		// BUG(eaburns): Figure out Identifier.Type for predeclared functions.
+		panic("unimplemented")
+
+	// predeclaredType and *TypeSpec are changed to TypeNames by Check.
+	// predeclaredConst and *ConstSpec are changed to literals by Check.
+	// *ImportDecls are simply invalid in all places that x.Type() will be called.
+	default:
+		panic(fmt.Sprintf("Type called on identifier with bad decl type: %T", d))
+	}
 }
 
-func (n *IntegerLiteral) Type() Type {
-	panic("unimplemented")
-}
-
-func (n *FloatLiteral) Type() Type {
-	panic("unimplemented")
-}
-
-func (n *ComplexLiteral) Type() Type {
-	panic("unimplemented")
-}
-
-func (n *RuneLiteral) Type() Type {
-	panic("unimplemented")
-}
-
-func (n *StringLiteral) Type() Type {
-	panic("unimplemented")
-}
-
-func (n *BoolLiteral) Type() Type {
-	panic("unimplemented")
-}
-
-func (n *NilLiteral) Type() Type {
-	panic("unimplemented")
-}
+func (n *IntegerLiteral) Type() Type { return n.typ }
+func (n *FloatLiteral) Type() Type   { return n.typ }
+func (n *ComplexLiteral) Type() Type { return n.typ }
+func (n *RuneLiteral) Type() Type    { return n.typ }
+func (n *StringLiteral) Type() Type  { return n.typ }
+func (n *BoolLiteral) Type() Type    { return n.typ }
+func (n *NilLiteral) Type() Type { return n.typ }
