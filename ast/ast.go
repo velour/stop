@@ -671,6 +671,8 @@ type Expression interface {
 	// For example, the location of the operator of a binary
 	// expression may be used.  Loc is used for error reporting.
 	Loc() token.Location
+	// Type returns the Type of the result of the expression.
+	Type() Type
 }
 
 // A FunctionLiteral is an expression node that represents a function literal.

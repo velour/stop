@@ -149,3 +149,71 @@ func (t *TypeName) Underlying() Type {
 		panic(fmt.Sprintf("bad TypeName decl: %T", d))
 	}
 }
+
+func (n *StructType) Type() Type    { return n }
+func (n *InterfaceType) Type() Type { return n }
+func (n *FunctionType) Type() Type  { return n }
+func (n *ChannelType) Type() Type   { return n }
+func (n *MapType) Type() Type       { return n }
+func (n *ArrayType) Type() Type     { return n }
+func (n *SliceType) Type() Type     { return n }
+
+func (n *Star) Type() Type {
+	panic("unimplemented")
+}
+
+func (n *TypeName) Type() Type { return n }
+
+func (n *CompositeLiteral) Type() Type { return n.LiteralType }
+
+func (n *Index) Type() Type {
+	panic("unimplemented")
+}
+
+func (n *Slice) Type() Type {
+	panic("unimplemented")
+}
+
+func (n *TypeAssertion) Type() Type {
+	panic("unimplemented")
+}
+
+func (n *Selector) Type() Type {
+	panic("unimplemented")
+}
+
+func (n *Call) Type() Type {
+	panic("unimplemented")
+}
+
+func (n *BinaryOp) Type() Type {
+	panic("unimplemented")
+}
+
+func (n *UnaryOp) Type() Type {
+	panic("unimplemented")
+}
+
+func (n *Identifier) Type() Type {
+	panic("unimplemented")
+}
+
+func (n *IntegerLiteral) Type() Type {
+	panic("unimplemented")
+}
+
+func (n *FloatLiteral) Type() Type {
+	panic("unimplemented")
+}
+
+func (n *ComplexLiteral) Type() Type {
+	panic("unimplemented")
+}
+
+func (n *RuneLiteral) Type() Type {
+	panic("unimplemented")
+}
+
+func (n *StringLiteral) Type() Type {
+	panic("unimplemented")
+}
