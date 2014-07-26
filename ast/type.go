@@ -30,6 +30,63 @@ func (Untyped) Identical(t Type) bool { return false }
 func (n Untyped) Underlying() Type    { return n }
 func (n Untyped) Type() Type          { return n }
 
+// IsAssignable returns whether an expression is assignable to a variable of a given type.
+//	A value x is assignable to a variable of type T ("x is assignable to T") in any of these cases:
+//	x's type is identical to T.
+//	x's type V and T have identical underlying types and at least one of V or T is not a named type.
+//	T is an interface type and x implements T.
+//	x is a bidirectional channel value, T is a channel type, x's type V and T have identical element types, and at least one of V or T is not a named type.
+//	x is the predeclared identifier nil and T is a pointer, function, slice, map, channel, or interface type.
+//	x is an untyped constant representable by a value of type T.
+func IsAssignable(x Expression, t Type) bool {
+	xt := x.Type()
+	_, xtIsNamed := xt.(*TypeName)
+	_, tIsNamed := t.(*TypeName)
+	_, xIsNil := x.(*NilLiteral)
+	_, xIsUntyped := xt.(*Untyped)
+	xch, xtIsChan := xt.(*ChannelType)
+	tch, tIsChan := t.(*ChannelType)
+
+	switch {
+	case xt.Identical(t):
+		return true
+
+	case xt.Underlying().Identical(t.Underlying()) && (!xtIsNamed || !tIsNamed):
+		return true
+
+	// BUG(eaburns): If t is an interface and x implements t: return true
+
+	case xtIsChan && xch.Send && xch.Receive && tIsChan && xch.ElementType.Identical(tch.ElementType) && (!xtIsNamed || !tIsNamed):
+		return true
+
+	case xIsNil && Nilable(t):
+		return true
+
+	case xIsUntyped && IsRepresentable(x, t):
+		return true
+	}
+
+	return false
+}
+
+// Nilable returns whether the type can be nil.
+func Nilable(t Type) bool {
+	switch t.(type) {
+	case *Star:
+		return true
+	case *SliceType:
+		return true
+	case *MapType:
+		return true
+	case *ChannelType:
+		return true
+	case *InterfaceType:
+		return true
+	default:
+		return false
+	}
+}
+
 var bounds = map[predeclaredType]struct{ min, max *big.Int }{
 	Int:     {big.NewInt(minInt), big.NewInt(maxInt)},
 	Int8:    {big.NewInt(math.MinInt8), big.NewInt(math.MaxInt8)},
