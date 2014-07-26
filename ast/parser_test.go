@@ -29,26 +29,34 @@ var (
 	bigInt                 = qtyp("big", "Int")
 )
 
-func runeLit(r rune) *RuneLiteral { return &RuneLiteral{Value: r} }
+func runeLit(r rune) *RuneLiteral {
+	return &RuneLiteral{Value: r, typ: Untyped(RuneConst)}
+}
 
-func strLit(s string) *StringLiteral { return &StringLiteral{Value: s} }
+func strLit(s string) *StringLiteral {
+	return &StringLiteral{Value: s, typ: Untyped(StringConst)}
+}
 
 func intLit(s string) *IntegerLiteral {
 	var i big.Int
 	i.SetString(s, 0)
-	return &IntegerLiteral{Value: &i}
+	return &IntegerLiteral{Value: &i, typ: Untyped(IntConst)}
 }
 
 func floatLit(s string) *FloatLiteral {
 	var r big.Rat
 	r.SetString(s)
-	return &FloatLiteral{Value: &r}
+	return &FloatLiteral{Value: &r, typ: Untyped(FloatConst)}
 }
 
 func imgLit(s string) *ComplexLiteral {
 	var r big.Rat
 	r.SetString(s)
-	return &ComplexLiteral{Real: new(big.Rat), Imaginary: &r}
+	return &ComplexLiteral{
+		Real:      new(big.Rat),
+		Imaginary: &r,
+		typ:       Untyped(ComplexConst),
+	}
 }
 
 func typ(s string) *TypeName { return &TypeName{Identifier: *id(s)} }

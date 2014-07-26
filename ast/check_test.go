@@ -66,6 +66,97 @@ func init() {
 	t1Diff.Identifier.decl = &TypeSpec{Identifier: *id("T1"), Type: intType}
 }
 
+func TestIsAssignable(t *testing.T) {
+	anInt32 := intLit("42")
+	anInt32.typ = int32Type
+	aUint8 := intLit("42")
+	aUint8.typ = uint8Type
+	t0Ident := id("t0")
+	t0Ident.decl = &VarSpec{Type: t0}
+	nilLit := &NilLiteral{typ: Untyped(NilConst)}
+
+	namedT0Slice0 := typ("T0Slice")
+	namedT0Slice0.Identifier.decl = &TypeSpec{
+		Identifier: *id("T0Slice"),
+		Type:       &SliceType{ElementType: t0},
+	}
+	// Just like namedT0Slice0, but via a different declaration.
+	namedT0Slice1 := typ("T0Slice")
+	namedT0Slice1.Identifier.decl = &TypeSpec{
+		Identifier: *id("T0Slice"),
+		Type:       &SliceType{ElementType: t0},
+	}
+	t0SliceIdent := id("t0slice")
+	t0SliceIdent.decl = &VarSpec{Type: namedT0Slice0}
+
+	bidirIntChan := id("ch")
+	bidirIntChan.decl = &VarSpec{Type: &ChannelType{Send: true, Receive: true, ElementType: intType}}
+	sendIntChan := id("ch")
+	sendIntChan.decl = &VarSpec{Type: &ChannelType{Send: true, ElementType: intType}}
+	recvIntChan := id("ch")
+	recvIntChan.decl = &VarSpec{Type: &ChannelType{Receive: true, ElementType: intType}}
+
+	tests := []struct {
+		x  Expression
+		t  Type
+		ok bool
+	}{
+		{intLit("42"), intType, true},
+		{intLit("42"), int8Type, true},
+		{intLit("42"), int16Type, true},
+		{intLit("42"), int32Type, true},
+		{intLit("42"), int64Type, true},
+		{intLit("42"), uintType, true},
+		{intLit("42"), uint8Type, true},
+		{intLit("42"), uint16Type, true},
+		{intLit("42"), uint32Type, true},
+		{intLit("42"), uint64Type, true},
+		{intLit("42"), float32Type, true},
+		{intLit("42"), float64Type, true},
+		{intLit("42"), complex64Type, true},
+		{intLit("42"), complex128Type, true},
+		{strLit("Hello, World!"), intType, false},
+		{anInt32, int32Type, true},
+		{anInt32, runeType, true},
+		{anInt32, intType, false},
+		{aUint8, uint8Type, true},
+		{aUint8, byteType, true},
+		{aUint8, intType, false},
+		{strLit("Hello, World!"), stringType, true},
+		{intLit("42"), stringType, false},
+		{t0Ident, t0, true},
+		{t0Ident, intType, false},
+		{t0Ident, &SliceType{ElementType: t0}, false},
+		{t0SliceIdent, &SliceType{ElementType: t0}, true},
+		{t0SliceIdent, namedT0Slice0, true},
+		{t0SliceIdent, namedT0Slice1, false},
+		{nilLit, intType, false},
+		{nilLit, &StructType{}, false},
+		{nilLit, &Star{Target: t0}, true},
+		{nilLit, &SliceType{ElementType: t0}, true},
+		{nilLit, &MapType{Key: t0, Value: intType}, true},
+		{nilLit, &ChannelType{ElementType: t0}, true},
+		{nilLit, &InterfaceType{}, true},
+		{bidirIntChan, &ChannelType{Send: true, ElementType: intType}, true},
+		{bidirIntChan, &ChannelType{Receive: true, ElementType: intType}, true},
+		{bidirIntChan, &ChannelType{Send: true, Receive: true, ElementType: intType}, true},
+		{bidirIntChan, &ChannelType{Send: true, ElementType: t0}, false},
+		{sendIntChan, &ChannelType{Send: true, ElementType: intType}, true},
+		{sendIntChan, &ChannelType{Receive: true, ElementType: intType}, false},
+		{sendIntChan, &ChannelType{Send: true, Receive: true, ElementType: intType}, false},
+		{sendIntChan, &ChannelType{Send: true, ElementType: t0}, false},
+		{recvIntChan, &ChannelType{Send: true, ElementType: intType}, false},
+		{recvIntChan, &ChannelType{Receive: true, ElementType: intType}, true},
+		{recvIntChan, &ChannelType{Send: true, Receive: true, ElementType: intType}, false},
+		{recvIntChan, &ChannelType{Receive: true, ElementType: t0}, false},
+	}
+	for _, test := range tests {
+		if ok := IsAssignable(test.x, test.t); ok != test.ok {
+			t.Errorf("IsAssignable(%s, %s)=%t, want %t", pretty.String(test.x), pretty.String(test.t), ok, test.ok)
+		}
+	}
+}
+
 func TestIsRepresentable(t *testing.T) {
 	zero, neg1 := intLit("0"), intLit("-1")
 	hello := strLit("Hello, World!")

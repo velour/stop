@@ -12,7 +12,8 @@ import (
 type ConstKind int
 
 const (
-	RuneConst ConstKind = iota
+	NilConst ConstKind = iota
+	RuneConst
 	IntConst
 	FloatConst
 	ComplexConst
@@ -21,7 +22,7 @@ const (
 )
 
 // An Untyped is a Type that representes an untyped constant.
-type Untyped struct{ ConstKind }
+type Untyped ConstKind
 
 func (Untyped) Start() token.Location { panic("unimplemented") }
 func (Untyped) End() token.Location   { panic("unimplemented") }
@@ -43,7 +44,7 @@ func IsAssignable(x Expression, t Type) bool {
 	_, xtIsNamed := xt.(*TypeName)
 	_, tIsNamed := t.(*TypeName)
 	_, xIsNil := x.(*NilLiteral)
-	_, xIsUntyped := xt.(*Untyped)
+	_, xIsUntyped := xt.(Untyped)
 	xch, xtIsChan := xt.(*ChannelType)
 	tch, tIsChan := t.(*ChannelType)
 
@@ -117,7 +118,7 @@ func IsRepresentable(x Expression, t Type) bool {
 	case Bool:
 		u, untyped := x.(Untyped)
 		_, boolLit := x.(*BoolLiteral)
-		return boolLit || (untyped && u.ConstKind == BoolConst)
+		return boolLit || (untyped && u == Untyped(BoolConst))
 
 	case Complex64, Complex128:
 		_, cmplxLit := x.(*ComplexLiteral)
@@ -363,4 +364,4 @@ func (n *ComplexLiteral) Type() Type { return n.typ }
 func (n *RuneLiteral) Type() Type    { return n.typ }
 func (n *StringLiteral) Type() Type  { return n.typ }
 func (n *BoolLiteral) Type() Type    { return n.typ }
-func (n *NilLiteral) Type() Type { return n.typ }
+func (n *NilLiteral) Type() Type     { return n.typ }
