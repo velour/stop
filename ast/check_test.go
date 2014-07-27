@@ -134,7 +134,7 @@ func TestIsAssignable(t *testing.T) {
 		{nilLit, &StructType{}, false},
 		{nilLit, &Star{Target: t0}, true},
 		{nilLit, &SliceType{ElementType: t0}, true},
-		{nilLit, &MapType{Key: t0, Value: intType}, true},
+		{nilLit, &MapType{KeyType: t0, ValueType: intType}, true},
 		{nilLit, &ChannelType{ElementType: t0}, true},
 		{nilLit, &InterfaceType{}, true},
 		{bidirIntChan, &ChannelType{Send: true, ElementType: intType}, true},
@@ -353,18 +353,18 @@ func TestTypeIdentical(t *testing.T) {
 			false,
 		},
 		{
-			&MapType{Key: intType, Value: t1},
-			&MapType{Key: intType, Value: t1Ident},
+			&MapType{KeyType: intType, ValueType: t1},
+			&MapType{KeyType: intType, ValueType: t1Ident},
 			true,
 		},
 		{
-			&MapType{Key: intType, Value: t1},
-			&MapType{Key: intType, Value: t1Diff},
+			&MapType{KeyType: intType, ValueType: t1},
+			&MapType{KeyType: intType, ValueType: t1Diff},
 			false,
 		},
 		{
-			&MapType{Key: t0, Value: t1},
-			&MapType{Key: intType, Value: t1},
+			&MapType{KeyType: t0, ValueType: t1},
+			&MapType{KeyType: intType, ValueType: t1},
 			false,
 		},
 		{
@@ -940,8 +940,8 @@ func TestTypeUnderlying(t *testing.T) {
 			u: &ArrayType{Size: intLit("5"), ElementType: intType},
 		},
 		{
-			t: &MapType{Key: t0, Value: intType},
-			u: &MapType{Key: t0, Value: intType},
+			t: &MapType{KeyType: t0, ValueType: intType},
+			u: &MapType{KeyType: t0, ValueType: intType},
 		},
 		{
 			t: &ChannelType{Send: true, ElementType: intType},

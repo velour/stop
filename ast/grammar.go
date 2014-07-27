@@ -1359,10 +1359,10 @@ func parseMapType(p *Parser) Type {
 	p.next()
 	p.expect(token.OpenBracket)
 	p.next()
-	m.Key = parseType(p)
+	m.KeyType = parseType(p)
 	p.expect(token.CloseBracket)
 	p.next()
-	m.Value = parseType(p)
+	m.ValueType = parseType(p)
 	return m
 }
 

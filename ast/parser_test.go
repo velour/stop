@@ -750,18 +750,24 @@ var specTypeTests = parserTests{
 		}},
 	},
 	{`interface{}`, &InterfaceType{}},
-	{`map[string]int`, &MapType{Key: typ("string"), Value: typ("int")}},
+	{`map[string]int`, &MapType{KeyType: typ("string"), ValueType: typ("int")}},
 	{
 		`map[*T]struct{ x, y float64 }`,
 		&MapType{
-			Key: &Star{Target: typ("T")},
-			Value: &StructType{Fields: []FieldDecl{
+			KeyType: &Star{Target: typ("T")},
+			ValueType: &StructType{Fields: []FieldDecl{
 				{Identifier: x, Type: typ("float64")},
 				{Identifier: y, Type: typ("float64")},
 			}},
 		},
 	},
-	{`map[string]interface{}`, &MapType{Key: typ("string"), Value: &InterfaceType{}}},
+	{
+		`map[string]interface{}`,
+		&MapType{
+			KeyType:   typ("string"),
+			ValueType: &InterfaceType{},
+		},
+	},
 	{`chan T`, &ChannelType{Send: true, Receive: true, ElementType: typ("T")}},
 	{`chan<- float64`, &ChannelType{Send: true, ElementType: typ("float64")}},
 	{`<-chan int`, &ChannelType{Receive: true, ElementType: typ("int")}},
@@ -2169,7 +2175,7 @@ func TestParseType(t *testing.T) {
 		{`[](a)`, &SliceType{ElementType: typ("a")}},
 		{`[]*(a)`, &SliceType{ElementType: &Star{Target: typ("a")}}},
 		{`*[](a)`, &Star{Target: &SliceType{ElementType: typ("a")}}},
-		{`map[a]b`, &MapType{Key: typ("a"), Value: typ("b")}},
+		{`map[a]b`, &MapType{KeyType: typ("a"), ValueType: typ("b")}},
 
 		{`[]func()`, &SliceType{ElementType: &FunctionType{}}},
 		{
@@ -2583,12 +2589,24 @@ func TestParseChannelType(t *testing.T) {
 
 func TestParseMapType(t *testing.T) {
 	parserTests{
-		{`map[int]a`, &MapType{Key: typ("int"), Value: typ("a")}},
-		{`map[*int]a.b`, &MapType{Key: &Star{Target: typ("int")}, Value: qtyp("a", "b")}},
-		{`map[*int]map[string]int]`, &MapType{
-			Key:   &Star{Target: typ("int")},
-			Value: &MapType{Key: typ("string"), Value: typ("int")},
-		}},
+		{`map[int]a`, &MapType{KeyType: typ("int"), ValueType: typ("a")}},
+		{
+			`map[*int]a.b`,
+			&MapType{
+				KeyType:   &Star{Target: typ("int")},
+				ValueType: qtyp("a", "b"),
+			},
+		},
+		{
+			`map[*int]map[string]int]`,
+			&MapType{
+				KeyType: &Star{Target: typ("int")},
+				ValueType: &MapType{
+					KeyType:   typ("string"),
+					ValueType: typ("int"),
+				},
+			},
+		},
 	}.run(t, func(p *Parser) Node { return parseType(p) })
 }
 

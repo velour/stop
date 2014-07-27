@@ -603,12 +603,12 @@ func (n *ChannelType) Loc() token.Location   { return n.Start() }
 
 // An MapType is a type node that represents a map from types to types.
 type MapType struct {
-	Key, Value Type
-	mapLoc     token.Location
+	KeyType, ValueType Type
+	mapLoc             token.Location
 }
 
 func (n *MapType) Start() token.Location { return n.mapLoc }
-func (n *MapType) End() token.Location   { return n.Value.End() }
+func (n *MapType) End() token.Location   { return n.ValueType.End() }
 func (n *MapType) Loc() token.Location   { return n.Start() }
 
 // An ArrayType is a type node that represents an array of types.
