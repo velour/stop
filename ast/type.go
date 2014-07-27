@@ -2,7 +2,149 @@ package ast
 
 import (
 	"fmt"
+	"math"
+	"math/big"
+
+	"github.com/velour/stop/token"
 )
+
+// A ConstKind is a constant kind.
+type ConstKind int
+
+// Constant kinds.
+const (
+	NilConst ConstKind = iota
+	RuneConst
+	IntConst
+	FloatConst
+	ComplexConst
+	StringConst
+	BoolConst
+)
+
+// An Untyped is a Type that representes an untyped constant.
+type Untyped ConstKind
+
+func (Untyped) Start() token.Location { panic("unimplemented") }
+func (Untyped) End() token.Location   { panic("unimplemented") }
+func (Untyped) Loc() token.Location   { panic("unimplemented") }
+func (Untyped) Identical(t Type) bool { return false }
+func (n Untyped) Underlying() Type    { return n }
+func (n Untyped) Type() Type          { return n }
+
+// IsAssignable returns whether an expression is assignable to a variable of a given type.
+//	A value x is assignable to a variable of type T ("x is assignable to T") in any of these cases:
+//	x's type is identical to T.
+//	x's type V and T have identical underlying types and at least one of V or T is not a named type.
+//	T is an interface type and x implements T.
+//	x is a bidirectional channel value, T is a channel type, x's type V and T have identical element types, and at least one of V or T is not a named type.
+//	x is the predeclared identifier nil and T is a pointer, function, slice, map, channel, or interface type.
+//	x is an untyped constant representable by a value of type T.
+func IsAssignable(x Expression, t Type) bool {
+	xt := x.Type()
+	_, xtIsNamed := xt.(*TypeName)
+	_, tIsNamed := t.(*TypeName)
+	_, xIsNil := x.(*NilLiteral)
+	_, xIsUntyped := xt.(Untyped)
+	xch, xtIsChan := xt.(*ChannelType)
+	tch, tIsChan := t.(*ChannelType)
+
+	switch {
+	case xt.Identical(t):
+		return true
+
+	case xt.Underlying().Identical(t.Underlying()) && (!xtIsNamed || !tIsNamed):
+		return true
+
+	// BUG(eaburns): If t is an interface and x implements t: return true
+
+	case xtIsChan && xch.Send && xch.Receive && tIsChan && xch.ElementType.Identical(tch.ElementType) && (!xtIsNamed || !tIsNamed):
+		return true
+
+	case xIsNil && Nilable(t):
+		return true
+
+	case xIsUntyped && IsRepresentable(x, t):
+		return true
+	}
+
+	return false
+}
+
+// Nilable returns whether the type can be nil.
+func Nilable(t Type) bool {
+	switch t.(type) {
+	case *Star:
+		return true
+	case *SliceType:
+		return true
+	case *MapType:
+		return true
+	case *ChannelType:
+		return true
+	case *InterfaceType:
+		return true
+	default:
+		return false
+	}
+}
+
+var bounds = map[predeclaredType]struct{ min, max *big.Int }{
+	Int:     {big.NewInt(minInt), big.NewInt(maxInt)},
+	Int8:    {big.NewInt(math.MinInt8), big.NewInt(math.MaxInt8)},
+	Int16:   {big.NewInt(math.MinInt16), big.NewInt(math.MaxInt16)},
+	Int32:   {big.NewInt(math.MinInt32), big.NewInt(math.MaxInt32)},
+	Int64:   {big.NewInt(math.MinInt64), big.NewInt(math.MaxInt64)},
+	Uint:    {big.NewInt(0), newUint(maxUint)},
+	Uint8:   {big.NewInt(0), newUint(math.MaxUint8)},
+	Uint16:  {big.NewInt(0), newUint(math.MaxUint16)},
+	Uint32:  {big.NewInt(0), newUint(math.MaxUint32)},
+	Uint64:  {big.NewInt(0), newUint(math.MaxUint64)},
+	Uintptr: {big.NewInt(0), newUint(maxUintptr)},
+}
+
+func newUint(x uint64) *big.Int {
+	var i big.Int
+	i.SetUint64(x)
+	return &i
+}
+
+// IsRepresentable returns whether a constant expression can be represented by a type.
+func IsRepresentable(x Expression, t Type) bool {
+	tn, ok := t.Underlying().(*TypeName)
+	if !ok {
+		return false
+	}
+	switch tn.Identifier.decl {
+	case Bool:
+		u, untyped := x.(Untyped)
+		_, boolLit := x.(*BoolLiteral)
+		return boolLit || (untyped && u == Untyped(BoolConst))
+
+	case Complex64, Complex128:
+		_, cmplxLit := x.(*ComplexLiteral)
+		_, floatLit := x.(*FloatLiteral)
+		_, intLit := x.(*IntegerLiteral)
+		return cmplxLit || floatLit || intLit
+
+	case Float32, Float64:
+		_, floatLit := x.(*FloatLiteral)
+		_, intLit := x.(*IntegerLiteral)
+		return floatLit || intLit
+
+	case String:
+		_, strLit := x.(*StringLiteral)
+		return strLit
+
+	case Int, Int8, Int16, Int32, Int64, Uint, Uint8, Uint16, Uint32, Uint64, Uintptr:
+		d := tn.Identifier.decl.(predeclaredType)
+		if l, ok := x.(*IntegerLiteral); ok {
+			b := bounds[d]
+			return b.min.Cmp(l.Value) <= 0 && l.Value.Cmp(b.max) <= 0
+		}
+	}
+	return false
+}
 
 // Identical returns whether the two types are identical.
 // Two struct types are identical if they have the same sequence of fields, and if corresponding fields have the same names, and identical types, and identical tags. Two anonymous fields are considered to have the same name. Lower-case field names from different packages are always different.
@@ -141,7 +283,7 @@ func (t *Star) Underlying() Type          { return t }
 
 func (t *TypeName) Underlying() Type {
 	switch d := t.Identifier.decl.(type) {
-	case *predeclaredType:
+	case predeclaredType:
 		return t
 	case *TypeSpec:
 		return d.Type.Underlying()
@@ -149,3 +291,78 @@ func (t *TypeName) Underlying() Type {
 		panic(fmt.Sprintf("bad TypeName decl: %T", d))
 	}
 }
+
+func (n *StructType) Type() Type    { return n }
+func (n *InterfaceType) Type() Type { return n }
+func (n *FunctionType) Type() Type  { return n }
+func (n *ChannelType) Type() Type   { return n }
+func (n *MapType) Type() Type       { return n }
+func (n *ArrayType) Type() Type     { return n }
+func (n *SliceType) Type() Type     { return n }
+
+func (n *Star) Type() Type {
+	panic("unimplemented")
+}
+
+func (n *TypeName) Type() Type { return n }
+
+func (n *CompositeLiteral) Type() Type { return n.LiteralType }
+
+func (n *Index) Type() Type {
+	panic("unimplemented")
+}
+
+func (n *Slice) Type() Type {
+	panic("unimplemented")
+}
+
+func (n *TypeAssertion) Type() Type {
+	panic("unimplemented")
+}
+
+func (n *Selector) Type() Type {
+	panic("unimplemented")
+}
+
+func (n *Call) Type() Type {
+	panic("unimplemented")
+}
+
+func (n *BinaryOp) Type() Type {
+	panic("unimplemented")
+}
+
+func (n *UnaryOp) Type() Type {
+	panic("unimplemented")
+}
+
+func (n *Identifier) Type() Type {
+	switch d := n.decl.(type) {
+	case *VarSpec:
+		return d.Type
+
+	case *MethodDecl:
+		return &FunctionType{Signature: d.Signature}
+
+	case *FunctionDecl:
+		return &FunctionType{Signature: d.Signature}
+
+	case *predeclaredFunc:
+		// BUG(eaburns): Figure out Identifier.Type for predeclared functions.
+		panic("unimplemented")
+
+	// predeclaredType and *TypeSpec are changed to TypeNames by Check.
+	// predeclaredConst and *ConstSpec are changed to literals by Check.
+	// *ImportDecls are simply invalid in all places that x.Type() will be called.
+	default:
+		panic(fmt.Sprintf("Type called on identifier with bad decl type: %T", d))
+	}
+}
+
+func (n *IntegerLiteral) Type() Type { return n.typ }
+func (n *FloatLiteral) Type() Type   { return n.typ }
+func (n *ComplexLiteral) Type() Type { return n.typ }
+func (n *RuneLiteral) Type() Type    { return n.typ }
+func (n *StringLiteral) Type() Type  { return n.typ }
+func (n *BoolLiteral) Type() Type    { return n.typ }
+func (n *NilLiteral) Type() Type     { return n.typ }
