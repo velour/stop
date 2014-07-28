@@ -231,7 +231,7 @@ func (t *ChannelType) Identical(other Type) bool {
 // Two map types are identical if they have identical key and value types.
 func (t *MapType) Identical(other Type) bool {
 	s, ok := other.(*MapType)
-	return ok && t.Key.Identical(s.Key) && t.Value.Identical(s.Value)
+	return ok && t.KeyType.Identical(s.KeyType) && t.ValueType.Identical(s.ValueType)
 }
 
 // Identical returns whether the two types are identical.
