@@ -58,7 +58,7 @@ func IsAssignable(x Expression, t Type) bool {
 
 	// BUG(eaburns): If t is an interface and x implements t: return true
 
-	case xtIsChan && xch.Send && xch.Receive && tIsChan && xch.ElementType.Identical(tch.ElementType) && (!xtIsNamed || !tIsNamed):
+	case xtIsChan && xch.Send && xch.Receive && tIsChan && xch.Element.Identical(tch.Element) && (!xtIsNamed || !tIsNamed):
 		return true
 
 	case xIsNil && Nilable(t):
@@ -224,14 +224,14 @@ func (t *Signature) identical(s *Signature) bool {
 // Two channel types are identical if they have identical value types and the same direction.
 func (t *ChannelType) Identical(other Type) bool {
 	s, ok := other.(*ChannelType)
-	return ok && t.Receive == s.Receive && t.Send == s.Send && t.ElementType.Identical(s.ElementType)
+	return ok && t.Receive == s.Receive && t.Send == s.Send && t.Element.Identical(s.Element)
 }
 
 // Identical returns whether the two types are identical.
 // Two map types are identical if they have identical key and value types.
 func (t *MapType) Identical(other Type) bool {
 	s, ok := other.(*MapType)
-	return ok && t.KeyType.Identical(s.KeyType) && t.ValueType.Identical(s.ValueType)
+	return ok && t.Key.Identical(s.Key) && t.Value.Identical(s.Value)
 }
 
 // Identical returns whether the two types are identical.
@@ -245,14 +245,14 @@ func (t *ArrayType) Identical(other Type) bool {
 	}
 	tSz := t.Size.(*IntegerLiteral)
 	sSz := s.Size.(*IntegerLiteral)
-	return tSz.Value.Cmp(sSz.Value) == 0 && t.ElementType.Identical(s.ElementType)
+	return tSz.Value.Cmp(sSz.Value) == 0 && t.Element.Identical(s.Element)
 }
 
 // Identical returns whether the two types are identical.
 // Two slice types are identical if they have identical element types.
 func (t *SliceType) Identical(other Type) bool {
 	s, ok := other.(*SliceType)
-	return ok && t.ElementType.Identical(s.ElementType)
+	return ok && t.Element.Identical(s.Element)
 }
 
 // Identical returns whether the two types are identical.

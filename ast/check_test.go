@@ -78,23 +78,23 @@ func TestIsAssignable(t *testing.T) {
 	namedT0Slice0 := typ("T0Slice")
 	namedT0Slice0.Identifier.decl = &TypeSpec{
 		Identifier: *id("T0Slice"),
-		Type:       &SliceType{ElementType: t0},
+		Type:       &SliceType{Element: t0},
 	}
 	// Just like namedT0Slice0, but via a different declaration.
 	namedT0Slice1 := typ("T0Slice")
 	namedT0Slice1.Identifier.decl = &TypeSpec{
 		Identifier: *id("T0Slice"),
-		Type:       &SliceType{ElementType: t0},
+		Type:       &SliceType{Element: t0},
 	}
 	t0SliceIdent := id("t0slice")
 	t0SliceIdent.decl = &VarSpec{Type: namedT0Slice0}
 
 	bidirIntChan := id("ch")
-	bidirIntChan.decl = &VarSpec{Type: &ChannelType{Send: true, Receive: true, ElementType: intType}}
+	bidirIntChan.decl = &VarSpec{Type: &ChannelType{Send: true, Receive: true, Element: intType}}
 	sendIntChan := id("ch")
-	sendIntChan.decl = &VarSpec{Type: &ChannelType{Send: true, ElementType: intType}}
+	sendIntChan.decl = &VarSpec{Type: &ChannelType{Send: true, Element: intType}}
 	recvIntChan := id("ch")
-	recvIntChan.decl = &VarSpec{Type: &ChannelType{Receive: true, ElementType: intType}}
+	recvIntChan.decl = &VarSpec{Type: &ChannelType{Receive: true, Element: intType}}
 
 	tests := []struct {
 		x  Expression
@@ -126,29 +126,29 @@ func TestIsAssignable(t *testing.T) {
 		{intLit("42"), stringType, false},
 		{t0Ident, t0, true},
 		{t0Ident, intType, false},
-		{t0Ident, &SliceType{ElementType: t0}, false},
-		{t0SliceIdent, &SliceType{ElementType: t0}, true},
+		{t0Ident, &SliceType{Element: t0}, false},
+		{t0SliceIdent, &SliceType{Element: t0}, true},
 		{t0SliceIdent, namedT0Slice0, true},
 		{t0SliceIdent, namedT0Slice1, false},
 		{nilLit, intType, false},
 		{nilLit, &StructType{}, false},
 		{nilLit, &Star{Target: t0}, true},
-		{nilLit, &SliceType{ElementType: t0}, true},
-		{nilLit, &MapType{KeyType: t0, ValueType: intType}, true},
-		{nilLit, &ChannelType{ElementType: t0}, true},
+		{nilLit, &SliceType{Element: t0}, true},
+		{nilLit, &MapType{Key: t0, Value: intType}, true},
+		{nilLit, &ChannelType{Element: t0}, true},
 		{nilLit, &InterfaceType{}, true},
-		{bidirIntChan, &ChannelType{Send: true, ElementType: intType}, true},
-		{bidirIntChan, &ChannelType{Receive: true, ElementType: intType}, true},
-		{bidirIntChan, &ChannelType{Send: true, Receive: true, ElementType: intType}, true},
-		{bidirIntChan, &ChannelType{Send: true, ElementType: t0}, false},
-		{sendIntChan, &ChannelType{Send: true, ElementType: intType}, true},
-		{sendIntChan, &ChannelType{Receive: true, ElementType: intType}, false},
-		{sendIntChan, &ChannelType{Send: true, Receive: true, ElementType: intType}, false},
-		{sendIntChan, &ChannelType{Send: true, ElementType: t0}, false},
-		{recvIntChan, &ChannelType{Send: true, ElementType: intType}, false},
-		{recvIntChan, &ChannelType{Receive: true, ElementType: intType}, true},
-		{recvIntChan, &ChannelType{Send: true, Receive: true, ElementType: intType}, false},
-		{recvIntChan, &ChannelType{Receive: true, ElementType: t0}, false},
+		{bidirIntChan, &ChannelType{Send: true, Element: intType}, true},
+		{bidirIntChan, &ChannelType{Receive: true, Element: intType}, true},
+		{bidirIntChan, &ChannelType{Send: true, Receive: true, Element: intType}, true},
+		{bidirIntChan, &ChannelType{Send: true, Element: t0}, false},
+		{sendIntChan, &ChannelType{Send: true, Element: intType}, true},
+		{sendIntChan, &ChannelType{Receive: true, Element: intType}, false},
+		{sendIntChan, &ChannelType{Send: true, Receive: true, Element: intType}, false},
+		{sendIntChan, &ChannelType{Send: true, Element: t0}, false},
+		{recvIntChan, &ChannelType{Send: true, Element: intType}, false},
+		{recvIntChan, &ChannelType{Receive: true, Element: intType}, true},
+		{recvIntChan, &ChannelType{Send: true, Receive: true, Element: intType}, false},
+		{recvIntChan, &ChannelType{Receive: true, Element: t0}, false},
 	}
 	for _, test := range tests {
 		if ok := IsAssignable(test.x, test.t); ok != test.ok {
@@ -230,7 +230,7 @@ func TestIsRepresentable(t *testing.T) {
 		{intLit("18446744073709551616"), uint64Type, false},
 		{&BoolLiteral{}, intType, false},
 
-		{&BoolLiteral{}, &SliceType{ElementType: intType}, false},
+		{&BoolLiteral{}, &SliceType{Element: intType}, false},
 	}
 	for _, test := range tests {
 		if ok := IsRepresentable(test.x, test.t); ok != test.ok {
@@ -273,59 +273,59 @@ func TestTypeIdentical(t *testing.T) {
 			false,
 		},
 		{
-			&SliceType{ElementType: intType},
-			&SliceType{ElementType: intType},
+			&SliceType{Element: intType},
+			&SliceType{Element: intType},
 			true,
 		},
 		{
-			&SliceType{ElementType: int32Type},
-			&SliceType{ElementType: runeType},
+			&SliceType{Element: int32Type},
+			&SliceType{Element: runeType},
 			true,
 		},
 		{
-			&SliceType{ElementType: int32Type},
-			&SliceType{ElementType: intType},
+			&SliceType{Element: int32Type},
+			&SliceType{Element: intType},
 			false,
 		},
 		{
-			&SliceType{ElementType: &SliceType{ElementType: intType}},
-			&SliceType{ElementType: &SliceType{ElementType: intType}},
+			&SliceType{Element: &SliceType{Element: intType}},
+			&SliceType{Element: &SliceType{Element: intType}},
 			true,
 		},
 		{
-			&SliceType{ElementType: &SliceType{ElementType: intType}},
-			&SliceType{ElementType: intType},
+			&SliceType{Element: &SliceType{Element: intType}},
+			&SliceType{Element: intType},
 			false,
 		},
-		{&SliceType{ElementType: int32Type}, t0, false},
+		{&SliceType{Element: int32Type}, t0, false},
 		{
-			&ArrayType{Size: intLit("1"), ElementType: intType},
-			&ArrayType{Size: intLit("1"), ElementType: intType},
+			&ArrayType{Size: intLit("1"), Element: intType},
+			&ArrayType{Size: intLit("1"), Element: intType},
 			true,
 		},
 		{
-			&ArrayType{Size: intLit("1"), ElementType: intType},
-			&ArrayType{Size: intLit("2"), ElementType: intType},
+			&ArrayType{Size: intLit("1"), Element: intType},
+			&ArrayType{Size: intLit("2"), Element: intType},
 			false,
 		},
 		{
-			&ArrayType{Size: intLit("1"), ElementType: intType},
-			&ArrayType{Size: intLit("1"), ElementType: t0},
+			&ArrayType{Size: intLit("1"), Element: intType},
+			&ArrayType{Size: intLit("1"), Element: t0},
 			false,
 		},
 		{
 			&ArrayType{
 				Size: intLit("1"),
-				ElementType: &ArrayType{
-					Size:        intLit("1"),
-					ElementType: t0,
+				Element: &ArrayType{
+					Size:    intLit("1"),
+					Element: t0,
 				},
 			},
 			&ArrayType{
 				Size: intLit("1"),
-				ElementType: &ArrayType{
-					Size:        intLit("1"),
-					ElementType: t0,
+				Element: &ArrayType{
+					Size:    intLit("1"),
+					Element: t0,
 				},
 			},
 			true,
@@ -333,81 +333,81 @@ func TestTypeIdentical(t *testing.T) {
 		{
 			&ArrayType{
 				Size: intLit("2"),
-				ElementType: &ArrayType{
-					Size:        intLit("1"),
-					ElementType: t0,
+				Element: &ArrayType{
+					Size:    intLit("1"),
+					Element: t0,
 				},
 			},
 			&ArrayType{
 				Size: intLit("1"),
-				ElementType: &ArrayType{
-					Size:        intLit("2"),
-					ElementType: t0,
+				Element: &ArrayType{
+					Size:    intLit("2"),
+					Element: t0,
 				},
 			},
 			false,
 		},
 		{
-			&ArrayType{Size: intLit("1"), ElementType: intType},
-			&SliceType{ElementType: intType},
+			&ArrayType{Size: intLit("1"), Element: intType},
+			&SliceType{Element: intType},
 			false,
 		},
 		{
-			&MapType{KeyType: intType, ValueType: t1},
-			&MapType{KeyType: intType, ValueType: t1Ident},
+			&MapType{Key: intType, Value: t1},
+			&MapType{Key: intType, Value: t1Ident},
 			true,
 		},
 		{
-			&MapType{KeyType: intType, ValueType: t1},
-			&MapType{KeyType: intType, ValueType: t1Diff},
+			&MapType{Key: intType, Value: t1},
+			&MapType{Key: intType, Value: t1Diff},
 			false,
 		},
 		{
-			&MapType{KeyType: t0, ValueType: t1},
-			&MapType{KeyType: intType, ValueType: t1},
+			&MapType{Key: t0, Value: t1},
+			&MapType{Key: intType, Value: t1},
 			false,
 		},
 		{
-			&ChannelType{ElementType: intType},
-			&ChannelType{ElementType: intType},
+			&ChannelType{Element: intType},
+			&ChannelType{Element: intType},
 			true,
 		},
 		{
-			&ChannelType{Receive: true, ElementType: intType},
-			&ChannelType{Receive: true, ElementType: intType},
+			&ChannelType{Receive: true, Element: intType},
+			&ChannelType{Receive: true, Element: intType},
 			true,
 		},
 		{
-			&ChannelType{Receive: true, Send: true, ElementType: intType},
-			&ChannelType{Receive: true, Send: true, ElementType: intType},
+			&ChannelType{Receive: true, Send: true, Element: intType},
+			&ChannelType{Receive: true, Send: true, Element: intType},
 			true,
 		},
 		{
-			&ChannelType{ElementType: intType},
-			&ChannelType{Send: true, ElementType: intType},
+			&ChannelType{Element: intType},
+			&ChannelType{Send: true, Element: intType},
 			false,
 		},
 		{
-			&ChannelType{Receive: true, ElementType: intType},
-			&ChannelType{ElementType: intType},
+			&ChannelType{Receive: true, Element: intType},
+			&ChannelType{Element: intType},
 			false,
 		},
 		{
-			&ChannelType{ElementType: t1},
-			&ChannelType{ElementType: t1Diff},
+			&ChannelType{Element: t1},
+			&ChannelType{Element: t1Diff},
 			false,
 		},
 		{
-			&ChannelType{ElementType: &ChannelType{ElementType: runeType}},
-			&ChannelType{ElementType: &ChannelType{ElementType: int32Type}},
+			&ChannelType{Element: &ChannelType{Element: runeType}},
+			&ChannelType{Element: &ChannelType{Element: int32Type}},
 			true,
 		},
 		{
-			&ChannelType{Receive: true, ElementType: &ChannelType{ElementType: t0}},
-			&ChannelType{ElementType: &ChannelType{Receive: true, ElementType: t0}},
+			&ChannelType{Receive: true, Element: &ChannelType{Element: t0}},
+			&ChannelType{Element: &ChannelType{Receive: true, Element: t0}},
 			false,
 		},
-		{&ChannelType{ElementType: t1}, t0, false},
+		{&ChannelType{Element: t1}, t0, false},
 		{&FunctionType{}, &FunctionType{}, true},
 		{
 			&FunctionType{Signature: Signature{
@@ -815,12 +815,12 @@ func TestTypeIdentical(t *testing.T) {
 		{
 			&StructType{Fields: []FieldDecl{
 				{Identifier: id("x"), Type: intType},
-				{Identifier: id("y"), Type: &SliceType{ElementType: t0}},
+				{Identifier: id("y"), Type: &SliceType{Element: t0}},
 				{Identifier: id("z"), Type: t1},
 			}},
 			&StructType{Fields: []FieldDecl{
 				{Identifier: id("x"), Type: intType},
-				{Identifier: id("y"), Type: &SliceType{ElementType: t0}},
+				{Identifier: id("y"), Type: &SliceType{Element: t0}},
 				{Identifier: id("z"), Type: t1},
 			}},
 			true,
@@ -828,7 +828,7 @@ func TestTypeIdentical(t *testing.T) {
 		{
 			&StructType{Fields: []FieldDecl{
 				{Identifier: id("x"), Type: intType},
-				{Identifier: id("y"), Type: &SliceType{ElementType: t0}},
+				{Identifier: id("y"), Type: &SliceType{Element: t0}},
 				{Identifier: id("z"), Type: t1},
 			}},
 			&StructType{Fields: []FieldDecl{
@@ -840,7 +840,7 @@ func TestTypeIdentical(t *testing.T) {
 		{
 			&StructType{Fields: []FieldDecl{
 				{Identifier: id("x"), Type: intType},
-				{Identifier: id("y"), Type: &SliceType{ElementType: t0}},
+				{Identifier: id("y"), Type: &SliceType{Element: t0}},
 				{Identifier: id("z"), Type: t1},
 			}},
 			&StructType{Fields: []FieldDecl{
@@ -932,20 +932,20 @@ func TestTypeUnderlying(t *testing.T) {
 		{t: t1, u: intType},
 		{t: &Star{Target: t0}, u: &Star{Target: t0}},
 		{
-			t: &SliceType{ElementType: intType},
-			u: &SliceType{ElementType: intType},
+			t: &SliceType{Element: intType},
+			u: &SliceType{Element: intType},
 		},
 		{
-			t: &ArrayType{Size: intLit("5"), ElementType: intType},
-			u: &ArrayType{Size: intLit("5"), ElementType: intType},
+			t: &ArrayType{Size: intLit("5"), Element: intType},
+			u: &ArrayType{Size: intLit("5"), Element: intType},
 		},
 		{
-			t: &MapType{KeyType: t0, ValueType: intType},
-			u: &MapType{KeyType: t0, ValueType: intType},
+			t: &MapType{Key: t0, Value: intType},
+			u: &MapType{Key: t0, Value: intType},
 		},
 		{
-			t: &ChannelType{Send: true, ElementType: intType},
-			u: &ChannelType{Send: true, ElementType: intType},
+			t: &ChannelType{Send: true, Element: intType},
+			u: &ChannelType{Send: true, Element: intType},
 		},
 		{t: &FunctionType{}, u: &FunctionType{}},
 		{t: &InterfaceType{}, u: &InterfaceType{}},

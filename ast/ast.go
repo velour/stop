@@ -593,45 +593,45 @@ func (n *ParameterDecl) End() token.Location { return n.Type.End() }
 // a send and receive channel.
 type ChannelType struct {
 	Send, Receive bool
-	ElementType   Type
+	Element       Type
 	startLoc      token.Location
 }
 
 func (n *ChannelType) Start() token.Location { return n.startLoc }
-func (n *ChannelType) End() token.Location   { return n.ElementType.End() }
+func (n *ChannelType) End() token.Location   { return n.Element.End() }
 func (n *ChannelType) Loc() token.Location   { return n.Start() }
 
 // An MapType is a type node that represents a map from types to types.
 type MapType struct {
-	KeyType, ValueType Type
-	mapLoc             token.Location
+	Key, Value Type
+	mapLoc     token.Location
 }
 
 func (n *MapType) Start() token.Location { return n.mapLoc }
-func (n *MapType) End() token.Location   { return n.ValueType.End() }
+func (n *MapType) End() token.Location   { return n.Value.End() }
 func (n *MapType) Loc() token.Location   { return n.Start() }
 
 // An ArrayType is a type node that represents an array of types.
 type ArrayType struct {
 	// If size==nil then this is an array type for a composite literal
 	// with the size specified using [...]Type notation.
-	Size        Expression
-	ElementType Type
-	openLoc     token.Location
+	Size    Expression
+	Element Type
+	openLoc token.Location
 }
 
 func (n *ArrayType) Start() token.Location { return n.openLoc }
-func (n *ArrayType) End() token.Location   { return n.ElementType.End() }
+func (n *ArrayType) End() token.Location   { return n.Element.End() }
 func (n *ArrayType) Loc() token.Location   { return n.Start() }
 
 // A SliceType is a type node that represents a slice of types.
 type SliceType struct {
-	ElementType Type
-	openLoc     token.Location
+	Element Type
+	openLoc token.Location
 }
 
 func (n *SliceType) Start() token.Location { return n.openLoc }
-func (n *SliceType) End() token.Location   { return n.ElementType.End() }
+func (n *SliceType) End() token.Location   { return n.Element.End() }
 func (n *SliceType) Loc() token.Location   { return n.Start() }
 
 // A Star is either a dereference expression or a type node that representing
