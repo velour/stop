@@ -1349,7 +1349,7 @@ func parseChannelType(p *Parser) Type {
 		ch.Receive = false
 		p.next()
 	}
-	ch.ElementType = parseType(p)
+	ch.Element = parseType(p)
 	return ch
 }
 
@@ -1359,10 +1359,10 @@ func parseMapType(p *Parser) Type {
 	p.next()
 	p.expect(token.OpenBracket)
 	p.next()
-	m.KeyType = parseType(p)
+	m.Key = parseType(p)
 	p.expect(token.CloseBracket)
 	p.next()
-	m.ValueType = parseType(p)
+	m.Value = parseType(p)
 	return m
 }
 
@@ -1375,7 +1375,7 @@ func parseArrayOrSliceType(p *Parser, dotDotDot bool) Type {
 
 	if p.tok == token.CloseBracket {
 		p.next()
-		sl := &SliceType{ElementType: parseType(p), openLoc: openLoc}
+		sl := &SliceType{Element: parseType(p), openLoc: openLoc}
 		return sl
 	}
 	ar := &ArrayType{openLoc: openLoc}
@@ -1386,7 +1386,7 @@ func parseArrayOrSliceType(p *Parser, dotDotDot bool) Type {
 	}
 	p.expect(token.CloseBracket)
 	p.next()
-	ar.ElementType = parseType(p)
+	ar.Element = parseType(p)
 	return ar
 }
 
