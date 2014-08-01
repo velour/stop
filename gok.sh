@@ -32,3 +32,4 @@ golint . \
 	| grep -v 'Type should have comment'\
 	| grep -v 'receiver name n should be consistent with previous receiver name t'\
 	| grep -v 'Untyped.Identical'\
+	| grep -v 'Source should have comment'\

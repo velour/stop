@@ -576,8 +576,9 @@ func (n *Signature) End() token.Location   { return n.end }
 // A ParameterDecl is a node representing the declaration of a single parameter.
 type ParameterDecl struct {
 	Type Type
+	// Identifier is nil if it is not specified.
 	*Identifier
-	// DotDotDot is true if the final identifier was followed by a "...".
+	// DotDotDot is true if the final type was prefixed by "...".
 	DotDotDot bool
 }
 
@@ -671,6 +672,11 @@ type Expression interface {
 	// For example, the location of the operator of a binary
 	// expression may be used.  Loc is used for error reporting.
 	Loc() token.Location
+	// Source returns a source-code-like representation of the expression.
+	// It is not guaranteed to be valid Go source; it strips information like
+	// function bodies, struct type field declarations, and interface type
+	// method declarations.
+	Source() string
 	// Type returns the Type of the result of the expression.
 	Type() Type
 }
@@ -705,8 +711,8 @@ func (n *CompositeLiteral) End() token.Location { return n.closeLoc }
 // An Element is a node representing the key-value mapping
 // of a single element of a composite literal.
 type Element struct {
-	Key   Expression
-	Value Expression
+	// Key may be nil if it was unspecified.
+	Key, Value Expression
 }
 
 func (n *Element) Start() token.Location {
