@@ -73,6 +73,15 @@ func (n *UnaryOp) Check(*symtab, int) (Expression, error) {
 	panic("unimplemented")
 }
 
+func (n *ConstSpec) Check(syms *symtab) error {
+	// BUG(eaburns): This is a placeholder. It needs to do two things:
+	// 1) Call n.Type.Check().
+	// 2) Verify that the number of identifiers matches the number of expressions.
+	panic("unimplemented")
+}
+
+// ConstSpec.Check must have been called on the ConstSpec of this view in
+// order to check its Type field before it's used here.
 func (n *constSpecView) Check(syms *symtab, iota int) (v Expression, err error) {
 	defer func() {
 		if err != nil {
