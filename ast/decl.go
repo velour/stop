@@ -195,21 +195,22 @@ func pkgDecls(files []*File) (*symtab, error) {
 	psyms := makeSymtab(&univScope)
 	var errs errors
 	for _, f := range files {
-		fsyms, err := fileDecls(psyms, f)
+		var err error
+		f.syms, err = fileDecls(psyms, f)
 		errs.Add(err)
 		for _, d := range f.Declarations {
 			switch d := d.(type) {
 			case *MethodDecl:
-				d.syms = fsyms
+				d.syms = f.syms
 				errs.Add(psyms.Bind(d.Identifier.Name, d))
 			case *FunctionDecl:
-				d.syms = fsyms
+				d.syms = f.syms
 				errs.Add(psyms.Bind(d.Identifier.Name, d))
 			case *TypeSpec:
-				d.syms = fsyms
+				d.syms = f.syms
 				errs.Add(psyms.Bind(d.Identifier.Name, d))
 			case *ConstSpec:
-				d.syms = fsyms
+				d.syms = f.syms
 				for i := range d.Identifiers {
 					n := d.Identifiers[i].Name
 					v := &constSpecView{Index: i, ConstSpec: d}
@@ -217,7 +218,7 @@ func pkgDecls(files []*File) (*symtab, error) {
 					errs.Add(psyms.Bind(n, v))
 				}
 			case *VarSpec:
-				d.syms = fsyms
+				d.syms = f.syms
 				for i := range d.Identifiers {
 					n := d.Identifiers[i].Name
 					v := &varSpecView{Index: i, VarSpec: d}

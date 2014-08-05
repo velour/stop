@@ -28,7 +28,7 @@ type File struct {
 	Imports          []ImportDecl
 	Declarations
 
-	// syms is the symbol table for the scope of this source file.
+	// Syms is the symbol table for the scope of this source file.
 	syms *symtab
 }
 
