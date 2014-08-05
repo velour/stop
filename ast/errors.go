@@ -27,13 +27,6 @@ func errs(es ...error) errors {
 	return errors(es)
 }
 
-// Add adds an error to the errors if it is non-nil.
-func (es *errors) Add(e error) {
-	if e != nil {
-		*es = append(*es, e)
-	}
-}
-
 // ErrorOrNil returns nil if the errors is empty or it returns the errors as an error.
 func (es errors) ErrorOrNil() error {
 	if len(es) == 0 {

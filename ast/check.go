@@ -10,8 +10,9 @@ import (
 func Check(files []*File) error {
 	var errs errors
 
-	_, err := pkgDecls(files)
-	errs.Add(err)
+	if _, err := pkgDecls(files); err != nil {
+		errs = append(errs, err)
+	}
 
 	// First check TypeSpecs and ConstSpecs. These must be checked before
 	// MethodDecl, FunctionDecl, and VarSpecs, because the aformentioned
@@ -23,8 +24,9 @@ func Check(files []*File) error {
 				// BUG(eaburns): Check TypeSpecs.
 				panic("unimplemented")
 			case *ConstSpec:
-				err := d.Check(f.syms)
-				errs.Add(err)
+				if err := d.Check(f.syms); err != nil {
+					errs = append(errs, err)
+				}
 			}
 		}
 	}
@@ -117,16 +119,20 @@ func (n *ConstSpec) Check(syms *symtab) error {
 
 	var errs errors
 	if n.Type != nil {
-		t, err := n.Type.Check(syms, -1)
-		n.Type = t.(Type)
-		errs.Add(err)
+		if t, err := n.Type.Check(syms, -1); err != nil {
+			errs = append(errs, err)
+			n.Type = nil
+		} else {
+			n.Type = t.(Type)
+		}
 	}
 	if len(n.Identifiers) != len(n.Values) {
-		errs.Add(&AssignCountMismatch{n})
+		errs = append(errs, AssignCountMismatch{n})
 	}
 	for _, v := range n.views {
-		_, err := v.Check(syms, n.Iota)
-		errs.Add(err)
+		if _, err := v.Check(syms, n.Iota); err != nil {
+			errs = append(errs, err)
+		}
 	}
 	if len(errs) > 0 {
 		n.state = checkedError

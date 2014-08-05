@@ -196,33 +196,44 @@ func pkgDecls(files []*File) (*symtab, error) {
 	var errs errors
 	for _, f := range files {
 		var err error
-		f.syms, err = fileDecls(psyms, f)
-		errs.Add(err)
+		if f.syms, err = fileDecls(psyms, f); err != nil {
+			errs = append(errs, err)
+		}
 		for _, d := range f.Declarations {
 			switch d := d.(type) {
 			case *MethodDecl:
 				d.syms = f.syms
-				errs.Add(psyms.Bind(d.Identifier.Name, d))
+				if err := psyms.Bind(d.Identifier.Name, d); err != nil {
+					errs = append(errs, err)
+				}
 			case *FunctionDecl:
 				d.syms = f.syms
-				errs.Add(psyms.Bind(d.Identifier.Name, d))
+				if err := psyms.Bind(d.Identifier.Name, d); err != nil {
+					errs = append(errs, err)
+				}
 			case *TypeSpec:
 				d.syms = f.syms
-				errs.Add(psyms.Bind(d.Identifier.Name, d))
+				if err := psyms.Bind(d.Identifier.Name, d); err != nil {
+					errs = append(errs, err)
+				}
 			case *ConstSpec:
 				d.syms = f.syms
 				for i := range d.Identifiers {
 					n := d.Identifiers[i].Name
 					v := &constSpecView{Index: i, ConstSpec: d}
 					d.views = append(d.views, v)
-					errs.Add(psyms.Bind(n, v))
+					if err := psyms.Bind(n, v); err != nil {
+						errs = append(errs, err)
+					}
 				}
 			case *VarSpec:
 				d.syms = f.syms
 				for i := range d.Identifiers {
 					n := d.Identifiers[i].Name
 					v := &varSpecView{Index: i, VarSpec: d}
-					errs.Add(psyms.Bind(n, v))
+					if err := psyms.Bind(n, v); err != nil {
+						errs = append(errs, err)
+					}
 				}
 			default:
 				panic("invalid top-level declaration")
@@ -246,7 +257,9 @@ func fileDecls(psyms *symtab, file *File) (*symtab, error) {
 				syms:       makeSymtab(&univScope),
 				ImportDecl: &file.Imports[i],
 			}
-			errs.Add(syms.Bind(im.Name(), p))
+			if err := syms.Bind(im.Name(), p); err != nil {
+				errs = append(errs, err)
+			}
 		}
 	}
 	return syms, errs.ErrorOrNil()
