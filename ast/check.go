@@ -129,21 +129,19 @@ func (n *ConstSpec) Check(syms *symtab) error {
 	if len(n.Identifiers) != len(n.Values) {
 		errs = append(errs, AssignCountMismatch{n})
 	}
-	for _, v := range n.views {
-		if _, err := v.Check(syms, n.Iota); err != nil {
-			errs = append(errs, err)
-		}
-	}
 	if len(errs) > 0 {
 		n.state = checkedError
 	} else {
 		n.state = checkedOK
 	}
+	for _, v := range n.views {
+		if _, err := v.Check(syms, n.Iota); err != nil {
+			errs = append(errs, err)
+		}
+	}
 	return errs.ErrorOrNil()
 }
 
-// ConstSpec.Check must have been called on the ConstSpec of this view in
-// order to check its Type field before it's used here.
 func (n *constSpecView) Check(syms *symtab, iota int) (v Expression, err error) {
 	defer func() {
 		if err != nil {
@@ -155,7 +153,7 @@ func (n *constSpecView) Check(syms *symtab, iota int) (v Expression, err error) 
 	}()
 	switch n.state {
 	case checking:
-		return nil, &ConstantLoop{n}
+		return nil, ConstantLoop{n}
 	case checkedError:
 		return nil, errors{}
 	case checkedOK:
@@ -172,6 +170,10 @@ func (n *constSpecView) Check(syms *symtab, iota int) (v Expression, err error) 
 		return nil, errors{}
 	}
 
+	var errs errors
+	if err := n.ConstSpec.Check(syms); err != nil {
+		errs = append(errs, err)
+	}
 	// If the type is specified in the ConstSpec, then all views get that type.
 	// Otherwise, this will assign nil, and each view gets the type from its
 	// bound expression.
@@ -181,16 +183,16 @@ func (n *constSpecView) Check(syms *symtab, iota int) (v Expression, err error) 
 	v, err = v.Check(syms, iota)
 	switch {
 	case err != nil:
-		return nil, err
+		return nil, append(errs, err)
 	case !constOperand(v):
-		return nil, NotConstant{v}
+		return nil, append(errs, NotConstant{v})
 	}
 
 	switch _, vIsUntyped := v.Type().(Untyped); {
 	case n.Type != nil && vIsUntyped && !IsRepresentable(v, n.Type):
-		return nil, &BadConstAssign{v, n.Type}
+		return nil, append(errs, BadConstAssign{v, n.Type})
 	case n.Type != nil && IsAssignable(v, n.Type):
-		return nil, &BadAssign{v, n.Type}
+		return nil, append(errs, BadAssign{v, n.Type})
 	case n.Type == nil:
 		n.Type = v.Type()
 	}
@@ -203,7 +205,7 @@ func (n *constSpecView) Check(syms *symtab, iota int) (v Expression, err error) 
 func constOperand(e Expression) bool {
 	switch e.(type) {
 	case *IntegerLiteral, *FloatLiteral, *ComplexLiteral, *RuneLiteral,
-		*StringLiteral, *BoolLiteral, *NilLiteral:
+		*StringLiteral, *BoolLiteral:
 		return true
 	}
 	return false

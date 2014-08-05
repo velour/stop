@@ -66,6 +66,105 @@ func init() {
 	t1Diff.Identifier.decl = &TypeSpec{Identifier: *id("T1"), Type: intType}
 }
 
+func TestCheckErrors(t *testing.T) {
+	tests := []struct {
+		src  []string
+		errs []reflect.Type
+	}{
+		{[]string{`package a`, `package a`}, []reflect.Type{}},
+		{
+			[]string{
+				`package a
+				const (
+					complexConst = 5i
+					floatConst = 3.1415926535
+					intConst = 6
+					runeConst = 'α'
+					stringConst = "Hello, World!"
+					trueConst, falseConst = true, false
+				)`,
+			},
+			[]reflect.Type{},
+		},
+		{
+			[]string{
+				`package a; const pi = 3.1415926535`,
+				`package a; const π = pi`,
+			},
+			[]reflect.Type{},
+		},
+		{
+			[]string{
+				`package a
+				const (
+					zero = iota
+					one
+					two
+				)`,
+			},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; const a = notDeclared`},
+			[]reflect.Type{reflect.TypeOf(Undeclared{})},
+		},
+		{
+			[]string{`package a; const a, b = 1`},
+			[]reflect.Type{reflect.TypeOf(AssignCountMismatch{})},
+		},
+		{
+			[]string{`package a; const nilConst = nil`},
+			[]reflect.Type{reflect.TypeOf(NotConstant{})},
+		},
+		{
+			[]string{`package a; const a = a`},
+			[]reflect.Type{reflect.TypeOf(ConstantLoop{})},
+		},
+		{
+			[]string{
+				`package a; const a = b`,
+				`package a; const b = c`,
+				`package a; const c = a`,
+			},
+			[]reflect.Type{reflect.TypeOf(ConstantLoop{})},
+		},
+	}
+	for _, test := range tests {
+		want := make(map[reflect.Type]int)
+		for _, e := range test.errs {
+			want[e]++
+		}
+
+		var files []*File
+		for _, src := range test.src {
+			l := token.NewLexer("", src)
+			p := NewParser(l)
+			files = append(files, parseFile(p))
+		}
+
+		var got []reflect.Type
+		if err := Check(files); err != nil {
+			for _, e := range err.(errors).All() {
+				got = append(got, reflect.TypeOf(e))
+			}
+		}
+		for _, t := range got {
+			want[t]--
+		}
+
+		diff := false
+		for _, v := range want {
+			if v != 0 {
+				diff = true
+				break
+			}
+		}
+		if diff {
+			t.Errorf("Check(%v)=%v, want %v", test.src, got, test.errs)
+		}
+	}
+}
+
 func TestIsAssignable(t *testing.T) {
 	anInt32 := intLit("42")
 	anInt32.typ = int32Type
