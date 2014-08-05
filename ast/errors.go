@@ -42,6 +42,19 @@ func (es errors) ErrorOrNil() error {
 	return es
 }
 
+// All returns all errors, gathered recursively by calling All on any nested errors.
+func (es errors) All() []error {
+	var all []error
+	for _, e := range es {
+		if es, ok := e.(errors); ok {
+			all = append(all, es.All()...)
+		} else {
+			all = append(all, e)
+		}
+	}
+	return all
+}
+
 // A SyntaxError is an error that describes a parse failure: something
 // unexpected in the syntax of the Go source code.
 type SyntaxError struct {
