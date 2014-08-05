@@ -213,6 +213,7 @@ func pkgDecls(files []*SourceFile) (*symtab, error) {
 				for i := range d.Identifiers {
 					n := d.Identifiers[i].Name
 					v := &constSpecView{Index: i, ConstSpec: d}
+					d.views = append(d.views, v)
 					errs.Add(psyms.Bind(n, v))
 				}
 			case *VarSpec:

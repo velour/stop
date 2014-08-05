@@ -443,6 +443,9 @@ type ConstSpec struct {
 	// Syms is the file-level symbol table defining the scope in which these
 	// constants were declared, or nil if they are not package-level.
 	syms *symtab
+
+	// Views is the set of views into this ConstSpec.
+	views []*constSpecView
 }
 
 func (n *ConstSpec) Start() token.Location { return n.Identifiers[0].Start() }
