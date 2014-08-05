@@ -446,6 +446,8 @@ type ConstSpec struct {
 
 	// Views is the set of views into this ConstSpec.
 	views []*constSpecView
+
+	state checkState
 }
 
 func (n *ConstSpec) Start() token.Location { return n.Identifiers[0].Start() }

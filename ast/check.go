@@ -5,6 +5,35 @@ import (
 	"math/big"
 )
 
+// Check performs type checking and semantic analysis on the AST,
+// returning any errors that are encountered.
+func Check(files []*File) error {
+	var errs errors
+
+	_, err := pkgDecls(files)
+	errs.Add(err)
+
+	// First check TypeSpecs and ConstSpecs. These must be checked before
+	// MethodDecl, FunctionDecl, and VarSpecs, because the aformentioned
+	// declarations need constants within types to be folded.
+	for _, f := range files {
+		for _, d := range f.Declarations {
+			switch d := d.(type) {
+			case *TypeSpec:
+				// BUG(eaburns): Check TypeSpecs.
+				panic("unimplemented")
+			case *ConstSpec:
+				err := d.Check(f.syms)
+				errs.Add(err)
+			}
+		}
+	}
+
+	// BUG(eaburns): Check MethodDecl, FunctionDecl, and VarSpecs.
+
+	return errs.ErrorOrNil()
+}
+
 func (n *StructType) Check(*symtab, int) (Expression, error) {
 	panic("unimplemented")
 }
@@ -74,10 +103,37 @@ func (n *UnaryOp) Check(*symtab, int) (Expression, error) {
 }
 
 func (n *ConstSpec) Check(syms *symtab) error {
-	// BUG(eaburns): This is a placeholder. It needs to do two things:
-	// 1) Call n.Type.Check().
-	// 2) Verify that the number of identifiers matches the number of expressions.
-	panic("unimplemented")
+	switch n.state {
+	case checking:
+		panic("impossible, not recursive")
+	case checkedError:
+		return errors{}
+	case checkedOK:
+		return nil
+	}
+	if n.syms != nil {
+		syms = n.syms
+	}
+
+	var errs errors
+	if n.Type != nil {
+		t, err := n.Type.Check(syms, -1)
+		n.Type = t.(Type)
+		errs.Add(err)
+	}
+	if len(n.Identifiers) != len(n.Values) {
+		errs.Add(&AssignCountMismatch{n})
+	}
+	for _, v := range n.views {
+		_, err := v.Check(syms, n.Iota)
+		errs.Add(err)
+	}
+	if len(errs) > 0 {
+		n.state = checkedError
+	} else {
+		n.state = checkedOK
+	}
+	return errs.ErrorOrNil()
 }
 
 // ConstSpec.Check must have been called on the ConstSpec of this view in
@@ -99,6 +155,9 @@ func (n *constSpecView) Check(syms *symtab, iota int) (v Expression, err error) 
 	case checkedOK:
 		return n.Value(), nil
 	}
+	if n.syms != nil {
+		syms = n.syms
+	}
 
 	v = n.Value()
 	if v == nil {
@@ -111,14 +170,6 @@ func (n *constSpecView) Check(syms *symtab, iota int) (v Expression, err error) 
 	// Otherwise, this will assign nil, and each view gets the type from its
 	// bound expression.
 	n.Type = n.ConstSpec.Type
-
-	// If we have a file-scoped symbol table, this must be a package-level
-	// constant declaration. We need to use the file-scoped symbol table
-	// instead of the one given to us, since the given one may come from
-	// a declaration in a separate file that this declaration cannot access.
-	if n.syms != nil {
-		syms = n.syms
-	}
 
 	n.state = checking
 	v, err = v.Check(syms, iota)

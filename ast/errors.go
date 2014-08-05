@@ -145,3 +145,14 @@ type BadAssign struct {
 func (e BadAssign) Error() string {
 	return fmt.Sprintf("%s: bad assignment", e.Expression.Start())
 }
+
+// A AssignCountMismatch is an error returned when a variable or contstant
+// assignment has differing numbers of identifiers as it has expressions
+// being assigned.
+type AssignCountMismatch struct {
+	Declaration
+}
+
+func (e AssignCountMismatch) Error() string {
+	return fmt.Sprintf("%s: assignment count mismatch", e.Start())
+}
