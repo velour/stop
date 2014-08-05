@@ -20,8 +20,8 @@ type Node interface {
 	End() token.Location
 }
 
-// SourceFile is a node representing a Go source file.
-type SourceFile struct {
+// File is a node representing a Go source file.
+type File struct {
 	comments
 	startLoc, endLoc token.Location
 	PackageName      Identifier
@@ -32,8 +32,8 @@ type SourceFile struct {
 	syms *symtab
 }
 
-func (n *SourceFile) Start() token.Location { return n.PackageName.Start() }
-func (n *SourceFile) End() token.Location {
+func (n *File) Start() token.Location { return n.PackageName.Start() }
+func (n *File) End() token.Location {
 	if l := len(n.Declarations); l > 0 {
 		return n.Declarations[l-1].End()
 	}

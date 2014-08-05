@@ -10,7 +10,7 @@ import (
 
 // Parse returns the root of an abstract syntax tree for the Go language
 // or an error if one is encountered.
-func Parse(p *Parser) (root *SourceFile, err error) {
+func Parse(p *Parser) (root *File, err error) {
 	defer func() {
 		r := recover()
 		if r == nil {
@@ -26,12 +26,12 @@ func Parse(p *Parser) (root *SourceFile, err error) {
 		}
 
 	}()
-	return parseSourceFile(p), nil
+	return parseFile(p), nil
 }
 
-func parseSourceFile(p *Parser) *SourceFile {
+func parseFile(p *Parser) *File {
 	p.expect(token.Package)
-	s := &SourceFile{comments: p.comments(), startLoc: p.start()}
+	s := &File{comments: p.comments(), startLoc: p.start()}
 	p.next()
 	s.PackageName = *parseIdentifier(p)
 	p.expect(token.Semicolon)

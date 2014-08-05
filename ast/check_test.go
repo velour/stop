@@ -1167,8 +1167,8 @@ func TestPkgDecls(t *testing.T) {
 	}
 }
 
-func parseSrcFiles(t *testing.T, srcFiles []string) []*SourceFile {
-	var files []*SourceFile
+func parseSrcFiles(t *testing.T, srcFiles []string) []*File {
+	var files []*File
 	for _, src := range srcFiles {
 		p := NewParser(token.NewLexer("", src))
 		file, err := Parse(p)
@@ -1194,7 +1194,7 @@ func TestScopeFind(t *testing.T) {
 		func f() int { return 0 }
 	`
 	p := NewParser(token.NewLexer("", src))
-	s, err := pkgDecls([]*SourceFile{parseSourceFile(p)})
+	s, err := pkgDecls([]*File{parseFile(p)})
 	if err != nil {
 		panic(err)
 	}

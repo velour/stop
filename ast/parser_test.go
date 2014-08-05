@@ -808,15 +808,15 @@ func TestParseSpecExamples(t *testing.T) {
 	specTypeTests.run(t, func(p *Parser) Node { return parseType(p) })
 }
 
-func TestParseSourceFile(t *testing.T) {
+func TestParseFile(t *testing.T) {
 	parserTests{
-		{`package main`, &SourceFile{PackageName: *id("main")}},
+		{`package main`, &File{PackageName: *id("main")}},
 		{
 			`
 				package main
 				import "fmt"
 			`,
-			&SourceFile{
+			&File{
 				PackageName: *id("main"),
 				Imports: []ImportDecl{
 					{Imports: []ImportSpec{{Path: *strLit("fmt")}}},
@@ -829,7 +829,7 @@ func TestParseSourceFile(t *testing.T) {
 				import "fmt"
 				func main() {}
 			`,
-			&SourceFile{
+			&File{
 				PackageName: *id("main"),
 				Imports: []ImportDecl{
 					{Imports: []ImportSpec{{Path: *strLit("fmt")}}},
@@ -841,7 +841,7 @@ func TestParseSourceFile(t *testing.T) {
 				},
 			},
 		},
-	}.run(t, func(p *Parser) Node { return parseSourceFile(p) })
+	}.run(t, func(p *Parser) Node { return parseFile(p) })
 }
 
 func TestParseImportDecl(t *testing.T) {

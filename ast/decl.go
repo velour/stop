@@ -191,7 +191,7 @@ type packageDecl struct {
 // ConstSpec is mapped to a unique view of the declaring spec.
 // Any errors that are encountered are also returned, but the symtab is always
 // valid, even in the face of errors.
-func pkgDecls(files []*SourceFile) (*symtab, error) {
+func pkgDecls(files []*File) (*symtab, error) {
 	psyms := makeSymtab(&univScope)
 	var errs errors
 	for _, f := range files {
@@ -234,7 +234,7 @@ func pkgDecls(files []*SourceFile) (*symtab, error) {
 // FileDecls returns the symtab, mapping file-scoped identifiers to their
 // correpsonding declarations. Any errors that are encountered are also
 // returned, but the symtab is always valid, even in the face of errors.
-func fileDecls(psyms *symtab, file *SourceFile) (*symtab, error) {
+func fileDecls(psyms *symtab, file *File) (*symtab, error) {
 	syms := makeSymtab(psyms)
 	var errs errors
 	for i, d := range file.Imports {
