@@ -24,7 +24,7 @@ func Check(files []*File) error {
 				// BUG(eaburns): Check TypeSpecs.
 				panic("unimplemented")
 			case *ConstSpec:
-				if err := d.Check(f.syms); err != nil {
+				if err := d.Check(); err != nil {
 					errs = append(errs, err)
 				}
 			}
@@ -104,7 +104,7 @@ func (n *UnaryOp) Check(*symtab, int) (Expression, error) {
 	panic("unimplemented")
 }
 
-func (n *ConstSpec) Check(syms *symtab) error {
+func (n *ConstSpec) Check() error {
 	switch n.state {
 	case checking:
 		panic("impossible, not recursive")
@@ -113,13 +113,10 @@ func (n *ConstSpec) Check(syms *symtab) error {
 	case checkedOK:
 		return nil
 	}
-	if n.syms != nil {
-		syms = n.syms
-	}
 
 	var errs errors
 	if n.Type != nil {
-		if t, err := n.Type.Check(syms, -1); err != nil {
+		if t, err := n.Type.Check(n.syms, -1); err != nil {
 			errs = append(errs, err)
 			n.Type = nil
 		} else {
@@ -135,14 +132,14 @@ func (n *ConstSpec) Check(syms *symtab) error {
 		n.state = checkedOK
 	}
 	for _, v := range n.views {
-		if _, err := v.Check(syms, n.Iota); err != nil {
+		if _, err := v.Check(); err != nil {
 			errs = append(errs, err)
 		}
 	}
 	return errs.ErrorOrNil()
 }
 
-func (n *constSpecView) Check(syms *symtab, iota int) (v Expression, err error) {
+func (n *constSpecView) Check() (v Expression, err error) {
 	defer func() {
 		if err != nil {
 			n.state = checkedError
@@ -159,9 +156,6 @@ func (n *constSpecView) Check(syms *symtab, iota int) (v Expression, err error) 
 	case checkedOK:
 		return n.Value(), nil
 	}
-	if n.syms != nil {
-		syms = n.syms
-	}
 
 	v = n.Value()
 	if v == nil {
@@ -171,7 +165,7 @@ func (n *constSpecView) Check(syms *symtab, iota int) (v Expression, err error) 
 	}
 
 	var errs errors
-	if err := n.ConstSpec.Check(syms); err != nil {
+	if err := n.ConstSpec.Check(); err != nil {
 		errs = append(errs, err)
 	}
 	// If the type is specified in the ConstSpec, then all views get that type.
@@ -180,7 +174,7 @@ func (n *constSpecView) Check(syms *symtab, iota int) (v Expression, err error) 
 	n.Type = n.ConstSpec.Type
 
 	n.state = checking
-	v, err = v.Check(syms, iota)
+	v, err = v.Check(n.syms, n.Iota)
 	switch {
 	case err != nil:
 		return nil, append(errs, err)
@@ -233,7 +227,7 @@ func (n *Identifier) Check(syms *symtab, iota int) (Expression, error) {
 		}
 
 	case *constSpecView:
-		return d.Check(syms, iota)
+		return d.Check()
 
 	case *predeclaredType:
 		return &TypeName{Identifier: *n}, nil
