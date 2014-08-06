@@ -145,7 +145,7 @@ func (n *constSpecView) Check() (v Expression, err error) {
 			n.state = checkedError
 			return
 		}
-		n.Values[n.Index] = v
+		n.Value = v
 		n.state = checkedOK
 	}()
 	switch n.state {
@@ -154,15 +154,15 @@ func (n *constSpecView) Check() (v Expression, err error) {
 	case checkedError:
 		return nil, errors{}
 	case checkedOK:
-		return n.Value(), nil
+		return n.Value, nil
 	}
 
-	v = n.Value()
-	if v == nil {
+	if n.Index >= len(n.Values) {
 		// This constant has no expression, but the error will be
 		// reported when checking the ConstSpec instead of here.
 		return nil, errors{}
 	}
+	v = n.Values[n.Index]
 
 	var errs errors
 	if err := n.ConstSpec.Check(); err != nil {

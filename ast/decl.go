@@ -154,21 +154,16 @@ const (
 // A constSpecView is a view of a ConstSpec that focuses on a single identifier
 // at a given index.
 type constSpecView struct {
+	*ConstSpec
 	Index int
 	// If the type of the const spec is not specified, then each identifier gets
 	// its own type, based on the type of its expression.
 	Type Type
-	*ConstSpec
+	// Value is the value of the expression after constant folding. It is set
+	// by the Check pass.
+	Value Expression
 
 	state checkState
-}
-
-// Value returns the bound expression or nil if there isn't one.
-func (c constSpecView) Value() Expression {
-	if c.Index < len(c.Values) {
-		return c.Values[c.Index]
-	}
-	return nil
 }
 
 // A varSpecView is a view of a VarSpec that focuses on a single identifier
