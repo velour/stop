@@ -165,6 +165,50 @@ func TestCheckErrors(t *testing.T) {
 	}
 }
 
+func TestConstFolding(t *testing.T) {
+	// The source must contain a const α. The test calls Check on the source and
+	// compares the resulting value of α to the given Expression.
+	tests := []struct {
+		src string
+		v   Expression
+	}{
+		{`package a; const α = 1`, intLit("1")},
+		{`package a; const α = 1.0`, floatLit("1.0")},
+		{`package a; const α = 1.0i`, imgLit("1.0")},
+		{`package a; const α = 'a'`, runeLit('a')},
+		{`package a; const α = "Hello, World!"`, strLit("Hello, World!")},
+		{`package a; const α = true`, &BoolLiteral{Value: true}},
+		{`package a; const α = false`, &BoolLiteral{Value: false}},
+		{`package a; const α, b = b, 5`, intLit("5")},
+		{`package a; const α = iota`, intLit("0")},
+		{`package a; const ( zero = iota; α )`, intLit("1")},
+		{`package a; const ( zero = iota; one; α )`, intLit("2")},
+	}
+	for _, test := range tests {
+		l := token.NewLexer("", test.src)
+		p := NewParser(l)
+		f := parseFile(p)
+		if err := Check([]*File{f}); err != nil {
+			t.Errorf("Check(%v), unexpected error: %v", test.src, err)
+			continue
+		}
+		d := f.syms.Find("α")
+		if d == nil {
+			t.Errorf("Check(%v): failed to find symbol α", test.src)
+			continue
+		}
+		a, ok := d.(*constSpecView)
+		if !ok {
+			t.Errorf("Check(%v): α is not a const", test.src)
+			continue
+		}
+		if !eq.Deep(a.Value, test.v) {
+			t.Errorf("Check(%v)=%v: α folded to %v, want %v", test.src,
+				pretty.String(f), pretty.String(a.Value), pretty.String(test.v))
+		}
+	}
+}
+
 func TestIsAssignable(t *testing.T) {
 	anInt32 := intLit("42")
 	anInt32.typ = int32Type
