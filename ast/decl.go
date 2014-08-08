@@ -140,19 +140,30 @@ func (s *symtab) Bind(n string, decl Declaration) error {
 	return nil
 }
 
+// A checkState specifies whether a declaration is unchecked, checked,
+// or is currently being checked.
+type checkState int
+
+const (
+	unchecked = iota
+	checking
+	checkedOK
+	checkedError
+)
+
 // A constSpecView is a view of a ConstSpec that focuses on a single identifier
 // at a given index.
 type constSpecView struct {
-	Index int
 	*ConstSpec
-}
+	Index int
+	// If the type of the const spec is not specified, then each identifier gets
+	// its own type, based on the type of its expression.
+	Type Type
+	// Value is the value of the expression after constant folding. It is set
+	// by the Check pass.
+	Value Expression
 
-// Value returns the bound expression or nil if there isn't one.
-func (c constSpecView) Value() Expression {
-	if c.Index < len(c.Values) {
-		return c.Values[c.Index]
-	}
-	return nil
+	state checkState
 }
 
 // A varSpecView is a view of a VarSpec that focuses on a single identifier
@@ -175,36 +186,49 @@ type packageDecl struct {
 // ConstSpec is mapped to a unique view of the declaring spec.
 // Any errors that are encountered are also returned, but the symtab is always
 // valid, even in the face of errors.
-func pkgDecls(files []*SourceFile) (*symtab, error) {
+func pkgDecls(files []*File) (*symtab, error) {
 	psyms := makeSymtab(&univScope)
 	var errs errors
 	for _, f := range files {
-		fsyms, err := fileDecls(psyms, f)
-		errs.Add(err)
+		var err error
+		if f.syms, err = fileDecls(psyms, f); err != nil {
+			errs = append(errs, err)
+		}
 		for _, d := range f.Declarations {
 			switch d := d.(type) {
 			case *MethodDecl:
-				d.syms = fsyms
-				errs.Add(psyms.Bind(d.Identifier.Name, d))
+				d.syms = f.syms
+				if err := psyms.Bind(d.Identifier.Name, d); err != nil {
+					errs = append(errs, err)
+				}
 			case *FunctionDecl:
-				d.syms = fsyms
-				errs.Add(psyms.Bind(d.Identifier.Name, d))
+				d.syms = f.syms
+				if err := psyms.Bind(d.Identifier.Name, d); err != nil {
+					errs = append(errs, err)
+				}
 			case *TypeSpec:
-				d.syms = fsyms
-				errs.Add(psyms.Bind(d.Identifier.Name, d))
+				d.syms = f.syms
+				if err := psyms.Bind(d.Identifier.Name, d); err != nil {
+					errs = append(errs, err)
+				}
 			case *ConstSpec:
-				d.syms = fsyms
+				d.syms = f.syms
 				for i := range d.Identifiers {
 					n := d.Identifiers[i].Name
 					v := &constSpecView{Index: i, ConstSpec: d}
-					errs.Add(psyms.Bind(n, v))
+					d.views = append(d.views, v)
+					if err := psyms.Bind(n, v); err != nil {
+						errs = append(errs, err)
+					}
 				}
 			case *VarSpec:
-				d.syms = fsyms
+				d.syms = f.syms
 				for i := range d.Identifiers {
 					n := d.Identifiers[i].Name
 					v := &varSpecView{Index: i, VarSpec: d}
-					errs.Add(psyms.Bind(n, v))
+					if err := psyms.Bind(n, v); err != nil {
+						errs = append(errs, err)
+					}
 				}
 			default:
 				panic("invalid top-level declaration")
@@ -217,7 +241,7 @@ func pkgDecls(files []*SourceFile) (*symtab, error) {
 // FileDecls returns the symtab, mapping file-scoped identifiers to their
 // correpsonding declarations. Any errors that are encountered are also
 // returned, but the symtab is always valid, even in the face of errors.
-func fileDecls(psyms *symtab, file *SourceFile) (*symtab, error) {
+func fileDecls(psyms *symtab, file *File) (*symtab, error) {
 	syms := makeSymtab(psyms)
 	var errs errors
 	for i, d := range file.Imports {
@@ -228,7 +252,9 @@ func fileDecls(psyms *symtab, file *SourceFile) (*symtab, error) {
 				syms:       makeSymtab(&univScope),
 				ImportDecl: &file.Imports[i],
 			}
-			errs.Add(syms.Bind(im.Name(), p))
+			if err := syms.Bind(im.Name(), p); err != nil {
+				errs = append(errs, err)
+			}
 		}
 	}
 	return syms, errs.ErrorOrNil()

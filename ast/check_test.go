@@ -66,6 +66,149 @@ func init() {
 	t1Diff.Identifier.decl = &TypeSpec{Identifier: *id("T1"), Type: intType}
 }
 
+func TestCheckErrors(t *testing.T) {
+	tests := []struct {
+		src  []string
+		errs []reflect.Type
+	}{
+		{[]string{`package a`, `package a`}, []reflect.Type{}},
+		{
+			[]string{
+				`package a
+				const (
+					complexConst = 5i
+					floatConst = 3.1415926535
+					intConst = 6
+					runeConst = 'α'
+					stringConst = "Hello, World!"
+					trueConst, falseConst = true, false
+				)`,
+			},
+			[]reflect.Type{},
+		},
+		{
+			[]string{
+				`package a; const pi = 3.1415926535`,
+				`package a; const π = pi`,
+			},
+			[]reflect.Type{},
+		},
+		{
+			[]string{
+				`package a
+				const (
+					zero = iota
+					one
+					two
+				)`,
+			},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; const a = notDeclared`},
+			[]reflect.Type{reflect.TypeOf(Undeclared{})},
+		},
+		{
+			[]string{`package a; const a, b = 1`},
+			[]reflect.Type{reflect.TypeOf(AssignCountMismatch{})},
+		},
+		{
+			[]string{`package a; const nilConst = nil`},
+			[]reflect.Type{reflect.TypeOf(NotConstant{})},
+		},
+		{
+			[]string{`package a; const a = a`},
+			[]reflect.Type{reflect.TypeOf(ConstantLoop{})},
+		},
+		{
+			[]string{
+				`package a; const a = b`,
+				`package a; const b = c`,
+				`package a; const c = a`,
+			},
+			[]reflect.Type{reflect.TypeOf(ConstantLoop{})},
+		},
+	}
+	for _, test := range tests {
+		want := make(map[reflect.Type]int)
+		for _, e := range test.errs {
+			want[e]++
+		}
+
+		var files []*File
+		for _, src := range test.src {
+			l := token.NewLexer("", src)
+			p := NewParser(l)
+			files = append(files, parseFile(p))
+		}
+
+		var got []reflect.Type
+		if err := Check(files); err != nil {
+			for _, e := range err.(errors).All() {
+				got = append(got, reflect.TypeOf(e))
+			}
+		}
+		for _, t := range got {
+			want[t]--
+		}
+
+		diff := false
+		for _, v := range want {
+			if v != 0 {
+				diff = true
+				break
+			}
+		}
+		if diff {
+			t.Errorf("Check(%v)=%v, want %v", test.src, got, test.errs)
+		}
+	}
+}
+
+func TestConstFolding(t *testing.T) {
+	// The source must contain a const α. The test calls Check on the source and
+	// compares the resulting value of α to the given Expression.
+	tests := []struct {
+		src string
+		v   Expression
+	}{
+		{`package a; const α = 1`, intLit("1")},
+		{`package a; const α = 1.0`, floatLit("1.0")},
+		{`package a; const α = 1.0i`, imgLit("1.0")},
+		{`package a; const α = 'a'`, runeLit('a')},
+		{`package a; const α = "Hello, World!"`, strLit("Hello, World!")},
+		{`package a; const α = true`, &BoolLiteral{Value: true}},
+		{`package a; const α = false`, &BoolLiteral{Value: false}},
+		{`package a; const α, b = b, 5`, intLit("5")},
+		{`package a; const α = iota`, intLit("0")},
+		{`package a; const ( zero = iota; α )`, intLit("1")},
+		{`package a; const ( zero = iota; one; α )`, intLit("2")},
+	}
+	for _, test := range tests {
+		l := token.NewLexer("", test.src)
+		p := NewParser(l)
+		f := parseFile(p)
+		if err := Check([]*File{f}); err != nil {
+			t.Errorf("Check(%v), unexpected error: %v", test.src, err)
+			continue
+		}
+		d := f.syms.Find("α")
+		if d == nil {
+			t.Errorf("Check(%v): failed to find symbol α", test.src)
+			continue
+		}
+		a, ok := d.(*constSpecView)
+		if !ok {
+			t.Errorf("Check(%v): α is not a const", test.src)
+			continue
+		}
+		if !eq.Deep(a.Value, test.v) {
+			t.Errorf("Check(%v)=%v: α folded to %v, want %v", test.src,
+				pretty.String(f), pretty.String(a.Value), pretty.String(test.v))
+		}
+	}
+}
+
 func TestIsAssignable(t *testing.T) {
 	anInt32 := intLit("42")
 	anInt32.typ = int32Type
@@ -1167,8 +1310,8 @@ func TestPkgDecls(t *testing.T) {
 	}
 }
 
-func parseSrcFiles(t *testing.T, srcFiles []string) []*SourceFile {
-	var files []*SourceFile
+func parseSrcFiles(t *testing.T, srcFiles []string) []*File {
+	var files []*File
 	for _, src := range srcFiles {
 		p := NewParser(token.NewLexer("", src))
 		file, err := Parse(p)
@@ -1194,7 +1337,7 @@ func TestScopeFind(t *testing.T) {
 		func f() int { return 0 }
 	`
 	p := NewParser(token.NewLexer("", src))
-	s, err := pkgDecls([]*SourceFile{parseSourceFile(p)})
+	s, err := pkgDecls([]*File{parseFile(p)})
 	if err != nil {
 		panic(err)
 	}

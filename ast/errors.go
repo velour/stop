@@ -27,19 +27,25 @@ func errs(es ...error) errors {
 	return errors(es)
 }
 
-// Add adds an error to the errors if it is non-nil.
-func (es *errors) Add(e error) {
-	if e != nil {
-		*es = append(*es, e)
-	}
-}
-
 // ErrorOrNil returns nil if the errors is empty or it returns the errors as an error.
 func (es errors) ErrorOrNil() error {
 	if len(es) == 0 {
 		return nil
 	}
 	return es
+}
+
+// All returns all errors, gathered recursively by calling All on any nested errors.
+func (es errors) All() []error {
+	var all []error
+	for _, e := range es {
+		if es, ok := e.(errors); ok {
+			all = append(all, es.All()...)
+		} else {
+			all = append(all, e)
+		}
+	}
+	return all
 }
 
 // A SyntaxError is an error that describes a parse failure: something
@@ -101,4 +107,58 @@ type Redeclaration struct {
 
 func (e *Redeclaration) Error() string {
 	return fmt.Sprintf("%s: %s redeclared, originally declared at %s", e.Second.Start(), e.Name, e.First.Start())
+}
+
+// An Undeclared is an error returned for undeclared identifiers.
+type Undeclared struct{ *Identifier }
+
+func (e Undeclared) Error() string {
+	return fmt.Sprintf("%s: undeclared identifier %s", e.Start(), e.Name)
+}
+
+// A ConstantLoop is an error returned when there is a cycle in a constant definition.
+type ConstantLoop struct{ *constSpecView }
+
+func (e ConstantLoop) Error() string {
+	return fmt.Sprintf("%s: constant definition loop", e.Start())
+}
+
+// A NotConstant is an error returned when a constant initializer is not constant.
+type NotConstant struct{ Expression }
+
+func (e NotConstant) Error() string {
+	return fmt.Sprintf("%s: const initializer is not constant", e.Start())
+}
+
+// A BadConstAssign is an error returned when a constant operand has a value
+// that is not representable by the type to which it is being assigned.
+type BadConstAssign struct {
+	Expression
+	Type
+}
+
+func (e BadConstAssign) Error() string {
+	return fmt.Sprintf("%s: bad constant assignment", e.Expression.Start())
+}
+
+// A BadAssign is an error returned when an expression is not assignable
+// to the type to which it is being assigned.
+type BadAssign struct {
+	Expression
+	Type
+}
+
+func (e BadAssign) Error() string {
+	return fmt.Sprintf("%s: bad assignment", e.Expression.Start())
+}
+
+// A AssignCountMismatch is an error returned when a variable or contstant
+// assignment has differing numbers of identifiers as it has expressions
+// being assigned.
+type AssignCountMismatch struct {
+	Declaration
+}
+
+func (e AssignCountMismatch) Error() string {
+	return fmt.Sprintf("%s: assignment count mismatch", e.Start())
 }

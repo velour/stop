@@ -20,20 +20,20 @@ type Node interface {
 	End() token.Location
 }
 
-// SourceFile is a node representing a Go source file.
-type SourceFile struct {
+// File is a node representing a Go source file.
+type File struct {
 	comments
 	startLoc, endLoc token.Location
 	PackageName      Identifier
 	Imports          []ImportDecl
 	Declarations
 
-	// syms is the symbol table for the scope of this source file.
+	// Syms is the symbol table for the scope of this source file.
 	syms *symtab
 }
 
-func (n *SourceFile) Start() token.Location { return n.PackageName.Start() }
-func (n *SourceFile) End() token.Location {
+func (n *File) Start() token.Location { return n.PackageName.Start() }
+func (n *File) End() token.Location {
 	if l := len(n.Declarations); l > 0 {
 		return n.Declarations[l-1].End()
 	}
@@ -434,6 +434,7 @@ func (n *FunctionDecl) End() token.Location   { return n.Body.End() }
 // a series of constants.
 type ConstSpec struct {
 	comments
+	// Type is nil if the type of the constant was not specified.
 	Type        Type
 	Identifiers []Identifier
 	Values      []Expression
@@ -442,6 +443,11 @@ type ConstSpec struct {
 	// Syms is the file-level symbol table defining the scope in which these
 	// constants were declared, or nil if they are not package-level.
 	syms *symtab
+
+	// Views is the set of views into this ConstSpec.
+	views []*constSpecView
+
+	state checkState
 }
 
 func (n *ConstSpec) Start() token.Location { return n.Identifiers[0].Start() }
@@ -679,6 +685,14 @@ type Expression interface {
 	Source() string
 	// Type returns the Type of the result of the expression.
 	Type() Type
+	// Checks the expression, returning a replacement if the
+	// expression can be reduced (for example, by constant folding)
+	// and any errors that may have occurred. Iota specifies the
+	// value to which iota should evaluate if encountered. For
+	// expressions that do not appear in ConstSpec nodes, it is -1.
+	// When iota is non-negative, it is an error for the expression
+	// not to reduce to a constant operand.
+	Check(syms *symtab, iota int) (Expression, error)
 }
 
 // A FunctionLiteral is an expression node that represents a function literal.
