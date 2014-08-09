@@ -145,21 +145,15 @@ func TestCheckErrors(t *testing.T) {
 		var got []reflect.Type
 		if err := Check(files); err != nil {
 			for _, e := range err.(errors).All() {
-				got = append(got, reflect.TypeOf(e))
+				t := reflect.TypeOf(e)
+				want[t]--
+				if want[t] == 0 {
+					delete(want, t)
+				}
+				got = append(got, t)
 			}
 		}
-		for _, t := range got {
-			want[t]--
-		}
-
-		diff := false
-		for _, v := range want {
-			if v != 0 {
-				diff = true
-				break
-			}
-		}
-		if diff {
+		if len(want) != 0 {
 			t.Errorf("Check(%v)=%v, want %v", test.src, got, test.errs)
 		}
 	}
