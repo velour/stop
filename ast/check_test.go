@@ -181,6 +181,31 @@ func TestCheckErrors(t *testing.T) {
 			[]string{`package a; const c undeclared = 256`},
 			[]reflect.Type{reflect.TypeOf(Undeclared{})},
 		},
+		{
+			// Report multiple errors.
+			[]string{
+				`package a
+				const c undeclared = 256
+				const d uint8 = 256`,
+			},
+			[]reflect.Type{
+				reflect.TypeOf(Undeclared{}),
+				reflect.TypeOf(BadConstAssign{}),
+			},
+		},
+		{
+			// Don't repeat errors.
+			[]string{
+				`package a
+				const c = undeclared
+				const d = c
+				const e = c
+				const f = c`,
+			},
+			[]reflect.Type{
+				reflect.TypeOf(Undeclared{}),
+			},
+		},
 
 		// Types
 		{[]string{`package a; type t int`}, []reflect.Type{}},
