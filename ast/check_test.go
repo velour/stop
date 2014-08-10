@@ -210,35 +210,35 @@ func TestCheckErrors(t *testing.T) {
 		},
 		{
 			[]string{`package a; const i int = ""`},
-			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+			[]reflect.Type{reflect.TypeOf(Unrepresentable{})},
 		},
 		{
 			[]string{`package a; const f float64 = "foo"`},
-			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+			[]reflect.Type{reflect.TypeOf(Unrepresentable{})},
 		},
 		{
 			[]string{`package a; const c complex128 = true`},
-			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+			[]reflect.Type{reflect.TypeOf(Unrepresentable{})},
 		},
 		{
 			[]string{`package a; const s string = 'a'`},
-			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+			[]reflect.Type{reflect.TypeOf(Unrepresentable{})},
 		},
 		{
 			[]string{`package a; const r rune = ""`},
-			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+			[]reflect.Type{reflect.TypeOf(Unrepresentable{})},
 		},
 		{
 			[]string{`package a; const b bool = "hi"`},
-			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+			[]reflect.Type{reflect.TypeOf(Unrepresentable{})},
 		},
 		{
 			[]string{`package a; const b bool = 0`},
-			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+			[]reflect.Type{reflect.TypeOf(Unrepresentable{})},
 		},
 		{
 			[]string{`package a; const i uint8 = 256`},
-			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+			[]reflect.Type{reflect.TypeOf(Unrepresentable{})},
 		},
 		{
 			[]string{`package a; const a uint8 = 0; const b int8 = a`},
@@ -257,7 +257,7 @@ func TestCheckErrors(t *testing.T) {
 			},
 			[]reflect.Type{
 				reflect.TypeOf(Undeclared{}),
-				reflect.TypeOf(BadConstAssign{}),
+				reflect.TypeOf(Unrepresentable{}),
 			},
 		},
 		{
@@ -314,19 +314,19 @@ func TestCheckErrors(t *testing.T) {
 		},
 		{
 			[]string{`package a; const a uint = -1`},
-			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+			[]reflect.Type{reflect.TypeOf(Unrepresentable{})},
 		},
 		{
 			[]string{`package a; const a, b uint = 1, -a`},
-			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+			[]reflect.Type{reflect.TypeOf(Unrepresentable{})},
 		},
 		{
 			[]string{`package a; const a uint = -1.0i`},
-			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+			[]reflect.Type{reflect.TypeOf(Unrepresentable{})},
 		},
 		{
 			[]string{`package a; const a uint8 = +256`},
-			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+			[]reflect.Type{reflect.TypeOf(Unrepresentable{})},
 		},
 		{
 			[]string{

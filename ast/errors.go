@@ -130,15 +130,15 @@ func (e NotConstant) Error() string {
 	return fmt.Sprintf("%s: const initializer is not constant", e.Start())
 }
 
-// A BadConstAssign is an error returned when a constant operand has a value
+// A Unrepresentable is an error returned when a constant operand has a value
 // that is not representable by the type to which it is being assigned.
-type BadConstAssign struct {
+type Unrepresentable struct {
 	Expression
 	Type
 }
 
-func (e BadConstAssign) Error() string {
-	return fmt.Sprintf("%s: bad constant assignment", e.Expression.Start())
+func (e Unrepresentable) Error() string {
+	return fmt.Sprintf("%s: const is not representable by its type")
 }
 
 // A BadAssign is an error returned when an expression is not assignable

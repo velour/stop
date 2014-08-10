@@ -209,7 +209,7 @@ func (n *UnaryOp) Check(syms *symtab, iota int) (Expression, error) {
 // by its type, otherwise it returns an error.
 func valueOKOrError(l Expression) (Expression, error) {
 	if !IsRepresentable(l, l.Type()) {
-		return nil, BadConstAssign{l, l.Type()}
+		return nil, Unrepresentable{l, l.Type()}
 	}
 	return l, nil
 }
@@ -294,7 +294,7 @@ func (n *constSpecView) Check() (v Expression, err error) {
 
 	switch _, vIsUntyped := v.Type().(Untyped); {
 	case n.Type != nil && vIsUntyped && !IsRepresentable(v, n.Type):
-		return nil, append(errs, BadConstAssign{v, n.Type})
+		return nil, append(errs, Unrepresentable{v, n.Type})
 	case n.Type != nil && !IsAssignable(v, n.Type):
 		return nil, append(errs, BadAssign{v, n.Type})
 	case n.Type == nil:
