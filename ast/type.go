@@ -138,9 +138,14 @@ func IsRepresentable(x Expression, t Type) bool {
 
 	case Int, Int8, Int16, Int32, Int64, Uint, Uint8, Uint16, Uint32, Uint64, Uintptr:
 		d := tn.Identifier.decl.(predeclaredType)
-		if l, ok := x.(*IntegerLiteral); ok {
+		switch l := x.(type) {
+		case *IntegerLiteral:
 			b := bounds[d]
 			return b.min.Cmp(l.Value) <= 0 && l.Value.Cmp(b.max) <= 0
+		case *RuneLiteral:
+			b := bounds[d]
+			v := big.NewInt(int64(l.Value))
+			return b.min.Cmp(v) <= 0 && v.Cmp(b.max) <= 0
 		}
 	}
 	return false
@@ -359,10 +364,17 @@ func (n *Identifier) Type() Type {
 	}
 }
 
-func (n *IntegerLiteral) Type() Type { return n.typ }
-func (n *FloatLiteral) Type() Type   { return n.typ }
-func (n *ComplexLiteral) Type() Type { return n.typ }
-func (n *RuneLiteral) Type() Type    { return n.typ }
-func (n *StringLiteral) Type() Type  { return n.typ }
-func (n *BoolLiteral) Type() Type    { return n.typ }
-func (n *NilLiteral) Type() Type     { return n.typ }
+func (n *IntegerLiteral) Type() Type     { return n.typ }
+func (n *IntegerLiteral) SetType(t Type) { n.typ = t }
+func (n *FloatLiteral) Type() Type       { return n.typ }
+func (n *FloatLiteral) SetType(t Type)   { n.typ = t }
+func (n *ComplexLiteral) Type() Type     { return n.typ }
+func (n *ComplexLiteral) SetType(t Type) { n.typ = t }
+func (n *RuneLiteral) Type() Type        { return n.typ }
+func (n *RuneLiteral) SetType(t Type)    { n.typ = t }
+func (n *StringLiteral) Type() Type      { return n.typ }
+func (n *StringLiteral) SetType(t Type)  { n.typ = t }
+func (n *BoolLiteral) Type() Type        { return n.typ }
+func (n *BoolLiteral) SetType(t Type)    { n.typ = t }
+func (n *NilLiteral) Type() Type         { return n.typ }
+func (n *NilLiteral) SetType(t Type)     { n.typ = t }

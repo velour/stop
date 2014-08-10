@@ -21,8 +21,9 @@ func Check(files []*File) error {
 		for _, d := range f.Declarations {
 			switch d := d.(type) {
 			case *TypeSpec:
-				// BUG(eaburns): Check TypeSpecs.
-				panic("unimplemented")
+				if err := d.Check(); err != nil {
+					errs = append(errs, err)
+				}
 			case *ConstSpec:
 				if err := d.Check(); err != nil {
 					errs = append(errs, err)
@@ -34,6 +35,17 @@ func Check(files []*File) error {
 	// BUG(eaburns): Check MethodDecl, FunctionDecl, and VarSpecs.
 
 	return errs.ErrorOrNil()
+}
+
+// Check checks the TypeSpec, returning any errors.
+//
+// BUG(eaburns): Need to check for incorrect, recursively-defined types.
+func (n *TypeSpec) Check() error {
+	t, err := n.Type.Check(n.syms, -1)
+	if err == nil {
+		n.Type = t.(Type)
+	}
+	return err
 }
 
 func (n *StructType) Check(*symtab, int) (Expression, error) {
@@ -68,8 +80,19 @@ func (n *Star) Check(*symtab, int) (Expression, error) {
 	panic("unimplemented")
 }
 
-func (n *TypeName) Check(*symtab, int) (Expression, error) {
-	panic("unimplemented")
+func (n *TypeName) Check(syms *symtab, _ int) (Expression, error) {
+	n.decl = syms.Find(n.Name)
+	if n.decl == nil {
+		return nil, Undeclared{&n.Identifier}
+	}
+	if n.Package == nil {
+		return n, nil
+	}
+	n.Package.decl = syms.Find(n.Name)
+	if n.Package.decl == nil {
+		return nil, Undeclared{n.Package}
+	}
+	return n, nil
 }
 
 func (n *CompositeLiteral) Check(*symtab, int) (Expression, error) {
@@ -185,10 +208,16 @@ func (n *constSpecView) Check() (v Expression, err error) {
 	switch _, vIsUntyped := v.Type().(Untyped); {
 	case n.Type != nil && vIsUntyped && !IsRepresentable(v, n.Type):
 		return nil, append(errs, BadConstAssign{v, n.Type})
-	case n.Type != nil && IsAssignable(v, n.Type):
+	case n.Type != nil && !IsAssignable(v, n.Type):
 		return nil, append(errs, BadAssign{v, n.Type})
 	case n.Type == nil:
 		n.Type = v.Type()
+	}
+	if n.Type != nil {
+		// All Literals, which this must be after folding, have a SetType method.
+		v.(interface {
+			SetType(Type)
+		}).SetType(n.Type)
 	}
 	return v, nil
 }
@@ -215,13 +244,13 @@ func (n *Identifier) Check(syms *symtab, iota int) (Expression, error) {
 		switch n.Name {
 		case "iota":
 			v := big.NewInt(int64(iota))
-			return &IntegerLiteral{Value: v, span: n.span}, nil
+			return (&IntegerLiteral{Value: v, span: n.span}).Check(syms, iota)
 		case "true":
-			return &BoolLiteral{Value: true, span: n.span}, nil
+			return (&BoolLiteral{Value: true, span: n.span}).Check(syms, iota)
 		case "false":
-			return &BoolLiteral{Value: false, span: n.span}, nil
+			return (&BoolLiteral{Value: false, span: n.span}).Check(syms, iota)
 		case "nil":
-			return &NilLiteral{span: n.span}, nil
+			return (&NilLiteral{span: n.span}).Check(syms, iota)
 		default:
 			panic("unknown predeclared constant: " + n.Name)
 		}
@@ -230,9 +259,9 @@ func (n *Identifier) Check(syms *symtab, iota int) (Expression, error) {
 		return d.Check()
 
 	case *predeclaredType:
-		return &TypeName{Identifier: *n}, nil
+		return (&TypeName{Identifier: *n}).Check(syms, iota)
 	case *TypeSpec:
-		return &TypeName{Identifier: *n}, nil
+		return (&TypeName{Identifier: *n}).Check(syms, iota)
 
 	default:
 		panic(fmt.Sprintf("unimplemented identifier type: %T", d))

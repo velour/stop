@@ -72,6 +72,8 @@ func TestCheckErrors(t *testing.T) {
 		errs []reflect.Type
 	}{
 		{[]string{`package a`, `package a`}, []reflect.Type{}},
+
+		// Consts
 		{
 			[]string{
 				`package a
@@ -104,8 +106,19 @@ func TestCheckErrors(t *testing.T) {
 			},
 			[]reflect.Type{},
 		},
+		{[]string{`package a; const i int = 5`}, []reflect.Type{}},
+		{[]string{`package a; const f float64 = 5`}, []reflect.Type{}},
+		{[]string{`package a; const c complex128 = 5`}, []reflect.Type{}},
+		{[]string{`package a; const s string = ""`}, []reflect.Type{}},
+		{[]string{`package a; const r rune = 'β'`}, []reflect.Type{}},
+		{[]string{`package a; const r int = 'β'`}, []reflect.Type{}},
+		{[]string{`package a; const b bool = true`}, []reflect.Type{}},
+		{[]string{`package a; const b bool = false`}, []reflect.Type{}},
+		{[]string{`package a; const a bool = false; const b bool = a`}, []reflect.Type{}},
+		{[]string{`package a; const a int = 0; const b int = a`}, []reflect.Type{}},
+		{[]string{`package a; const a int32 = 0; const b rune = a`}, []reflect.Type{}},
 		{
-			[]string{`package a; const a = notDeclared`},
+			[]string{`package a; const a = undeclared`},
 			[]reflect.Type{reflect.TypeOf(Undeclared{})},
 		},
 		{
@@ -127,6 +140,53 @@ func TestCheckErrors(t *testing.T) {
 				`package a; const c = a`,
 			},
 			[]reflect.Type{reflect.TypeOf(ConstantLoop{})},
+		},
+		{
+			[]string{`package a; const i int = ""`},
+			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+		},
+		{
+			[]string{`package a; const f float64 = '\000'`},
+			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+		},
+		{
+			[]string{`package a; const c complex128 = true`},
+			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+		},
+		{
+			[]string{`package a; const s string = 'a'`},
+			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+		},
+		{
+			[]string{`package a; const r rune = ""`},
+			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+		},
+		{
+			[]string{`package a; const b bool = "hi"`},
+			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+		},
+		{
+			[]string{`package a; const b bool = 0`},
+			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+		},
+		{
+			[]string{`package a; const i uint8 = 256`},
+			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+		},
+		{
+			[]string{`package a; const a uint8 = 0; const b int8 = a`},
+			[]reflect.Type{reflect.TypeOf(BadAssign{})},
+		},
+		{
+			[]string{`package a; const c undeclared = 256`},
+			[]reflect.Type{reflect.TypeOf(Undeclared{})},
+		},
+
+		// Types
+		{[]string{`package a; type t int`}, []reflect.Type{}},
+		{
+			[]string{`package a; type t undeclared`},
+			[]reflect.Type{reflect.TypeOf(Undeclared{})},
 		},
 	}
 	for _, test := range tests {
