@@ -227,8 +227,7 @@ func (n *constSpecView) Check() (v Expression, err error) {
 // constant expression.
 func constOperand(e Expression) bool {
 	switch e.(type) {
-	case *IntegerLiteral, *FloatLiteral, *ComplexLiteral, *RuneLiteral,
-		*StringLiteral, *BoolLiteral:
+	case *IntegerLiteral, *FloatLiteral, *ComplexLiteral, *StringLiteral, *BoolLiteral:
 		return true
 	}
 	return false
@@ -269,7 +268,11 @@ func (n *Identifier) Check(syms *symtab, iota int) (Expression, error) {
 }
 
 func (n *IntegerLiteral) Check(*symtab, int) (Expression, error) {
-	n.typ = Untyped(IntegerConst)
+	if n.Rune {
+		n.typ = Untyped(RuneConst)
+	} else {
+		n.typ = Untyped(IntegerConst)
+	}
 	return n, nil
 }
 
@@ -280,11 +283,6 @@ func (n *FloatLiteral) Check(*symtab, int) (Expression, error) {
 
 func (n *ComplexLiteral) Check(*symtab, int) (Expression, error) {
 	n.typ = Untyped(ComplexConst)
-	return n, nil
-}
-
-func (n *RuneLiteral) Check(*symtab, int) (Expression, error) {
-	n.typ = Untyped(RuneConst)
 	return n, nil
 }
 

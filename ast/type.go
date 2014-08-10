@@ -121,12 +121,12 @@ func IsRepresentable(x Expression, t Type) bool {
 			return boolLit || (untyped && u == Untyped(BoolConst))
 		case Untyped(ComplexConst):
 			switch x.(type) {
-			case *ComplexLiteral, *FloatLiteral, *IntegerLiteral, *RuneLiteral:
+			case *ComplexLiteral, *FloatLiteral, *IntegerLiteral:
 				return true
 			}
 		case Untyped(FloatConst):
 			switch x.(type) {
-			case *FloatLiteral, *IntegerLiteral, *RuneLiteral:
+			case *FloatLiteral, *IntegerLiteral:
 				return true
 			}
 		case Untyped(StringConst):
@@ -134,7 +134,7 @@ func IsRepresentable(x Expression, t Type) bool {
 			return strLit
 		case Untyped(IntegerConst), Untyped(RuneConst):
 			switch l := x.(type) {
-			case *IntegerLiteral, *RuneLiteral:
+			case *IntegerLiteral:
 				return true
 			case *FloatLiteral:
 				return l.Value.IsInt()
@@ -153,12 +153,12 @@ func IsRepresentable(x Expression, t Type) bool {
 
 		case Complex64, Complex128:
 			switch x.(type) {
-			case *ComplexLiteral, *FloatLiteral, *IntegerLiteral, *RuneLiteral:
+			case *ComplexLiteral, *FloatLiteral, *IntegerLiteral:
 				return true
 			}
 		case Float32, Float64:
 			switch x.(type) {
-			case *FloatLiteral, *IntegerLiteral, *RuneLiteral:
+			case *FloatLiteral, *IntegerLiteral:
 				return true
 			}
 		case String:
@@ -171,10 +171,6 @@ func IsRepresentable(x Expression, t Type) bool {
 			case *IntegerLiteral:
 				b := bounds[d]
 				return b.min.Cmp(l.Value) <= 0 && l.Value.Cmp(b.max) <= 0
-			case *RuneLiteral:
-				b := bounds[d]
-				v := big.NewInt(int64(l.Value))
-				return b.min.Cmp(v) <= 0 && v.Cmp(b.max) <= 0
 			case *FloatLiteral:
 				return l.Value.IsInt()
 			case *ComplexLiteral:
@@ -404,8 +400,6 @@ func (n *FloatLiteral) Type() Type       { return n.typ }
 func (n *FloatLiteral) SetType(t Type)   { n.typ = t }
 func (n *ComplexLiteral) Type() Type     { return n.typ }
 func (n *ComplexLiteral) SetType(t Type) { n.typ = t }
-func (n *RuneLiteral) Type() Type        { return n.typ }
-func (n *RuneLiteral) SetType(t Type)    { n.typ = t }
 func (n *StringLiteral) Type() Type      { return n.typ }
 func (n *StringLiteral) SetType(t Type)  { n.typ = t }
 func (n *BoolLiteral) Type() Type        { return n.typ }
