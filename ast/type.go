@@ -111,41 +111,75 @@ func newUint(x uint64) *big.Int {
 
 // IsRepresentable returns whether a constant expression can be represented by a type.
 func IsRepresentable(x Expression, t Type) bool {
-	tn, ok := t.Underlying().(*TypeName)
-	if !ok {
-		return false
-	}
-	switch tn.Identifier.decl {
-	case Bool:
-		u, untyped := x.(Untyped)
-		_, boolLit := x.(*BoolLiteral)
-		return boolLit || (untyped && u == Untyped(BoolConst))
+	var zero big.Rat
+	switch u := t.Underlying().(type) {
+	case Untyped:
+		switch u {
+		case Untyped(BoolConst):
+			u, untyped := x.(Untyped)
+			_, boolLit := x.(*BoolLiteral)
+			return boolLit || (untyped && u == Untyped(BoolConst))
+		case Untyped(ComplexConst):
+			switch x.(type) {
+			case *ComplexLiteral, *FloatLiteral, *IntegerLiteral, *RuneLiteral:
+				return true
+			}
+		case Untyped(FloatConst):
+			switch x.(type) {
+			case *FloatLiteral, *IntegerLiteral, *RuneLiteral:
+				return true
+			}
+		case Untyped(StringConst):
+			_, strLit := x.(*StringLiteral)
+			return strLit
+		case Untyped(IntegerConst), Untyped(RuneConst):
+			switch l := x.(type) {
+			case *IntegerLiteral, *RuneLiteral:
+				return true
+			case *FloatLiteral:
+				return l.Value.IsInt()
+			case *ComplexLiteral:
+				return l.Real.IsInt() && l.Imaginary.Cmp(&zero) == 0
+			}
+		default:
+			panic("bad untyped")
+		}
+	case *TypeName:
+		switch u.Identifier.decl {
+		case Bool:
+			u, untyped := x.(Untyped)
+			_, boolLit := x.(*BoolLiteral)
+			return boolLit || (untyped && u == Untyped(BoolConst))
 
-	case Complex64, Complex128:
-		_, cmplxLit := x.(*ComplexLiteral)
-		_, floatLit := x.(*FloatLiteral)
-		_, intLit := x.(*IntegerLiteral)
-		return cmplxLit || floatLit || intLit
+		case Complex64, Complex128:
+			switch x.(type) {
+			case *ComplexLiteral, *FloatLiteral, *IntegerLiteral, *RuneLiteral:
+				return true
+			}
+		case Float32, Float64:
+			switch x.(type) {
+			case *FloatLiteral, *IntegerLiteral, *RuneLiteral:
+				return true
+			}
+		case String:
+			_, strLit := x.(*StringLiteral)
+			return strLit
 
-	case Float32, Float64:
-		_, floatLit := x.(*FloatLiteral)
-		_, intLit := x.(*IntegerLiteral)
-		return floatLit || intLit
-
-	case String:
-		_, strLit := x.(*StringLiteral)
-		return strLit
-
-	case Int, Int8, Int16, Int32, Int64, Uint, Uint8, Uint16, Uint32, Uint64, Uintptr:
-		d := tn.Identifier.decl.(predeclaredType)
-		switch l := x.(type) {
-		case *IntegerLiteral:
-			b := bounds[d]
-			return b.min.Cmp(l.Value) <= 0 && l.Value.Cmp(b.max) <= 0
-		case *RuneLiteral:
-			b := bounds[d]
-			v := big.NewInt(int64(l.Value))
-			return b.min.Cmp(v) <= 0 && v.Cmp(b.max) <= 0
+		case Int, Int8, Int16, Int32, Int64, Uint, Uint8, Uint16, Uint32, Uint64, Uintptr:
+			d := u.Identifier.decl.(predeclaredType)
+			switch l := x.(type) {
+			case *IntegerLiteral:
+				b := bounds[d]
+				return b.min.Cmp(l.Value) <= 0 && l.Value.Cmp(b.max) <= 0
+			case *RuneLiteral:
+				b := bounds[d]
+				v := big.NewInt(int64(l.Value))
+				return b.min.Cmp(v) <= 0 && v.Cmp(b.max) <= 0
+			case *FloatLiteral:
+				return l.Value.IsInt()
+			case *ComplexLiteral:
+				return l.Real.IsInt() && l.Imaginary.Cmp(&zero) == 0
+			}
 		}
 	}
 	return false

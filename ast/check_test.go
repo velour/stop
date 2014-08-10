@@ -2,6 +2,7 @@ package ast
 
 import (
 	"math"
+	"math/big"
 	"reflect"
 	"regexp"
 	"sort"
@@ -146,7 +147,7 @@ func TestCheckErrors(t *testing.T) {
 			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
 		},
 		{
-			[]string{`package a; const f float64 = '\000'`},
+			[]string{`package a; const f float64 = "foo"`},
 			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
 		},
 		{
@@ -397,10 +398,12 @@ func TestIsRepresentable(t *testing.T) {
 		{imgLit("5i"), complex128Type, true},
 		{floatLit("5"), complex128Type, true},
 		{intLit("5"), complex128Type, true},
+		{runeLit('a'), complex128Type, true},
 		{hello, complex128Type, false},
 
 		{floatLit("5"), float32Type, true},
 		{intLit("5"), float32Type, true},
+		{runeLit('a'), float32Type, true},
 		{hello, float32Type, false},
 		{floatLit("5"), float64Type, true},
 		{intLit("5"), float64Type, true},
@@ -451,8 +454,49 @@ func TestIsRepresentable(t *testing.T) {
 		{intLit(strconv.FormatUint(math.MaxUint64, 10)), uint64Type, true},
 		{intLit("18446744073709551616"), uint64Type, false},
 		{&BoolLiteral{}, intType, false},
+		{floatLit("5.0"), intType, true},
+		{
+			&ComplexLiteral{
+				Real:      big.NewRat(5, 1),
+				Imaginary: big.NewRat(0, 1),
+			},
+			intType,
+			true,
+		},
 
 		{&BoolLiteral{}, &SliceType{Element: intType}, false},
+
+		// Untyped types.
+		{intLit("5"), Untyped(IntegerConst), true},
+		{runeLit('α'), Untyped(IntegerConst), true},
+		{floatLit("5.0"), Untyped(IntegerConst), true},
+		{floatLit("5.1"), Untyped(IntegerConst), false},
+		{
+			&ComplexLiteral{
+				Real:      big.NewRat(5, 1),
+				Imaginary: big.NewRat(0, 1),
+			},
+			Untyped(IntegerConst),
+			true,
+		},
+
+		{intLit("0"), Untyped(FloatConst), true},
+		{runeLit('a'), Untyped(FloatConst), true},
+		{floatLit("5.1"), Untyped(FloatConst), true},
+		{imgLit("5.1"), Untyped(FloatConst), false},
+
+		{intLit("0"), Untyped(ComplexConst), true},
+		{runeLit('a'), Untyped(ComplexConst), true},
+		{floatLit("5.1"), Untyped(ComplexConst), true},
+		{imgLit("5.1"), Untyped(ComplexConst), true},
+		{hello, Untyped(ComplexConst), false},
+
+		{hello, Untyped(StringConst), true},
+		{intLit("5"), Untyped(StringConst), false},
+
+		{&BoolLiteral{}, Untyped(BoolConst), true},
+		{&BoolLiteral{Value: true}, Untyped(BoolConst), true},
+		{hello, Untyped(BoolConst), false},
 	}
 	for _, test := range tests {
 		if ok := IsRepresentable(test.x, test.t); ok != test.ok {
