@@ -67,6 +67,56 @@ func init() {
 	t1Diff.Identifier.decl = &TypeSpec{Identifier: *id("T1"), Type: intType}
 }
 
+func TestCheckTypes(t *testing.T) {
+	// The source must contain an identifier α.
+	// The test calls Check and compares the type of α to the given Type.
+	tests := []struct {
+		src string
+		t   Type
+	}{
+		{`package a; const α = 1`, Untyped(IntegerConst)},
+		{`package a; const α = 1.0`, Untyped(FloatConst)},
+		{`package a; const α = 1.0i`, Untyped(ComplexConst)},
+		{`package a; const α = 'a'`, Untyped(RuneConst)},
+		{`package a; const α = "Hello, World!"`, Untyped(StringConst)},
+		{`package a; const α = true`, Untyped(BoolConst)},
+		{`package a; const α = false`, Untyped(BoolConst)},
+		{`package a; const α = iota`, Untyped(IntegerConst)},
+		{`package a; const ( a = iota; α )`, Untyped(IntegerConst)},
+		{`package a; const α int = 1`, intType},
+		{`package a; const α float64 = 'a'`, float64Type},
+		{`package a; const a, b, c, α int = 1, 2, 3, 4`, intType},
+		{`package a; const ( a int = iota; α )`, intType},
+	}
+	for _, test := range tests {
+		l := token.NewLexer("", test.src)
+		p := NewParser(l)
+		f := parseFile(p)
+		if err := Check([]*File{f}); err != nil {
+			t.Errorf("Check(%v), unexpected error: %v", test.src, err)
+			continue
+		}
+		d := f.syms.Find("α")
+		if d == nil {
+			t.Errorf("Check(%v): failed to find symbol α", test.src)
+			continue
+		}
+		var typ Type
+		switch d := d.(type) {
+		case *constSpecView:
+			typ = d.Type
+		case *varSpecView:
+			typ = d.Type
+		default:
+			panic("declaration type not supported")
+		}
+		if !eq.Deep(typ, test.t) {
+			t.Errorf("Check(%v)=%v: α's type is %v, want %v", test.src,
+				pretty.String(f), pretty.String(typ), pretty.String(test.t))
+		}
+	}
+}
+
 func TestCheckErrors(t *testing.T) {
 	tests := []struct {
 		src  []string
