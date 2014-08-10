@@ -844,7 +844,9 @@ func (n *Identifier) Exported() bool {
 // integer literal.
 type IntegerLiteral struct {
 	Value *big.Int
-	typ   Type
+	// Rune is true if the integer literal is a rune literal.
+	Rune bool
+	typ  Type
 	span
 }
 
@@ -896,13 +898,6 @@ func (n *ComplexLiteral) Eq(v interface{}) bool {
 func (n *ComplexLiteral) PrettyPrint() string {
 	return "ComplexLiteral{ Real: " + n.Real.String() +
 		", Imaginary: " + n.Imaginary.String() + " }"
-}
-
-// RuneLiteral is an expression node representing a rune literal.
-type RuneLiteral struct {
-	Value rune
-	typ   Type
-	span
 }
 
 // StringLiteral is an expression node representing an interpreted or

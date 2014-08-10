@@ -1896,7 +1896,7 @@ func parseRuneLiteral(p *Parser) Expression {
 			End:   p.end(),
 		})
 	}
-	l := &RuneLiteral{Value: r, span: p.span()}
+	l := &IntegerLiteral{Value: big.NewInt(int64(r)), Rune: true, span: p.span()}
 	p.next()
 	return l
 }

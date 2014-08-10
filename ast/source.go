@@ -1,6 +1,7 @@
 package ast
 
 import (
+	"math"
 	"math/big"
 	"strconv"
 	"strings"
@@ -180,7 +181,12 @@ func (e *UnaryOp) Source() string {
 
 func (e *Identifier) Source() string { return e.Name }
 
-func (e *IntegerLiteral) Source() string { return e.Value.String() }
+func (e *IntegerLiteral) Source() string {
+	if i := e.Value.Int64(); e.Rune && i <= math.MaxInt32 && i >= math.MinInt32 {
+		return strconv.QuoteRune(rune(i))
+	}
+	return e.Value.String()
+}
 
 func (e *FloatLiteral) Source() string { return floatString(e.Value) }
 
@@ -207,8 +213,6 @@ func floatString(r *big.Rat) string {
 	}
 	return s
 }
-
-func (e *RuneLiteral) Source() string { return strconv.QuoteRune(e.Value) }
 
 func (e *StringLiteral) Source() string { return strconv.Quote(e.Value) }
 

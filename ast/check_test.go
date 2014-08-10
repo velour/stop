@@ -2,6 +2,7 @@ package ast
 
 import (
 	"math"
+	"math/big"
 	"reflect"
 	"regexp"
 	"sort"
@@ -66,12 +67,64 @@ func init() {
 	t1Diff.Identifier.decl = &TypeSpec{Identifier: *id("T1"), Type: intType}
 }
 
+func TestCheckTypes(t *testing.T) {
+	// The source must contain an identifier α.
+	// The test calls Check and compares the type of α to the given Type.
+	tests := []struct {
+		src string
+		t   Type
+	}{
+		{`package a; const α = 1`, Untyped(IntegerConst)},
+		{`package a; const α = 1.0`, Untyped(FloatConst)},
+		{`package a; const α = 1.0i`, Untyped(ComplexConst)},
+		{`package a; const α = 'a'`, Untyped(RuneConst)},
+		{`package a; const α = "Hello, World!"`, Untyped(StringConst)},
+		{`package a; const α = true`, Untyped(BoolConst)},
+		{`package a; const α = false`, Untyped(BoolConst)},
+		{`package a; const α = iota`, Untyped(IntegerConst)},
+		{`package a; const ( a = iota; α )`, Untyped(IntegerConst)},
+		{`package a; const α int = 1`, intType},
+		{`package a; const α float64 = 'a'`, float64Type},
+		{`package a; const a, b, c, α int = 1, 2, 3, 4`, intType},
+		{`package a; const ( a int = iota; α )`, intType},
+	}
+	for _, test := range tests {
+		l := token.NewLexer("", test.src)
+		p := NewParser(l)
+		f := parseFile(p)
+		if err := Check([]*File{f}); err != nil {
+			t.Errorf("Check(%v), unexpected error: %v", test.src, err)
+			continue
+		}
+		d := f.syms.Find("α")
+		if d == nil {
+			t.Errorf("Check(%v): failed to find symbol α", test.src)
+			continue
+		}
+		var typ Type
+		switch d := d.(type) {
+		case *constSpecView:
+			typ = d.Type
+		case *varSpecView:
+			typ = d.Type
+		default:
+			panic("declaration type not supported")
+		}
+		if !eq.Deep(typ, test.t) {
+			t.Errorf("Check(%v)=%v: α's type is %v, want %v", test.src,
+				pretty.String(f), pretty.String(typ), pretty.String(test.t))
+		}
+	}
+}
+
 func TestCheckErrors(t *testing.T) {
 	tests := []struct {
 		src  []string
 		errs []reflect.Type
 	}{
 		{[]string{`package a`, `package a`}, []reflect.Type{}},
+
+		// Consts
 		{
 			[]string{
 				`package a
@@ -104,8 +157,19 @@ func TestCheckErrors(t *testing.T) {
 			},
 			[]reflect.Type{},
 		},
+		{[]string{`package a; const i int = 5`}, []reflect.Type{}},
+		{[]string{`package a; const f float64 = 5`}, []reflect.Type{}},
+		{[]string{`package a; const c complex128 = 5`}, []reflect.Type{}},
+		{[]string{`package a; const s string = ""`}, []reflect.Type{}},
+		{[]string{`package a; const r rune = 'β'`}, []reflect.Type{}},
+		{[]string{`package a; const r int = 'β'`}, []reflect.Type{}},
+		{[]string{`package a; const b bool = true`}, []reflect.Type{}},
+		{[]string{`package a; const b bool = false`}, []reflect.Type{}},
+		{[]string{`package a; const a bool = false; const b bool = a`}, []reflect.Type{}},
+		{[]string{`package a; const a int = 0; const b int = a`}, []reflect.Type{}},
+		{[]string{`package a; const a int32 = 0; const b rune = a`}, []reflect.Type{}},
 		{
-			[]string{`package a; const a = notDeclared`},
+			[]string{`package a; const a = undeclared`},
 			[]reflect.Type{reflect.TypeOf(Undeclared{})},
 		},
 		{
@@ -127,6 +191,78 @@ func TestCheckErrors(t *testing.T) {
 				`package a; const c = a`,
 			},
 			[]reflect.Type{reflect.TypeOf(ConstantLoop{})},
+		},
+		{
+			[]string{`package a; const i int = ""`},
+			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+		},
+		{
+			[]string{`package a; const f float64 = "foo"`},
+			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+		},
+		{
+			[]string{`package a; const c complex128 = true`},
+			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+		},
+		{
+			[]string{`package a; const s string = 'a'`},
+			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+		},
+		{
+			[]string{`package a; const r rune = ""`},
+			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+		},
+		{
+			[]string{`package a; const b bool = "hi"`},
+			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+		},
+		{
+			[]string{`package a; const b bool = 0`},
+			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+		},
+		{
+			[]string{`package a; const i uint8 = 256`},
+			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+		},
+		{
+			[]string{`package a; const a uint8 = 0; const b int8 = a`},
+			[]reflect.Type{reflect.TypeOf(BadAssign{})},
+		},
+		{
+			[]string{`package a; const c undeclared = 256`},
+			[]reflect.Type{reflect.TypeOf(Undeclared{})},
+		},
+		{
+			// Report multiple errors.
+			[]string{
+				`package a
+				const c undeclared = 256
+				const d uint8 = 256`,
+			},
+			[]reflect.Type{
+				reflect.TypeOf(Undeclared{}),
+				reflect.TypeOf(BadConstAssign{}),
+			},
+		},
+		{
+			// Don't repeat errors.
+			[]string{
+				`package a
+				const c = undeclared
+				const d = c
+				const e = c
+				const f = c`,
+			},
+			[]reflect.Type{
+				reflect.TypeOf(Undeclared{}),
+			},
+		},
+
+		// Types
+		{[]string{`package a; type t int`}, []reflect.Type{}},
+		{
+			[]string{`package a; type t undeclared`},
+			[]reflect.Type{reflect.TypeOf(Undeclared{})},
 		},
 	}
 	for _, test := range tests {
@@ -312,10 +448,12 @@ func TestIsRepresentable(t *testing.T) {
 		{imgLit("5i"), complex128Type, true},
 		{floatLit("5"), complex128Type, true},
 		{intLit("5"), complex128Type, true},
+		{runeLit('a'), complex128Type, true},
 		{hello, complex128Type, false},
 
 		{floatLit("5"), float32Type, true},
 		{intLit("5"), float32Type, true},
+		{runeLit('a'), float32Type, true},
 		{hello, float32Type, false},
 		{floatLit("5"), float64Type, true},
 		{intLit("5"), float64Type, true},
@@ -366,8 +504,49 @@ func TestIsRepresentable(t *testing.T) {
 		{intLit(strconv.FormatUint(math.MaxUint64, 10)), uint64Type, true},
 		{intLit("18446744073709551616"), uint64Type, false},
 		{&BoolLiteral{}, intType, false},
+		{floatLit("5.0"), intType, true},
+		{
+			&ComplexLiteral{
+				Real:      big.NewRat(5, 1),
+				Imaginary: big.NewRat(0, 1),
+			},
+			intType,
+			true,
+		},
 
 		{&BoolLiteral{}, &SliceType{Element: intType}, false},
+
+		// Untyped types.
+		{intLit("5"), Untyped(IntegerConst), true},
+		{runeLit('α'), Untyped(IntegerConst), true},
+		{floatLit("5.0"), Untyped(IntegerConst), true},
+		{floatLit("5.1"), Untyped(IntegerConst), false},
+		{
+			&ComplexLiteral{
+				Real:      big.NewRat(5, 1),
+				Imaginary: big.NewRat(0, 1),
+			},
+			Untyped(IntegerConst),
+			true,
+		},
+
+		{intLit("0"), Untyped(FloatConst), true},
+		{runeLit('a'), Untyped(FloatConst), true},
+		{floatLit("5.1"), Untyped(FloatConst), true},
+		{imgLit("5.1"), Untyped(FloatConst), false},
+
+		{intLit("0"), Untyped(ComplexConst), true},
+		{runeLit('a'), Untyped(ComplexConst), true},
+		{floatLit("5.1"), Untyped(ComplexConst), true},
+		{imgLit("5.1"), Untyped(ComplexConst), true},
+		{hello, Untyped(ComplexConst), false},
+
+		{hello, Untyped(StringConst), true},
+		{intLit("5"), Untyped(StringConst), false},
+
+		{&BoolLiteral{}, Untyped(BoolConst), true},
+		{&BoolLiteral{Value: true}, Untyped(BoolConst), true},
+		{hello, Untyped(BoolConst), false},
 	}
 	for _, test := range tests {
 		if ok := IsRepresentable(test.x, test.t); ok != test.ok {

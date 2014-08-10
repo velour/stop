@@ -29,8 +29,8 @@ var (
 	bigInt                 = qtyp("big", "Int")
 )
 
-func runeLit(r rune) *RuneLiteral {
-	return &RuneLiteral{Value: r, typ: Untyped(RuneConst)}
+func runeLit(r rune) *IntegerLiteral {
+	return &IntegerLiteral{Value: big.NewInt(int64(r)), Rune: true, typ: Untyped(RuneConst)}
 }
 
 func strLit(s string) *StringLiteral {
