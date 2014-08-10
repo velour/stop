@@ -74,11 +74,14 @@ func TestCheckTypes(t *testing.T) {
 		src string
 		t   Type
 	}{
+		// Literals
 		{`package a; const α = 1`, Untyped(IntegerConst)},
 		{`package a; const α = 1.0`, Untyped(FloatConst)},
 		{`package a; const α = 1.0i`, Untyped(ComplexConst)},
 		{`package a; const α = 'a'`, Untyped(RuneConst)},
 		{`package a; const α = "Hello, World!"`, Untyped(StringConst)},
+
+		// Identifiers
 		{`package a; const α = true`, Untyped(BoolConst)},
 		{`package a; const α = false`, Untyped(BoolConst)},
 		{`package a; const α = iota`, Untyped(IntegerConst)},
@@ -87,6 +90,19 @@ func TestCheckTypes(t *testing.T) {
 		{`package a; const α float64 = 'a'`, float64Type},
 		{`package a; const a, b, c, α int = 1, 2, 3, 4`, intType},
 		{`package a; const ( a int = iota; α )`, intType},
+
+		// UnaryOps
+		{`package a; const α = -1`, Untyped(IntegerConst)},
+		{`package a; const α = -1.0`, Untyped(FloatConst)},
+		{`package a; const α = -1.0i`, Untyped(ComplexConst)},
+		{`package a; const α = -'a'`, Untyped(RuneConst)},
+		{`package a; const α = !true`, Untyped(BoolConst)},
+		{`package a; const α = -iota`, Untyped(IntegerConst)},
+		{`package a; const α = ^1`, Untyped(IntegerConst)},
+		{`package a; const α = +1.189`, Untyped(FloatConst)},
+		{`package a; const α int = -1`, intType},
+		{`package a; const α int = +1.0`, intType},
+		{`package a; const α int = ^1`, intType},
 	}
 	for _, test := range tests {
 		l := token.NewLexer("", test.src)
@@ -264,6 +280,82 @@ func TestCheckErrors(t *testing.T) {
 			[]string{`package a; type t undeclared`},
 			[]reflect.Type{reflect.TypeOf(Undeclared{})},
 		},
+
+		// UnaryOps
+		{[]string{`package a; const a float64 = +256`}, []reflect.Type{}},
+		{[]string{`package a; const a float64 = -256`}, []reflect.Type{}},
+		{[]string{`package a; const a float64 = ^256`}, []reflect.Type{}},
+		{[]string{`package a; const a float64 = 1; const b = -a`}, []reflect.Type{}},
+		{[]string{`package a; const a complex128 = 1; const b = -a`}, []reflect.Type{}},
+		{[]string{`package a; const t bool = true; const f = !t`}, []reflect.Type{}},
+		{
+			[]string{`package a; const a uint = -undeclared`},
+			[]reflect.Type{reflect.TypeOf(Undeclared{})},
+		},
+		{
+			[]string{`package a; const a uint = +"hello"`},
+			[]reflect.Type{reflect.TypeOf(InvalidOperation{})},
+		},
+		{
+			[]string{`package a; const a uint = -"hello"`},
+			[]reflect.Type{reflect.TypeOf(InvalidOperation{})},
+		},
+		{
+			[]string{`package a; const a uint = !0`},
+			[]reflect.Type{reflect.TypeOf(InvalidOperation{})},
+		},
+		{
+			[]string{`package a; const a uint = ^1.0`},
+			[]reflect.Type{reflect.TypeOf(InvalidOperation{})},
+		},
+		{
+			[]string{`package a; const a uint = ^1.1`},
+			[]reflect.Type{reflect.TypeOf(InvalidOperation{})},
+		},
+		{
+			[]string{`package a; const a uint = -1`},
+			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+		},
+		{
+			[]string{`package a; const a, b uint = 1, -a`},
+			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+		},
+		{
+			[]string{`package a; const a uint = -1.0i`},
+			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+		},
+		{
+			[]string{`package a; const a uint8 = +256`},
+			[]reflect.Type{reflect.TypeOf(BadConstAssign{})},
+		},
+		{
+			[]string{
+				`package a
+				const a string = "hello"
+				const b int = -a`,
+			},
+			[]reflect.Type{reflect.TypeOf(InvalidOperation{})},
+		},
+		{
+			[]string{
+				`package a
+				const a float64 = 1.1
+				const b complex128 = 1.1i
+				const c, d int = ^a, ^b`,
+			},
+			[]reflect.Type{
+				reflect.TypeOf(InvalidOperation{}),
+				reflect.TypeOf(InvalidOperation{}),
+			},
+		},
+		{
+			[]string{`package a; const i int = 1; const f = !i`},
+			[]reflect.Type{reflect.TypeOf(InvalidOperation{})},
+		},
+		{
+			[]string{`package a; const c = nil`},
+			[]reflect.Type{reflect.TypeOf(NotConstant{})},
+		},
 	}
 	for _, test := range tests {
 		want := make(map[reflect.Type]int)
@@ -296,6 +388,9 @@ func TestCheckErrors(t *testing.T) {
 }
 
 func TestConstFolding(t *testing.T) {
+	runeNeg97 := intLit("-97")
+	runeNeg97.Rune = true
+
 	// The source must contain a const α. The test calls Check on the source and
 	// compares the resulting value of α to the given Expression.
 	tests := []struct {
@@ -313,6 +408,23 @@ func TestConstFolding(t *testing.T) {
 		{`package a; const α = iota`, intLit("0")},
 		{`package a; const ( zero = iota; α )`, intLit("1")},
 		{`package a; const ( zero = iota; one; α )`, intLit("2")},
+		{`package a; const α = +1`, intLit("1")},
+		{`package a; const α = -1`, intLit("-1")},
+		{`package a; const α = - -1`, intLit("1")},
+		{`package a; const α = +'a'`, runeLit('a')},
+		{`package a; const α = -'a'`, runeNeg97},
+		{`package a; const α = +1.0`, floatLit("1.0")},
+		{`package a; const α = - - -1.0`, floatLit("-1.0")},
+		{`package a; const α = +1.0i`, imgLit("1.0")},
+		{`package a; const α = - - -1.0i`, imgLit("-1.0")},
+		{`package a; const α = ^0`, intLit("-1")},
+		{`package a; const α = ^1`, intLit("-2")},
+		{`package a; const α float64 = ^256`, intLit("-257")},
+		{`package a; const α = !true`, &BoolLiteral{Value: false}},
+		{`package a; const α = !!true`, &BoolLiteral{Value: true}},
+		{`package a; const α = !false`, &BoolLiteral{Value: true}},
+		{`package a; const α = !!false`, &BoolLiteral{Value: false}},
+		{`package a; const f, α = false, !f`, &BoolLiteral{Value: true}},
 	}
 	for _, test := range tests {
 		l := token.NewLexer("", test.src)

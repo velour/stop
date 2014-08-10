@@ -162,3 +162,15 @@ type AssignCountMismatch struct {
 func (e AssignCountMismatch) Error() string {
 	return fmt.Sprintf("%s: assignment count mismatch", e.Start())
 }
+
+// An InvalidOperation is an error returned when an operation is not
+// applicable to one of its operands.
+type InvalidOperation struct {
+	Expression
+	Op      token.Token
+	Operand Expression
+}
+
+func (e InvalidOperation) Error() string {
+	return fmt.Sprintf("%s: invalid operation: %s %s", e.Start(), e.Op, e.Operand.Source())
+}

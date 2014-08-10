@@ -814,8 +814,9 @@ func (b *BinaryOp) End() token.Location   { return b.Right.End() }
 // UnaryOp is an expression node representing a unary operator.
 type UnaryOp struct {
 	Op      token.Token
-	opLoc   token.Location
 	Operand Expression
+	typ     Type
+	opLoc   token.Location
 }
 
 func (u *UnaryOp) Start() token.Location { return u.opLoc }
