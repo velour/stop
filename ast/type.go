@@ -32,6 +32,46 @@ func (Untyped) Identical(t Type) bool { return false }
 func (n Untyped) Underlying() Type    { return n }
 func (n Untyped) Type() Type          { return n }
 
+// IsInteger returns whether the type is an integer type.
+func IsInteger(t Type) bool {
+	switch u := t.Underlying().(type) {
+	case Untyped:
+		return u == Untyped(IntegerConst) || u == Untyped(RuneConst)
+	case *TypeName:
+		switch u.decl {
+		case Int, Int8, Int16, Int32, Int64, Uint, Uint8, Uint16, Uint32, Uint64, Uintptr:
+			return true
+		}
+	}
+	return false
+}
+
+// IsComplex returns whether the type is a float or complex type.
+func IsComplex(t Type) bool {
+	switch u := t.Underlying().(type) {
+	case Untyped:
+		return u == Untyped(FloatConst) || u == Untyped(ComplexConst)
+	case *TypeName:
+		switch u.decl {
+		case Float32, Float64, Complex64, Complex128:
+			return true
+		}
+	}
+	return false
+}
+
+// IsBool returns whether the type is a boolean type.
+func IsBool(t Type) bool {
+	switch u := t.Underlying().(type) {
+	case Untyped:
+		return u == Untyped(BoolConst)
+	case *TypeName:
+		return u.decl == Bool
+	}
+	return false
+
+}
+
 // IsAssignable returns whether an expression is assignable to a variable of a given type.
 //	A value x is assignable to a variable of type T ("x is assignable to T") in any of these cases:
 //	x's type is identical to T.

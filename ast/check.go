@@ -3,6 +3,8 @@ package ast
 import (
 	"fmt"
 	"math/big"
+
+	"github.com/velour/stop/token"
 )
 
 // Check performs type checking and semantic analysis on the AST,
@@ -123,8 +125,93 @@ func (n *BinaryOp) Check(*symtab, int) (Expression, error) {
 	panic("unimplemented")
 }
 
-func (n *UnaryOp) Check(*symtab, int) (Expression, error) {
-	panic("unimplemented")
+func (n *UnaryOp) Check(syms *symtab, iota int) (Expression, error) {
+	var err error
+	n.Operand, err = n.Operand.Check(syms, iota)
+	if err != nil {
+		return nil, err
+	}
+	n.typ = n.Operand.Type()
+
+	switch n.Op {
+	case token.Plus:
+		if !IsInteger(n.typ) && !IsComplex(n.typ) {
+			return nil, InvalidOperation{n, n.Op, n.Operand}
+		}
+		switch l := n.Operand.(type) {
+		case *IntegerLiteral, *FloatLiteral, *ComplexLiteral:
+			return l, nil
+		}
+
+	case token.Minus:
+		if !IsInteger(n.typ) && !IsComplex(n.typ) {
+			return nil, InvalidOperation{n, n.Op, n.Operand}
+		}
+		switch l := n.Operand.(type) {
+		case *IntegerLiteral:
+			l.Value.Neg(l.Value)
+			return valueOKOrError(l)
+
+		case *FloatLiteral:
+			l.Value.Neg(l.Value)
+			return valueOKOrError(l)
+
+		case *ComplexLiteral:
+			l.Real.Neg(l.Real)
+			l.Imaginary.Neg(l.Imaginary)
+			return valueOKOrError(l)
+		}
+
+	case token.Bang:
+		if !IsBool(n.typ) {
+			return nil, InvalidOperation{n, n.Op, n.Operand}
+		}
+		if l, ok := n.Operand.(*BoolLiteral); ok {
+			l.Value = !l.Value
+			return l, nil
+		}
+
+	case token.Carrot:
+		if !IsInteger(n.typ) {
+			return nil, InvalidOperation{n, n.Op, n.Operand}
+		}
+		if l, ok := n.Operand.(*IntegerLiteral); ok {
+			l.Value.Not(l.Value)
+			return valueOKOrError(l)
+		}
+
+	case token.And:
+		n.typ = &Star{Target: n.typ}
+		// BUG(eaburns): Verify that n.Operand is addressable.
+		panic("unimplemented")
+
+	case token.LessMinus:
+		ch, ok := n.typ.(*ChannelType)
+		if !ok || !ch.Receive {
+			return nil, InvalidOperation{n, n.Op, n.Operand}
+		}
+		n.typ = ch.Element
+
+	case token.Star:
+		// Instead, this would be a Star node.
+		panic("UnaryOp node cannot be Star")
+	default:
+		panic("bad unary op: " + n.Op.String())
+	}
+
+	if iota >= 0 {
+		return nil, NotConstant{n.Operand}
+	}
+	return n, nil
+}
+
+// ValueOKOrError returns the literal expression if its value is representable
+// by its type, otherwise it returns an error.
+func valueOKOrError(l Expression) (Expression, error) {
+	if !IsRepresentable(l, l.Type()) {
+		return nil, Unrepresentable{l, l.Type()}
+	}
+	return l, nil
 }
 
 func (n *ConstSpec) Check() error {
@@ -207,7 +294,7 @@ func (n *constSpecView) Check() (v Expression, err error) {
 
 	switch _, vIsUntyped := v.Type().(Untyped); {
 	case n.Type != nil && vIsUntyped && !IsRepresentable(v, n.Type):
-		return nil, append(errs, BadConstAssign{v, n.Type})
+		return nil, append(errs, Unrepresentable{v, n.Type})
 	case n.Type != nil && !IsAssignable(v, n.Type):
 		return nil, append(errs, BadAssign{v, n.Type})
 	case n.Type == nil:
