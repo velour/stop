@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/eaburns/pp"
 	"github.com/eaburns/pretty"
 	"github.com/velour/stop/ast"
 	"github.com/velour/stop/token"
@@ -43,7 +44,7 @@ func main() {
 		dot(root)
 	} else {
 		out := bufio.NewWriter(os.Stdout)
-		if err = pretty.Print(out, root); err != nil {
+		if err = pretty.Fprint(out, root); err != nil {
 			die(err)
 		}
 		out.Flush()
@@ -65,7 +66,7 @@ func dot(root ast.Node) {
 		die(err)
 	}
 	go func() {
-		if err := pretty.Dot(out, root); err != nil {
+		if err := pp.Dot(out, root); err != nil {
 			die(err)
 		}
 		out.Close()
