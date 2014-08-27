@@ -138,7 +138,7 @@ type Unrepresentable struct {
 }
 
 func (e Unrepresentable) Error() string {
-	return fmt.Sprintf("%s: const is not representable by its type")
+	return fmt.Sprintf("%s: const is not representable by its type", e.Expression.Loc())
 }
 
 // A BadAssign is an error returned when an expression is not assignable
