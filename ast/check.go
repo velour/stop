@@ -111,18 +111,25 @@ func (n *MapType) Check(syms *symtab, iota int) (Expression, error) {
 }
 
 func (n *MapType) check(syms *symtab, iota int, path map[string]bool) (Type, error) {
+	var errs errors
+
 	var err error
 	n.Key, err = n.Key.check(syms, iota, map[string]bool{})
 	if err != nil {
-		return nil, err
+		errs = append(errs, err)
+	} else {
+		switch n.Key.Underlying().(type) {
+		case *FunctionType, *MapType, *SliceType:
+			errs = append(errs, BadMapKey{n.Key})
+		}
 	}
-	switch n.Key.Underlying().(type) {
-	case *FunctionType, *MapType, *SliceType:
-		return nil, BadMapKey{n.Key}
-	}
+
 	n.Value, err = n.Value.check(syms, iota, map[string]bool{})
 	if err != nil {
-		return nil, err
+		errs = append(errs, err)
+	}
+	if len(errs) > 0 {
+		return nil, errs
 	}
 	return n, nil
 }
@@ -139,17 +146,20 @@ var intType = &TypeName{
 }
 
 func (n *ArrayType) check(syms *symtab, iota int, path map[string]bool) (Type, error) {
+	var errs errors
 	var err error
 	n.Size, err = n.Size.Check(syms, iota)
 	if err != nil {
-		return nil, err
-	}
-	if !IsRepresentable(n.Size, intType) || Negative(n.Size) {
-		return nil, BadArraySize{n}
+		errs = append(errs, err)
+	} else if !IsRepresentable(n.Size, intType) || Negative(n.Size) {
+		errs = append(errs, BadArraySize{n})
 	}
 	n.Element, err = n.Element.check(syms, iota, path)
 	if err != nil {
-		return nil, err
+		errs = append(errs, err)
+	}
+	if len(errs) > 0 {
+		return nil, errs
 	}
 	return n, nil
 }
@@ -203,21 +213,23 @@ func (n *TypeName) check(syms *symtab, _ int, path map[string]bool) (Type, error
 	if path[n.Name] {
 		return nil, BadRecursiveType{n}
 	}
+	var errs errors
 	n.decl = syms.Find(n.Name)
 	if n.decl == nil {
-		return nil, Undeclared{&n.Identifier}
-	}
-	if ts, ok := n.decl.(*TypeSpec); ok {
+		errs = append(errs, Undeclared{&n.Identifier})
+	} else if ts, ok := n.decl.(*TypeSpec); ok {
 		if err := ts.check(path); err != nil {
-			return nil, err
+			errs = append(errs, err)
 		}
 	}
-	if n.Package == nil {
-		return n, nil
+	if n.Package != nil {
+		n.Package.decl = syms.Find(n.Name)
+		if n.Package.decl == nil {
+			errs = append(errs, Undeclared{n.Package})
+		}
 	}
-	n.Package.decl = syms.Find(n.Name)
-	if n.Package.decl == nil {
-		return nil, Undeclared{n.Package}
+	if len(errs) > 0 {
+		return n, errs
 	}
 	return n, nil
 }

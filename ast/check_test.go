@@ -274,13 +274,6 @@ func TestCheckErrors(t *testing.T) {
 			},
 		},
 
-		// Types
-		{[]string{`package a; type t int`}, []reflect.Type{}},
-		{
-			[]string{`package a; type t undeclared`},
-			[]reflect.Type{reflect.TypeOf(Undeclared{})},
-		},
-
 		// UnaryOps
 		{[]string{`package a; const a float64 = +256`}, []reflect.Type{}},
 		{[]string{`package a; const a float64 = -256`}, []reflect.Type{}},
@@ -356,6 +349,21 @@ func TestCheckErrors(t *testing.T) {
 			[]string{`package a; const c = nil`},
 			[]reflect.Type{reflect.TypeOf(NotConstant{})},
 		},
+
+		// Types
+		{[]string{`package a; type T int`}, []reflect.Type{}},
+		{
+			[]string{`package a; type T undeclared`},
+			[]reflect.Type{reflect.TypeOf(Undeclared{})},
+		},
+		{[]string{`package a; type T int`}, []reflect.Type{}},
+		{
+			[]string{`package a; type T undeclared0.undeclared1`},
+			[]reflect.Type{
+				reflect.TypeOf(Undeclared{}),
+				reflect.TypeOf(Undeclared{}),
+			},
+		},
 		{
 			[]string{`package a; type T [5]int`},
 			[]reflect.Type{},
@@ -388,6 +396,21 @@ func TestCheckErrors(t *testing.T) {
 		{
 			[]string{`package a; const c = 5; type T [c]int`},
 			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; const c = 5; type T [-1]undeclared`},
+			[]reflect.Type{
+				reflect.TypeOf(BadArraySize{}),
+				reflect.TypeOf(Undeclared{}),
+			},
+		},
+		{
+			// Don't report both BadArraySize and Undeclared.
+			[]string{`package a; const c = 5; type T [undeclared]undeclared`},
+			[]reflect.Type{
+				reflect.TypeOf(Undeclared{}),
+				reflect.TypeOf(Undeclared{}),
+			},
 		},
 		{
 			[]string{`package a; type T [undeclared]int`},
@@ -424,6 +447,21 @@ func TestCheckErrors(t *testing.T) {
 		{
 			[]string{`package a; type T map[string]map[string]int`},
 			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T map[map[string]int]undeclared`},
+			[]reflect.Type{
+				reflect.TypeOf(BadMapKey{}),
+				reflect.TypeOf(Undeclared{}),
+			},
+		},
+		{
+			// Don't report both BadMapKey and Undeclared.
+			[]string{`package a; type T map[map[undeclared]int]undeclared`},
+			[]reflect.Type{
+				reflect.TypeOf(Undeclared{}),
+				reflect.TypeOf(Undeclared{}),
+			},
 		},
 		{
 			[]string{`package a; type T map[undefined]int`},
