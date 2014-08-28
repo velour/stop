@@ -102,6 +102,7 @@ func TestCheckTypes(t *testing.T) {
 		{`package a; const α int = -1`, intType},
 		{`package a; const α int = +1.0`, intType},
 		{`package a; const α int = ^1`, intType},
+		{`package a; const α int = ^1`, intType},
 	}
 	for _, test := range tests {
 		l := token.NewLexer("", test.src)
@@ -380,6 +381,77 @@ func TestCheckErrors(t *testing.T) {
 			[]string{`package a; type T [1.1]int`},
 			[]reflect.Type{reflect.TypeOf(BadArraySize{})},
 		},
+		{
+			[]string{`package a; type T [^1]int`},
+			[]reflect.Type{reflect.TypeOf(BadArraySize{})},
+		},
+		{
+			[]string{`package a; const c = 5; type T [c]int`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T [undeclared]int`},
+			[]reflect.Type{reflect.TypeOf(Undeclared{})},
+		},
+		{
+			[]string{`package a; type T []int`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T []undeclared`},
+			[]reflect.Type{reflect.TypeOf(Undeclared{})},
+		},
+		{
+			[]string{`package a; type T [][3][]int`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T *int`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T ***[5]int`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T *undeclared`},
+			[]reflect.Type{reflect.TypeOf(Undeclared{})},
+		},
+		{
+			[]string{`package a; type T map[string]int`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T map[string]map[string]int`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T map[undefined]int`},
+			[]reflect.Type{reflect.TypeOf(Undeclared{})},
+		},
+		{
+			[]string{`package a; type T map[string]undefined`},
+			[]reflect.Type{reflect.TypeOf(Undeclared{})},
+		},
+		{
+			[]string{`package a; type T map[map[string]int]int`},
+			[]reflect.Type{reflect.TypeOf(BadMapKey{})},
+		},
+		{
+			[]string{`
+				package a
+				type (
+					T chan int
+					U chan <- int
+					V <-chan int
+				)`,
+			},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T chan undeclared`},
+			[]reflect.Type{reflect.TypeOf(Undeclared{})},
+		},
 
 		// Recursive Types
 		{
@@ -416,6 +488,26 @@ func TestCheckErrors(t *testing.T) {
 		},
 		{
 			[]string{`package a; type T U; type U V; type V []T`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T *T`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T U; type U V; type V *T`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T map[T]int`},
+			[]reflect.Type{reflect.TypeOf(BadMapKey{})},
+		},
+		{
+			[]string{`package a; type T map[string]T`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T chan T`},
 			[]reflect.Type{},
 		},
 	}

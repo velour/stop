@@ -653,7 +653,8 @@ func (n *SliceType) End() token.Location   { return n.Element.End() }
 func (n *SliceType) Loc() token.Location   { return n.Start() }
 
 // A Star is either a dereference expression or a type node that representing
-// a pointer to a type.
+// a pointer to a type. After the Check pass, all Star nodes are Pointer types.
+// Unary deref ops are changed to UnaryOp nodes with Op==token.Star.
 type Star struct {
 	// Target is either the expression being dereferenced, in the case of a
 	// dereference expression, or the type being pointed to, in the case of

@@ -194,3 +194,13 @@ type BadArraySize struct {
 func (e BadArraySize) Error() string {
 	return fmt.Sprintf("%s: bad array size", e.Loc())
 }
+
+// A BadMapKey is an error returned when a map type's key value is a map,
+// function, or slice. All types that do not support ==.
+type BadMapKey struct {
+	Type
+}
+
+func (e BadMapKey) Error() string {
+	return fmt.Sprintf("%s: map key type does not support ==", e.Type.Loc())
+}

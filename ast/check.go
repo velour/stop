@@ -93,20 +93,38 @@ func (n *Signature) check(syms *symtab, iota int, path map[string]bool) (Type, e
 	panic("unimplemented")
 }
 
-func (n *ChannelType) Check(*symtab, int) (Expression, error) {
-	panic("unimplemented")
+func (n *ChannelType) Check(syms *symtab, iota int) (Expression, error) {
+	return n.check(syms, iota, map[string]bool{})
 }
 
 func (n *ChannelType) check(syms *symtab, iota int, path map[string]bool) (Type, error) {
-	panic("unimplemented")
+	var err error
+	n.Element, err = n.Element.check(syms, iota, map[string]bool{})
+	if err != nil {
+		return nil, err
+	}
+	return n, nil
 }
 
-func (n *MapType) Check(*symtab, int) (Expression, error) {
-	panic("unimplemented")
+func (n *MapType) Check(syms *symtab, iota int) (Expression, error) {
+	return n.check(syms, iota, map[string]bool{})
 }
 
 func (n *MapType) check(syms *symtab, iota int, path map[string]bool) (Type, error) {
-	panic("unimplemented")
+	var err error
+	n.Key, err = n.Key.check(syms, iota, map[string]bool{})
+	if err != nil {
+		return nil, err
+	}
+	switch n.Key.Underlying().(type) {
+	case *FunctionType, *MapType, *SliceType:
+		return nil, BadMapKey{n.Key}
+	}
+	n.Value, err = n.Value.check(syms, iota, map[string]bool{})
+	if err != nil {
+		return nil, err
+	}
+	return n, nil
 }
 
 func (n *ArrayType) Check(syms *symtab, iota int) (Expression, error) {
@@ -149,12 +167,31 @@ func (n *SliceType) check(syms *symtab, iota int, _ map[string]bool) (Type, erro
 	return n, nil
 }
 
-func (n *Star) Check(*symtab, int) (Expression, error) {
-	panic("unimplemented")
+func (n *Star) Check(syms *symtab, iota int) (Expression, error) {
+	var err error
+	n.Target, err = n.Target.Check(syms, iota)
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := n.Target.(Type); ok {
+		// It was a pointer type. Nothing else to check.
+		return n, nil
+	}
+	u := &UnaryOp{
+		Op:      token.Star,
+		Operand: n.Target,
+		opLoc:   n.starLoc,
+	}
+	return u.Check(syms, iota)
 }
 
-func (n *Star) check(syms *symtab, iota int, path map[string]bool) (Type, error) {
-	panic("unimplemented")
+func (n *Star) check(syms *symtab, iota int, _ map[string]bool) (Type, error) {
+	var err error
+	n.Target, err = n.Target.(Type).check(syms, iota, map[string]bool{})
+	if err != nil {
+		return nil, err
+	}
+	return n, nil
 }
 
 func (n *TypeName) Check(syms *symtab, iota int) (Expression, error) {
@@ -281,8 +318,12 @@ func (n *UnaryOp) Check(syms *symtab, iota int) (Expression, error) {
 		n.typ = ch.Element
 
 	case token.Star:
-		// Instead, this would be a Star node.
-		panic("UnaryOp node cannot be Star")
+		p, ok := n.Operand.Type().(*Star)
+		if !ok {
+			return nil, InvalidOperation{n, n.Op, n.Operand}
+		}
+		n.typ = p.Target.(Type)
+
 	default:
 		panic("bad unary op: " + n.Op.String())
 	}
