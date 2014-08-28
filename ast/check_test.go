@@ -15,9 +15,9 @@ import (
 )
 
 var (
-	boolType       = typ("bool")
-	runeType       = typ("rune")
-	intType        = typ("int")
+	boolType = typ("bool")
+	runeType = typ("rune")
+	// intType is declared in check.go.
 	int8Type       = typ("int8")
 	int16Type      = typ("int16")
 	int32Type      = typ("int32")
@@ -41,7 +41,6 @@ var (
 func init() {
 	boolType.Identifier.decl = univScope.Decls["bool"]
 	runeType.Identifier.decl = univScope.Decls["rune"]
-	intType.Identifier.decl = univScope.Decls["int"]
 	int8Type.Identifier.decl = univScope.Decls["int8"]
 	int16Type.Identifier.decl = univScope.Decls["int16"]
 	int32Type.Identifier.decl = univScope.Decls["int32"]
@@ -102,6 +101,7 @@ func TestCheckTypes(t *testing.T) {
 		{`package a; const α = +1.189`, Untyped(FloatConst)},
 		{`package a; const α int = -1`, intType},
 		{`package a; const α int = +1.0`, intType},
+		{`package a; const α int = ^1`, intType},
 		{`package a; const α int = ^1`, intType},
 	}
 	for _, test := range tests {
@@ -274,13 +274,6 @@ func TestCheckErrors(t *testing.T) {
 			},
 		},
 
-		// Types
-		{[]string{`package a; type t int`}, []reflect.Type{}},
-		{
-			[]string{`package a; type t undeclared`},
-			[]reflect.Type{reflect.TypeOf(Undeclared{})},
-		},
-
 		// UnaryOps
 		{[]string{`package a; const a float64 = +256`}, []reflect.Type{}},
 		{[]string{`package a; const a float64 = -256`}, []reflect.Type{}},
@@ -355,6 +348,205 @@ func TestCheckErrors(t *testing.T) {
 		{
 			[]string{`package a; const c = nil`},
 			[]reflect.Type{reflect.TypeOf(NotConstant{})},
+		},
+
+		// Types
+		{[]string{`package a; type T int`}, []reflect.Type{}},
+		{
+			[]string{`package a; type T undeclared`},
+			[]reflect.Type{reflect.TypeOf(Undeclared{})},
+		},
+		{[]string{`package a; type T int`}, []reflect.Type{}},
+		{
+			[]string{`package a; type T undeclared0.undeclared1`},
+			[]reflect.Type{
+				reflect.TypeOf(Undeclared{}),
+				reflect.TypeOf(Undeclared{}),
+			},
+		},
+		{
+			[]string{`package a; type T [5]int`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T [1.0]int`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T ["hello"]int`},
+			[]reflect.Type{reflect.TypeOf(BadArraySize{})},
+		},
+		{
+			// Too big for 64 bits, surely too big for an int.
+			[]string{`package a; type T [18446744073709551616]int`},
+			[]reflect.Type{reflect.TypeOf(BadArraySize{})},
+		},
+		{
+			[]string{`package a; type T [-1]int`},
+			[]reflect.Type{reflect.TypeOf(BadArraySize{})},
+		},
+		{
+			[]string{`package a; type T [1.1]int`},
+			[]reflect.Type{reflect.TypeOf(BadArraySize{})},
+		},
+		{
+			[]string{`package a; type T [^1]int`},
+			[]reflect.Type{reflect.TypeOf(BadArraySize{})},
+		},
+		{
+			[]string{`package a; const c = 5; type T [c]int`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; const c = 5; type T [-1]undeclared`},
+			[]reflect.Type{
+				reflect.TypeOf(BadArraySize{}),
+				reflect.TypeOf(Undeclared{}),
+			},
+		},
+		{
+			// Don't report both BadArraySize and Undeclared.
+			[]string{`package a; const c = 5; type T [undeclared]undeclared`},
+			[]reflect.Type{
+				reflect.TypeOf(Undeclared{}),
+				reflect.TypeOf(Undeclared{}),
+			},
+		},
+		{
+			[]string{`package a; type T [undeclared]int`},
+			[]reflect.Type{reflect.TypeOf(Undeclared{})},
+		},
+		{
+			[]string{`package a; type T []int`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T []undeclared`},
+			[]reflect.Type{reflect.TypeOf(Undeclared{})},
+		},
+		{
+			[]string{`package a; type T [][3][]int`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T *int`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T ***[5]int`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T *undeclared`},
+			[]reflect.Type{reflect.TypeOf(Undeclared{})},
+		},
+		{
+			[]string{`package a; type T map[string]int`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T map[string]map[string]int`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T map[map[string]int]undeclared`},
+			[]reflect.Type{
+				reflect.TypeOf(BadMapKey{}),
+				reflect.TypeOf(Undeclared{}),
+			},
+		},
+		{
+			// Don't report both BadMapKey and Undeclared.
+			[]string{`package a; type T map[map[undeclared]int]undeclared`},
+			[]reflect.Type{
+				reflect.TypeOf(Undeclared{}),
+				reflect.TypeOf(Undeclared{}),
+			},
+		},
+		{
+			[]string{`package a; type T map[undefined]int`},
+			[]reflect.Type{reflect.TypeOf(Undeclared{})},
+		},
+		{
+			[]string{`package a; type T map[string]undefined`},
+			[]reflect.Type{reflect.TypeOf(Undeclared{})},
+		},
+		{
+			[]string{`package a; type T map[map[string]int]int`},
+			[]reflect.Type{reflect.TypeOf(BadMapKey{})},
+		},
+		{
+			[]string{`
+				package a
+				type (
+					T chan int
+					U chan <- int
+					V <-chan int
+				)`,
+			},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T chan undeclared`},
+			[]reflect.Type{reflect.TypeOf(Undeclared{})},
+		},
+
+		// Recursive Types
+		{
+			[]string{`package a; type T T`},
+			[]reflect.Type{reflect.TypeOf(BadRecursiveType{})},
+		},
+		{
+			[]string{`package a; type T U; type U T`},
+			[]reflect.Type{reflect.TypeOf(BadRecursiveType{})},
+		},
+		{
+			[]string{`package a; type T U; type U V; type V T`},
+			[]reflect.Type{reflect.TypeOf(BadRecursiveType{})},
+		},
+		{
+			[]string{`package a; type T [5]T`},
+			[]reflect.Type{reflect.TypeOf(BadRecursiveType{})},
+		},
+		{
+			[]string{`package a; type T [5][6][7]T`},
+			[]reflect.Type{reflect.TypeOf(BadRecursiveType{})},
+		},
+		{
+			[]string{`package a; type T U; type U V; type V [1]T`},
+			[]reflect.Type{reflect.TypeOf(BadRecursiveType{})},
+		},
+		{
+			[]string{`package a; type T []T`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T [][5]T`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T U; type U V; type V []T`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T *T`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T U; type U V; type V *T`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T map[T]int`},
+			[]reflect.Type{reflect.TypeOf(BadMapKey{})},
+		},
+		{
+			[]string{`package a; type T map[string]T`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T chan T`},
+			[]reflect.Type{},
 		},
 	}
 	for _, test := range tests {
