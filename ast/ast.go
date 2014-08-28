@@ -480,7 +480,8 @@ type TypeSpec struct {
 
 	// Syms is the file-level symbol table defining the scope in which this
 	// type was declared, or nil if this is not a package-level type.
-	syms *symtab
+	syms  *symtab
+	state checkState
 }
 
 func (n *TypeSpec) Start() token.Location { return n.Identifier.Start() }
@@ -493,6 +494,16 @@ type Type interface {
 	Identical(Type) bool
 	// Underlying returns the underlying type.
 	Underlying() Type
+
+	// check is like Expression.Check, but for types only. In addition to
+	// normal expression checking, it also looks for invalid, recursive
+	// types. Any recurrance from one type into checking another type
+	// uses this method instead of Expression.Check. The latter is only
+	// used on the root of a type subtree.
+	//
+	// The path argument contains all type names along the path from
+	// the root of the type tree that occur without intervening references.
+	check(syms *symtab, iota int, path map[string]bool) (Type, error)
 }
 
 // A StructType is a type node representing a struct type.

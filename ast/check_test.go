@@ -15,9 +15,9 @@ import (
 )
 
 var (
-	boolType       = typ("bool")
-	runeType       = typ("rune")
-	intType        = typ("int")
+	boolType = typ("bool")
+	runeType = typ("rune")
+	// intType is declared in check.go.
 	int8Type       = typ("int8")
 	int16Type      = typ("int16")
 	int32Type      = typ("int32")
@@ -41,7 +41,6 @@ var (
 func init() {
 	boolType.Identifier.decl = univScope.Decls["bool"]
 	runeType.Identifier.decl = univScope.Decls["rune"]
-	intType.Identifier.decl = univScope.Decls["int"]
 	int8Type.Identifier.decl = univScope.Decls["int8"]
 	int16Type.Identifier.decl = univScope.Decls["int16"]
 	int32Type.Identifier.decl = univScope.Decls["int32"]
@@ -355,6 +354,69 @@ func TestCheckErrors(t *testing.T) {
 		{
 			[]string{`package a; const c = nil`},
 			[]reflect.Type{reflect.TypeOf(NotConstant{})},
+		},
+		{
+			[]string{`package a; type T [5]int`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T [1.0]int`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T ["hello"]int`},
+			[]reflect.Type{reflect.TypeOf(BadArraySize{})},
+		},
+		{
+			// Too big for 64 bits, surely too big for an int.
+			[]string{`package a; type T [18446744073709551616]int`},
+			[]reflect.Type{reflect.TypeOf(BadArraySize{})},
+		},
+		{
+			[]string{`package a; type T [-1]int`},
+			[]reflect.Type{reflect.TypeOf(BadArraySize{})},
+		},
+		{
+			[]string{`package a; type T [1.1]int`},
+			[]reflect.Type{reflect.TypeOf(BadArraySize{})},
+		},
+
+		// Recursive Types
+		{
+			[]string{`package a; type T T`},
+			[]reflect.Type{reflect.TypeOf(BadRecursiveType{})},
+		},
+		{
+			[]string{`package a; type T U; type U T`},
+			[]reflect.Type{reflect.TypeOf(BadRecursiveType{})},
+		},
+		{
+			[]string{`package a; type T U; type U V; type V T`},
+			[]reflect.Type{reflect.TypeOf(BadRecursiveType{})},
+		},
+		{
+			[]string{`package a; type T [5]T`},
+			[]reflect.Type{reflect.TypeOf(BadRecursiveType{})},
+		},
+		{
+			[]string{`package a; type T [5][6][7]T`},
+			[]reflect.Type{reflect.TypeOf(BadRecursiveType{})},
+		},
+		{
+			[]string{`package a; type T U; type U V; type V [1]T`},
+			[]reflect.Type{reflect.TypeOf(BadRecursiveType{})},
+		},
+		{
+			[]string{`package a; type T []T`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T [][5]T`},
+			[]reflect.Type{},
+		},
+		{
+			[]string{`package a; type T U; type U V; type V []T`},
+			[]reflect.Type{},
 		},
 	}
 	for _, test := range tests {

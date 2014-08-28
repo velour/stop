@@ -174,3 +174,23 @@ type InvalidOperation struct {
 func (e InvalidOperation) Error() string {
 	return fmt.Sprintf("%s: invalid operation: %s %s", e.Start(), e.Op, e.Operand.Source())
 }
+
+// A BadRecursiveType is an error returned when a type is self-referential,
+// but there is no indirection (pointer, map, channel, slice, etc.) along the cycle.
+type BadRecursiveType struct {
+	*TypeName
+}
+
+func (e BadRecursiveType) Error() string {
+	return fmt.Sprintf("%s: bad recursive type", e.Loc())
+}
+
+// A BadArraySize is an error returned when an array size is either not
+// constant, not representable by an integer, or negative.
+type BadArraySize struct {
+	*ArrayType
+}
+
+func (e BadArraySize) Error() string {
+	return fmt.Sprintf("%s: bad array size", e.Loc())
+}

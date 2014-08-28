@@ -40,12 +40,31 @@ func Check(files []*File) error {
 }
 
 // Check checks the TypeSpec, returning any errors.
-//
-// BUG(eaburns): Need to check for incorrect, recursively-defined types.
 func (n *TypeSpec) Check() error {
-	t, err := n.Type.Check(n.syms, -1)
-	if err == nil {
-		n.Type = t.(Type)
+	return n.check(map[string]bool{})
+}
+
+func (n *TypeSpec) check(path map[string]bool) error {
+	switch n.state {
+	case checking:
+		// We are currently checking this. It is not an invalid recursive type,
+		// since those are caught in TypeName.check using the path map.
+		return nil
+	case checkedError:
+		return errors{}
+	case checkedOK:
+		return nil
+	}
+
+	var err error
+	n.state = checking
+	path[n.Name] = true
+	n.Type, err = n.Type.check(n.syms, -1, path)
+	path[n.Name] = false
+	if err != nil {
+		n.state = checkedError
+	} else {
+		n.state = checkedOK
 	}
 	return err
 }
@@ -54,7 +73,15 @@ func (n *StructType) Check(*symtab, int) (Expression, error) {
 	panic("unimplemented")
 }
 
+func (n *StructType) check(syms *symtab, iota int, path map[string]bool) (Type, error) {
+	panic("unimplemented")
+}
+
 func (n *InterfaceType) Check(*symtab, int) (Expression, error) {
+	panic("unimplemented")
+}
+
+func (n *InterfaceType) check(syms *symtab, iota int, path map[string]bool) (Type, error) {
 	panic("unimplemented")
 }
 
@@ -62,7 +89,15 @@ func (n *Signature) Check(*symtab, int) (Expression, error) {
 	panic("unimplemented")
 }
 
+func (n *Signature) check(syms *symtab, iota int, path map[string]bool) (Type, error) {
+	panic("unimplemented")
+}
+
 func (n *ChannelType) Check(*symtab, int) (Expression, error) {
+	panic("unimplemented")
+}
+
+func (n *ChannelType) check(syms *symtab, iota int, path map[string]bool) (Type, error) {
 	panic("unimplemented")
 }
 
@@ -70,22 +105,75 @@ func (n *MapType) Check(*symtab, int) (Expression, error) {
 	panic("unimplemented")
 }
 
-func (n *ArrayType) Check(*symtab, int) (Expression, error) {
+func (n *MapType) check(syms *symtab, iota int, path map[string]bool) (Type, error) {
 	panic("unimplemented")
 }
 
-func (n *SliceType) Check(*symtab, int) (Expression, error) {
-	panic("unimplemented")
+func (n *ArrayType) Check(syms *symtab, iota int) (Expression, error) {
+	return n.check(syms, iota, map[string]bool{})
+}
+
+var intType = &TypeName{
+	Identifier: Identifier{
+		Name: "int",
+		decl: univScope.Find("int"),
+	},
+}
+
+func (n *ArrayType) check(syms *symtab, iota int, path map[string]bool) (Type, error) {
+	var err error
+	n.Size, err = n.Size.Check(syms, iota)
+	if err != nil {
+		return nil, err
+	}
+	if !IsRepresentable(n.Size, intType) || Negative(n.Size) {
+		return nil, BadArraySize{n}
+	}
+	n.Element, err = n.Element.check(syms, iota, path)
+	if err != nil {
+		return nil, err
+	}
+	return n, nil
+}
+
+func (n *SliceType) Check(syms *symtab, iota int) (Expression, error) {
+	return n.check(syms, iota, map[string]bool{})
+}
+
+func (n *SliceType) check(syms *symtab, iota int, _ map[string]bool) (Type, error) {
+	var err error
+	n.Element, err = n.Element.check(syms, iota, map[string]bool{})
+	if err != nil {
+		return nil, err
+	}
+	return n, nil
 }
 
 func (n *Star) Check(*symtab, int) (Expression, error) {
 	panic("unimplemented")
 }
 
-func (n *TypeName) Check(syms *symtab, _ int) (Expression, error) {
+func (n *Star) check(syms *symtab, iota int, path map[string]bool) (Type, error) {
+	panic("unimplemented")
+}
+
+func (n *TypeName) Check(syms *symtab, iota int) (Expression, error) {
+	return n.check(syms, iota, map[string]bool{})
+
+}
+
+func (n *TypeName) check(syms *symtab, _ int, path map[string]bool) (Type, error) {
+	if path[n.Name] {
+		return nil, BadRecursiveType{n}
+	}
 	n.decl = syms.Find(n.Name)
 	if n.decl == nil {
 		return nil, Undeclared{&n.Identifier}
+	}
+	if ts, ok := n.decl.(*TypeSpec); ok {
+		if err := ts.check(path); err != nil {
+			return nil, err
+		}
 	}
 	if n.Package == nil {
 		return n, nil
@@ -389,3 +477,5 @@ func (n *NilLiteral) Check(*symtab, int) (Expression, error) {
 }
 
 func (n Untyped) Check(*symtab, int) (Expression, error) { return n, nil }
+
+func (n Untyped) check(*symtab, int, map[string]bool) (Type, error) { return n, nil }

@@ -221,6 +221,20 @@ func IsRepresentable(x Expression, t Type) bool {
 	return false
 }
 
+// Negative returns whether the expression is a constant numeric expression
+// with a negative real component.
+func Negative(x Expression) bool {
+	switch l := x.(type) {
+	case *IntegerLiteral:
+		return l.Value.Sign() < 0
+	case *FloatLiteral:
+		return l.Value.Sign() < 0
+	case *ComplexLiteral:
+		return l.Real.Sign() < 0
+	}
+	return false
+}
+
 // Identical returns whether the two types are identical.
 // Two struct types are identical if they have the same sequence of fields, and if corresponding fields have the same names, and identical types, and identical tags. Two anonymous fields are considered to have the same name. Lower-case field names from different packages are always different.
 func (t *StructType) Identical(other Type) bool {
