@@ -1975,6 +1975,10 @@ func TestParseFunctionDecl(t *testing.T) {
 				},
 			},
 		},
+		{
+			`func f() (a b string, ok bool)`,
+			parseError{"expected ,"},
+		},
 	}.run(t, func(p *Parser) Node { return parseTopLevelDecl(p) })
 }
 
