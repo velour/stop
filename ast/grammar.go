@@ -1620,8 +1620,20 @@ func parseCall(p *Parser, left Expression) Expression {
 	p.expect(token.OpenParen)
 	c := &Call{Function: left, openLoc: p.start()}
 	p.next()
+
 	if p.tok != token.CloseParen {
-		c.Arguments = parseExpressionList(p)
+		// Like parseExpressionList, but allows a trailing , before a ).
+		for {
+			c.Arguments = append(c.Arguments, parseExpr(p))
+			if p.tok != token.Comma {
+				break
+			}
+			p.next()
+			if p.tok == token.CloseParen {
+				break
+			}
+		}
+
 		if p.tok == token.DotDotDot {
 			c.DotDotDot = true
 			p.next()

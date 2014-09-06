@@ -2847,6 +2847,10 @@ func TestParseConversionExpr(t *testing.T) {
 		}, false, a)},
 		{`(chan <- a)(b)`, call(&ChannelType{Send: true, Element: typ("a")}, false, b)},
 		{`chan <- a(b)`, call(&ChannelType{Send: true, Element: typ("a")}, false, b)},
+
+		// Trailing comma is OK.
+		{`int(a,)`, call(id("int"), false, a)},
+		{`f(a, b,)`, call(id("f"), false, a, b)},
 	}.run(t, func(p *Parser) Node { return parseExpr(p) })
 }
 
