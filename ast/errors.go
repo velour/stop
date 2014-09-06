@@ -204,3 +204,15 @@ type BadMapKey struct {
 func (e BadMapKey) Error() string {
 	return fmt.Sprintf("%s: map key type does not support ==", e.Type.Loc())
 }
+
+// A BadConversion is an error returned when a constant experssion cannot
+// be converted to the given type.
+type BadConversion struct {
+	Expression
+	Type
+}
+
+func (e BadConversion) Error() string {
+	return fmt.Sprintf("%s: cannot convert %s to type %s", e.Expression.Loc(),
+		e.Expression.Source(), e.Type.Source())
+}

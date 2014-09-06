@@ -72,6 +72,66 @@ func IsBool(t Type) bool {
 
 }
 
+// IsString returns whether the type is a string type.
+func IsString(t Type) bool {
+	switch u := t.Underlying().(type) {
+	case Untyped:
+		return u == Untyped(StringConst)
+	case *TypeName:
+		return u.decl == String
+	}
+	return false
+
+}
+
+// ConstConvert returns a constant expression converted to the given type or an error.
+// The first argument must be a constant operand. Specifically, it must implement the
+// SetTyper interface. The second argument must not be Untyped.
+//
+//	A constant value x can be converted to type T in any of these cases:
+//	x is representable by a value of type T.
+//	x is a floating-point constant, T is a floating-point type, and x is representable by a value of type T after rounding using IEEE 754 round-to-even rules. The constant T(x) is the rounded value.
+//	x is an integer constant and T is a string type. The same rule as for non-constant x applies in this case.
+func ConstConvert(c Expression, t Type) (Expression, error) {
+	if _, ok := t.(Untyped); ok {
+		panic("untyped type in constant conversion")
+	}
+
+	if IsRepresentable(c, t) {
+		return c.(withTyper).WithType(t), nil
+	}
+
+	switch x := c.(type) {
+	case *FloatLiteral:
+		tn, ok := t.Underlying().(*TypeName)
+		if !ok {
+			break
+		}
+		// BUG(eaburns): is this the correct rounding?
+		switch tn.decl {
+		case Float64:
+			fl, _ := x.Value.Float64()
+			x.Value.SetFloat64(fl)
+			return x, nil
+		case Float32:
+			fl, _ := x.Value.Float64()
+			x.Value.SetFloat64(float64(float32(fl)))
+			return x, nil
+		}
+
+	case *IntegerLiteral:
+		if IsString(t) {
+			return &StringLiteral{
+				Value: string(x.Value.Int64()),
+				typ:   t,
+				span:  x.span,
+			}, nil
+		}
+	}
+
+	return nil, BadConversion{c, t}
+}
+
 // IsAssignable returns whether an expression is assignable to a variable of a given type.
 //	A value x is assignable to a variable of type T ("x is assignable to T") in any of these cases:
 //	x's type is identical to T.
