@@ -241,6 +241,10 @@ func TestCheckErrors(t *testing.T) {
 			[]reflect.Type{reflect.TypeOf(Unrepresentable{})},
 		},
 		{
+			[]string{`package a; const i string = 3`},
+			[]reflect.Type{reflect.TypeOf(Unrepresentable{})},
+		},
+		{
 			[]string{`package a; const a uint8 = 0; const b int8 = a`},
 			[]reflect.Type{reflect.TypeOf(BadAssign{})},
 		},
