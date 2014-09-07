@@ -448,15 +448,56 @@ func (n *Identifier) Type() Type {
 	}
 }
 
-func (n *IntegerLiteral) Type() Type     { return n.typ }
-func (n *IntegerLiteral) SetType(t Type) { n.typ = t }
-func (n *FloatLiteral) Type() Type       { return n.typ }
-func (n *FloatLiteral) SetType(t Type)   { n.typ = t }
-func (n *ComplexLiteral) Type() Type     { return n.typ }
-func (n *ComplexLiteral) SetType(t Type) { n.typ = t }
-func (n *StringLiteral) Type() Type      { return n.typ }
-func (n *StringLiteral) SetType(t Type)  { n.typ = t }
-func (n *BoolLiteral) Type() Type        { return n.typ }
-func (n *BoolLiteral) SetType(t Type)    { n.typ = t }
-func (n *NilLiteral) Type() Type         { return n.typ }
-func (n *NilLiteral) SetType(t Type)     { n.typ = t }
+// A withTyper implements the WithType method, which returns a copy of the
+// receiver with its type set to the specified type.
+type withTyper interface {
+	WithType(t Type) Expression
+}
+
+func (n *IntegerLiteral) Type() Type { return n.typ }
+
+func (n *IntegerLiteral) WithType(t Type) Expression {
+	cpy := *n
+	cpy.typ = t
+	return &cpy
+}
+
+func (n *FloatLiteral) Type() Type { return n.typ }
+
+func (n *FloatLiteral) WithType(t Type) Expression {
+	cpy := *n
+	cpy.typ = t
+	return &cpy
+}
+
+func (n *ComplexLiteral) Type() Type { return n.typ }
+
+func (n *ComplexLiteral) WithType(t Type) Expression {
+	cpy := *n
+	cpy.typ = t
+	return &cpy
+}
+
+func (n *StringLiteral) Type() Type { return n.typ }
+
+func (n *StringLiteral) WithType(t Type) Expression {
+	cpy := *n
+	cpy.typ = t
+	return &cpy
+}
+
+func (n *BoolLiteral) Type() Type { return n.typ }
+
+func (n *BoolLiteral) WithType(t Type) Expression {
+	cpy := *n
+	cpy.typ = t
+	return &cpy
+}
+
+func (n *NilLiteral) Type() Type { return n.typ }
+
+func (n *NilLiteral) WithType(t Type) Expression {
+	cpy := *n
+	cpy.typ = t
+	return &cpy
+}

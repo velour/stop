@@ -442,10 +442,8 @@ func (n *constSpecView) Check() (v Expression, err error) {
 		n.Type = v.Type()
 	}
 	if n.Type != nil {
-		// All Literals, which this must be after folding, have a SetType method.
-		v.(interface {
-			SetType(Type)
-		}).SetType(n.Type)
+		// Must be a literal and all Literals are withTypers.
+		v = v.(withTyper).WithType(n.Type)
 	}
 	return v, nil
 }
