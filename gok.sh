@@ -34,3 +34,5 @@ golint . \
 	| grep -v 'Untyped.Identical'\
 	| grep -v 'Source should have comment'\
 	| grep -v 'Check should have comment'\
+
+exit 0
